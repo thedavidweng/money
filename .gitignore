@@ -1,0 +1,27 @@
+.DS_Store
+
+# Local environment and secrets.
+.env
+.env.*
+!.env.example
+
+# Local runtime data and encrypted databases.
+data/
+tmp/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Build and test outputs.
+bin/
+dist/
+coverage.out
+*.test
+
+# Local scratch assets. The CLI backend does not currently ship web assets.
+public/
+
+# Local-only donor repositories. Keep them out of git; this project is a clean rewrite.
+donors/

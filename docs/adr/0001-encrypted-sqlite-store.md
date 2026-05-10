@@ -1,0 +1,3 @@
+# Use app-managed encrypted SQLite for the local store
+
+`money` stores financial accounts, transactions, sync state, and provider credentials locally, so the SQLite database must be encrypted at rest from the first provider-backed version. The encryption behavior is app-managed local encryption inspired by Ray Finance's BYOK path, not a zero-knowledge master-password vault and not managed SaaS. The concrete Go implementation should use the best fit for `money`'s single-binary architecture and current security best practices rather than copying Ray's `libsql` details. Commands that need the store must fail explicitly when the configured local database key is missing or invalid; real financial data must not silently fall back to plaintext SQLite.
