@@ -45,14 +45,15 @@ type Institution struct {
 }
 
 type ProviderItem struct {
-	ID                     string `json:"id"`
-	Provider               string `json:"provider"`
-	InstitutionID          string `json:"institution_id"`
-	ProviderExternalItemID string `json:"provider_external_item_id"`
-	EncryptedAccessToken   []byte `json:"-"`
-	TransactionCursor      string `json:"transaction_cursor,omitempty"`
-	ExternalUserID         string `json:"external_user_id,omitempty"`
-	Status                 string `json:"status"`
+	ID                     string   `json:"id"`
+	Provider               string   `json:"provider"`
+	InstitutionID          string   `json:"institution_id"`
+	ProviderExternalItemID string   `json:"provider_external_item_id"`
+	EncryptedAccessToken   []byte   `json:"-"`
+	TransactionCursor      string   `json:"transaction_cursor,omitempty"`
+	ExternalUserID         string   `json:"external_user_id,omitempty"`
+	Status                 string   `json:"status"`
+	Products               []string `json:"products"`
 }
 
 type FinancialAccount struct {
@@ -112,14 +113,36 @@ type LinkRequest struct {
 }
 
 type LinkSession struct {
-	Provider string `json:"provider"`
-	URL      string `json:"url"`
-	State    string `json:"state"`
+	Provider                string   `json:"provider"`
+	URL                     string   `json:"url,omitempty"`
+	LinkToken               string   `json:"link_token,omitempty"`
+	State                   string   `json:"state"`
+	ProviderAccessToken     string   `json:"-"`
+	ExistingProviderItemIDs []string `json:"-"`
 }
 
 type LinkCallback struct {
 	PublicToken string
 	State       string
+	Metadata    LinkMetadata
+}
+
+type LinkMetadata struct {
+	Institution LinkInstitutionMetadata `json:"institution"`
+	Accounts    []LinkAccountMetadata   `json:"accounts"`
+}
+
+type LinkInstitutionMetadata struct {
+	ID   string `json:"institution_id"`
+	Name string `json:"name"`
+}
+
+type LinkAccountMetadata struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Mask    string `json:"mask"`
+	Type    string `json:"type"`
+	Subtype string `json:"subtype"`
 }
 
 type LinkedItem struct {
@@ -128,9 +151,16 @@ type LinkedItem struct {
 }
 
 type SyncRun struct {
-	ProviderItemID string
-	StartedAt      string
-	FinishedAt     string
-	Status         string
-	ErrorCode      string
+	Provider             string
+	ProviderItemID       string
+	StartedAt            string
+	FinishedAt           string
+	Status               string
+	AccountsSeen         int
+	TransactionsAdded    int
+	TransactionsModified int
+	TransactionsRemoved  int
+	RecurringStreamsSeen int
+	ErrorCode            string
+	ErrorMessage         string
 }
