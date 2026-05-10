@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 
 	"github.com/thedavidweng/money/internal/config"
@@ -21,6 +22,12 @@ import (
 	"github.com/thedavidweng/money/internal/providers"
 	"github.com/thedavidweng/money/internal/store"
 	"github.com/thedavidweng/money/internal/syncer"
+)
+
+// Set via -ldflags at build time.
+var (
+	Version = "dev"
+	Commit  = "dev"
 )
 
 type runtimeState struct {
@@ -82,12 +89,18 @@ func newRootCommand(ctx context.Context, state *runtimeState, stdout io.Writer, 
 		Use:   "version",
 		Short: "Print version",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			env := contracts.NewSuccess("version", map[string]string{"version": "0.0.0"})
-			env.Meta.Demo = state.demo
-			return contracts.WriteJSON(stdout, env)
+			if state.json {
+				env := contracts.NewSuccess("version", map[string]string{"version": Version, "commit": Commit})
+				env.Meta.Demo = state.demo
+				return contracts.WriteJSON(stdout, env)
+			}
+			fmt.Fprintf(stdout, "money %s (commit %s)\n", Version, Commit)
+			return nil
 		},
 	})
 
+	root.AddCommand(newSetupCommand(ctx, state, stdout))
+	root.AddCommand(newDoctorCommand(ctx, state, stdout))
 	root.AddCommand(newDemoCommand(ctx, state, stdout, stderr))
 	root.AddCommand(newAccountsCommand(ctx, state, stdout))
 	root.AddCommand(newTransactionsCommand(ctx, state, stdout))
@@ -176,9 +189,14 @@ func newAccountsCommand(ctx context.Context, state *runtimeState, stdout io.Writ
 				return err
 			}
 			if !state.json {
-				for _, account := range accounts {
-					fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\n", account.DisplayName, account.Type, account.CurrentBalance, account.Currency)
+				table := tablewriter.NewWriter(stdout)
+				table.SetHeader([]string{"NAME", "TYPE", "BALANCE", "CURRENCY", "SOURCE"})
+				table.SetBorder(false)
+				table.SetAutoWrapText(false)
+				for _, a := range accounts {
+					table.Append([]string{a.DisplayName, a.Type, a.CurrentBalance, a.Currency, a.Source.Kind})
 				}
+				table.Render()
 				return nil
 			}
 			env := contracts.NewSuccess("accounts.list", map[string]any{"accounts": accounts})
@@ -453,6 +471,7 @@ func newProvidersCommand(ctx context.Context, state *runtimeState, stdout io.Wri
 	cmd := &cobra.Command{Use: "providers"}
 	cmd.AddCommand(newProviderLinkCommand(ctx, state, "plaid", stdout))
 	cmd.AddCommand(newProviderLinkCommand(ctx, state, "bridge", stdout))
+	cmd.AddCommand(newConfigureCommand(state, stdout))
 	return cmd
 }
 
@@ -809,23 +828,37 @@ func writeManualPlan(stdout io.Writer, state *runtimeState, plan manualAccountPl
 	return nil
 }
 
-func writeTransactions(stdout io.Writer, state *runtimeState, command string, transactions []core.Transaction) error {
-	if !state.json {
-		for _, tx := range transactions {
-			fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\n", tx.Date, tx.MerchantName, tx.Amount, tx.CategorySource)
-		}
-		return nil
-	}
-	env := contracts.NewSuccess(command, map[string]any{"transactions": transactions})
-	env.Meta.Demo = state.demo
-	return contracts.WriteJSON(stdout, env)
-}
-
 func writeTransactionsPage(stdout io.Writer, state *runtimeState, command string, transactions []core.Transaction, limit int, offset int) error {
 	if !state.json {
+		table := tablewriter.NewWriter(stdout)
+		table.SetHeader([]string{"DATE", "MERCHANT", "AMOUNT", "CATEGORY", "STATUS"})
+		table.SetBorder(false)
+		table.SetAutoWrapText(false)
 		for _, tx := range transactions {
-			fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\n", tx.Date, tx.MerchantName, tx.Amount, tx.CategorySource)
+			cat := ""
+			if tx.CategoryName != nil {
+				cat = *tx.CategoryName
+			}
+			status := ""
+			if tx.Pending {
+				status = "pending"
+			}
+			if tx.NeedsReview {
+				if status != "" {
+					status += ","
+				}
+				status += "review"
+			}
+			if tx.Removed {
+				status = "removed"
+			}
+			merchant := tx.MerchantName
+			if merchant == "" {
+				merchant = tx.Name
+			}
+			table.Append([]string{tx.Date, merchant, tx.Amount, cat, status})
 		}
+		table.Render()
 		return nil
 	}
 	env := contracts.NewSuccess(command, map[string]any{"transactions": transactions})

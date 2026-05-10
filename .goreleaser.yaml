@@ -1,0 +1,27 @@
+version: 2
+
+builds:
+  - main: ./cmd/money
+    binary: money
+    ldflags:
+      - -s -w
+      - -X github.com/thedavidweng/money/internal/cli.Version={{.Version}}
+      - -X github.com/thedavidweng/money/internal/cli.Commit={{.ShortCommit}}
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - format: tar.gz
+    name_template: "money_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  github:
+    owner: thedavidweng
+    name: money

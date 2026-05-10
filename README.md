@@ -41,7 +41,13 @@ go install github.com/thedavidweng/money/cmd/money@latest
 # Try it without real credentials
 money demo accounts list --json
 
-# After creating ~/.money/config.yaml and ~/.money/.env
+# Initialize configuration and encrypted database
+money setup
+
+# Configure a provider
+money providers configure plaid --client-id ... --secret ... --environment sandbox
+
+# Link and sync
 money link
 money sync
 money accounts list --json
@@ -51,18 +57,22 @@ money transactions search "Costco" --json
 ## Commands
 
 ```text
-money accounts list          List financial accounts
-money accounts create-manual Create a local manual account
-money transactions list      List transactions with filters
-money transactions search    Search transactions by text
-money categories list        List transaction categories
-money tags list              List transaction tags
-money recurring list         List recurring transactions
-money link                   Link a financial institution
-money providers plaid link   Link a Plaid Provider Item
-money providers bridge link  Link a Bridge Provider Item
-money sync                   Sync linked provider data
-money demo <command>         Run against non-persistent sample data
+money setup                         Initialize configuration and encrypted database
+money doctor                        Check configuration and system health
+money accounts list                 List financial accounts
+money accounts create-manual        Create a local manual account
+money transactions list             List transactions with filters
+money transactions search           Search transactions by text
+money categories list               List transaction categories
+money tags list                     List transaction tags
+money recurring list                List recurring transactions
+money link                          Link a financial institution
+money providers configure <provider> Configure provider credentials
+money providers plaid link          Link a Plaid Provider Item
+money providers bridge link         Link a Bridge Provider Item
+money sync                          Sync linked provider data
+money demo <command>                Run against non-persistent sample data
+money version                       Print version
 ```
 
 Read commands and provisional sync diagnostics support `--json` for machine-readable output. Manual write operations require `--dry-run` or `--confirm`.

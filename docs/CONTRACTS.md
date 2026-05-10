@@ -111,11 +111,75 @@ Reconnect-required provider states are machine-readable through item status or c
 ## Examples
 
 ```bash
+money setup --json
+money doctor --json
+money version --json
+money providers configure plaid --client-id ... --secret ... --environment sandbox --json
 money demo accounts list --json
 money demo transactions list --json --merchant Coffee --pending true --limit 10
 money demo transactions search coffee --json --limit 5
 money sync --json
 money sync --provider plaid --provider-item pi_example --json
+```
+
+## Setup Command
+
+`setup --json` returns:
+
+```json
+{
+  "config_path": "~/.money/config.yaml",
+  "env_path": "~/.money/.env",
+  "database_path": "~/.money/data/money.db",
+  "secret_created": true,
+  "db_created": true,
+  "diagnostics": []
+}
+```
+
+## Doctor Command
+
+`doctor --json` returns:
+
+```json
+{
+  "diagnostics": [
+    {
+      "section": "Config",
+      "code": "CONFIG_OK",
+      "status": "ok",
+      "message": "Config loaded from ~/.money/config.yaml",
+      "category": "config"
+    }
+  ]
+}
+```
+
+Diagnostic status values: `ok`, `warn`, `error`. Sections: `Config`, `Store`, `Providers`, `Links`, `Sync`, `Warnings`.
+
+## Version Command
+
+Default output is plain text: `money 0.1.0 (commit abc1234)`.
+
+`version --json` returns:
+
+```json
+{
+  "version": "0.1.0",
+  "commit": "abc1234"
+}
+```
+
+## Providers Configure Command
+
+`providers configure plaid --json` returns:
+
+```json
+{
+  "provider": "plaid",
+  "keys_written": 2,
+  "diagnostics": []
+}
 ```
 
 ## Monarch Compatibility Notes
