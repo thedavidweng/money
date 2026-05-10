@@ -1,8 +1,90 @@
 package core
 
+import (
+	"crypto/rand"
+	"encoding/base32"
+	"fmt"
+	"strconv"
+	"strings"
+)
+
 type Money struct {
 	MinorUnits int64  `json:"-"`
 	Currency   string `json:"currency"`
+}
+
+func FormatMinorUnits(minorUnits int64, currency string) string {
+	sign := ""
+	if minorUnits < 0 {
+		sign = "-"
+		minorUnits = -minorUnits
+	}
+	return fmt.Sprintf("%s%d.%02d", sign, minorUnits/100, minorUnits%100)
+}
+
+func ParseUnsignedDecimalMinorUnits(input string) (int64, error) {
+	normalized := strings.ReplaceAll(strings.TrimSpace(input), ",", "")
+	if normalized == "" {
+		return 0, fmt.Errorf("amount is required")
+	}
+	if strings.HasPrefix(normalized, "+") || strings.HasPrefix(normalized, "-") {
+		return 0, fmt.Errorf("amount must be unsigned")
+	}
+
+	whole, frac, hasFrac := strings.Cut(normalized, ".")
+	if whole == "" {
+		whole = "0"
+	}
+	if !onlyDigits(whole) {
+		return 0, fmt.Errorf("amount must contain only digits, thousands separators, and one decimal point")
+	}
+	if !hasFrac {
+		frac = "00"
+	}
+	if len(frac) > 2 || !onlyDigits(frac) {
+		return 0, fmt.Errorf("amount must use at most two decimal places")
+	}
+	for len(frac) < 2 {
+		frac += "0"
+	}
+	wholeUnits, err := strconv.ParseInt(whole, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("amount is too large")
+	}
+	fractionUnits, err := strconv.ParseInt(frac, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("amount is invalid")
+	}
+	return wholeUnits*100 + fractionUnits, nil
+}
+
+func SignedManualBalance(accountType string, unsignedMinorUnits int64) (int64, string, error) {
+	switch accountType {
+	case "credit", "loan", "other_liability":
+		return -unsignedMinorUnits, "decreases", nil
+	case "depository", "investment", "property", "vehicle", "other_asset":
+		return unsignedMinorUnits, "increases", nil
+	default:
+		return 0, "", fmt.Errorf("unsupported manual account type %q", accountType)
+	}
+}
+
+func NewLocalID(prefix string) (string, error) {
+	var raw [16]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		return "", err
+	}
+	suffix := strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(raw[:]))
+	return prefix + suffix, nil
+}
+
+func onlyDigits(value string) bool {
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 type Source struct {
