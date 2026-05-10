@@ -5,6 +5,9 @@
 .env.*
 !.env.example
 
+# Cursor MCP with local bearer tokens (do not commit).
+.cursor/mcp.json
+
 # Local runtime data and encrypted databases.
 data/
 tmp/
@@ -20,8 +23,6 @@ dist/
 coverage.out
 *.test
 
-# Local scratch assets. The CLI backend does not currently ship web assets.
-public/
 
 # Local-only donor repositories. Keep them out of git; this project is a clean rewrite.
 donors/
