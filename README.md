@@ -12,7 +12,7 @@
   <a href="https://github.com/thedavidweng/money/actions"><img src="https://img.shields.io/github/actions/workflow/status/thedavidweng/money/ci.yml?branch=main&style=flat-square" alt="CI"></a>
   <a href="https://github.com/thedavidweng/money/releases"><img src="https://img.shields.io/github/v/release/thedavidweng/money?style=flat-square" alt="Release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/thedavidweng/money?style=flat-square" alt="License"></a>
-  <img src="https://img.shields.io/badge/go-%3E%3D1.23-blue?style=flat-square" alt="Go">
+  <img src="https://img.shields.io/badge/go-%3E%3D1.25-blue?style=flat-square" alt="Go">
 </p>
 
 ---
@@ -38,13 +38,10 @@ Existing personal finance tools either lock data behind a paid SaaS, embed opini
 # Install
 go install github.com/thedavidweng/money/cmd/money@latest
 
-# Interactive setup — creates config, encryption key, and database
-money setup
-
 # Try it without real credentials
 money demo accounts list --json
 
-# After configuring a provider
+# After creating ~/.money/config.yaml and ~/.money/.env
 money link
 money sync
 money accounts list --json
@@ -62,13 +59,13 @@ money categories list        List transaction categories
 money tags list              List transaction tags
 money recurring list         List recurring transactions
 money link                   Link a financial institution
+money providers plaid link   Link a Plaid Provider Item
+money providers bridge link  Link a Bridge Provider Item
 money sync                   Sync linked provider data
 money demo <command>         Run against non-persistent sample data
-money doctor                 Check configuration health
-money setup                  Guided first-time configuration
 ```
 
-All commands support `--json` for machine-readable output. Write operations require `--dry-run` or `--confirm`.
+Read commands and provisional sync diagnostics support `--json` for machine-readable output. Manual write operations require `--dry-run` or `--confirm`.
 
 ## Architecture
 
@@ -98,6 +95,7 @@ Read commands use local data only. Sync is the explicit boundary where outbound 
 |----------|---------|
 | [`docs/PRD.md`](docs/PRD.md) | Product requirements |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Module boundaries and data flow |
+| [`docs/CONTRACTS.md`](docs/CONTRACTS.md) | Current CLI JSON contracts |
 | [`docs/SCHEMA.md`](docs/SCHEMA.md) | Database schema contract |
 | [`docs/CONFIG.md`](docs/CONFIG.md) | Configuration loading rules |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Development phases |

@@ -472,17 +472,17 @@ Goal: stable local read contracts against encrypted SQLite without any live Prov
 
 Steps:
 
-1. Add `internal/config`.
-2. Add encrypted SQLite dependency.
-3. Implement store open/close and migrations.
-4. Create minimal tables: institutions, provider_items, accounts, transactions, transaction_tags, categories, tags, recurring, sync_runs.
-5. Support manual accounts with nullable Provider Item provenance and local source metadata.
-6. Support a non-persistent demo store seeded with small, inspectable synthetic data for local testing and trial use without Provider credentials.
-7. Implement store methods for listing accounts, creating manual accounts, listing/searching transactions, listing categories, listing tags, and listing recurring items against both real and demo stores.
-8. Add fixture seed helpers for tests.
-9. Implement CLI skeleton for `accounts list`, `accounts create-manual`, `demo <command...>`, `transactions list`, `transactions search`, `tx` aliases, `categories list`, `tags list`, and `recurring list`.
-10. Add JSON contract tests for all first-milestone read commands, manual account dry-run/confirm behavior, and demo isolation/reset behavior.
-11. Run `go test ./...`.
+- [x] 1. Add `internal/config`.
+- [x] 2. Add encrypted SQLite dependency.
+- [x] 3. Implement store open/close and migrations.
+- [x] 4. Create minimal tables: institutions, provider_items, accounts, transactions, transaction_tags, categories, tags, recurring, sync_runs.
+- [x] 5. Support manual accounts with nullable Provider Item provenance and local source metadata.
+- [x] 6. Support a non-persistent demo store seeded with small, inspectable synthetic data for local testing and trial use without Provider credentials.
+- [x] 7. Implement store methods for listing accounts, creating manual accounts, listing/searching transactions, listing categories, listing tags, and listing recurring items against both real and demo stores.
+- [x] 8. Add fixture seed helpers for tests.
+- [x] 9. Implement CLI skeleton for `accounts list`, `accounts create-manual`, `demo <command...>`, `transactions list`, `transactions search`, `tx` aliases, `categories list`, `tags list`, and `recurring list`.
+- [x] 10. Add JSON contract tests for all first-milestone read commands, manual account dry-run/confirm behavior, and demo isolation/reset behavior.
+- [x] 11. Run `go test ./...`.
 
 Acceptance:
 
@@ -546,16 +546,16 @@ Goal: prepare Plaid and Bridge as replaceable Provider adapters.
 
 Steps:
 
-1. Add official Go Plaid SDK.
-2. Add Bridge HTTP client implementation.
-3. Add Plaid config fields with `PLAID_` environment variable names.
-4. Add Bridge config fields with `BRIDGE_` environment variable names.
-5. Add provider registry with Plaid and Bridge adapters.
-6. Define canonical provider records for Institution, ProviderItem, FinancialAccount, Transaction, and SyncResult.
-7. Write fixture-based mapper tests before any live Provider calls, including canonical amount sign normalization and liability balance normalization.
-8. Implement Plaid client construction without managed proxy behavior.
-9. Implement Bridge client construction without managed proxy behavior.
-10. Implement provider error classification.
+- [x] 1. Add official Go Plaid SDK.
+- [x] 2. Add Bridge HTTP client implementation.
+- [x] 3. Add Plaid config fields with `PLAID_` environment variable names.
+- [x] 4. Add Bridge config fields with `BRIDGE_` environment variable names.
+- [x] 5. Add provider registry with Plaid and Bridge adapters.
+- [x] 6. Define canonical provider records for Institution, ProviderItem, FinancialAccount, Transaction, and SyncResult.
+- [x] 7. Write fixture-based mapper tests before any live Provider calls, including canonical amount sign normalization and liability balance normalization.
+- [x] 8. Implement Plaid client construction without managed proxy behavior.
+- [x] 9. Implement Bridge client construction without managed proxy behavior.
+- [x] 10. Implement provider error classification.
 
 Acceptance:
 
@@ -573,22 +573,22 @@ Goal: allow the user to create a Plaid item and store its access token inside th
 
 Steps:
 
-1. Implement `money link` for institution-first linking through Plaid when Plaid is the selected Provider.
-2. Implement `money providers plaid link` for explicit Plaid linking.
-3. Separate Provider support from Provider availability: list all Providers known to support the selected institution, mark locally unavailable Providers as missing credentials, and block selecting unavailable Providers with generated configure guidance.
-4. Determine Provider availability from local config/env required fields, following Ray's configured-state pattern but using `money`'s explicit `env:` model.
-5. Use Plaid `/institutions/search` with configured products and country codes for Plaid institution discovery.
-6. Use a short-lived localhost Link page and callback server only for Plaid Link.
-7. Create Plaid Link token with explicit products and country codes.
-8. Serve a local page that loads Plaid Link with the link token and posts `public_token`, selected institution/account metadata, and random state back to the localhost helper on success.
-9. Exchange public token for access token.
-10. Store access token only after the encrypted store is open.
-11. Store provider item, institution metadata, products, and initial cursor state.
-12. Use random state/nonce values, timeout callback sessions, bind only for the active link flow, and shut down the helper after completion.
-13. Follow GitHub CLI browser ergonomics in human mode: print the local Link URL, wait for Enter, then open the browser.
-14. Support `--no-open` to print the URL without opening a browser for SSH, cron, and headless environments.
-15. Do not automatically run the first sync after link; print help-derived guidance for running `money sync`.
-16. Add tests for encrypted-store requirements and link exchange logic using fakes.
+- [x] 1. Implement `money link` for institution-first linking through Plaid when Plaid is the selected Provider.
+- [x] 2. Implement `money providers plaid link` for explicit Plaid linking.
+- [x] 3. Separate Provider support from Provider availability: list all Providers known to support the selected institution, mark locally unavailable Providers as missing credentials, and block selecting unavailable Providers with generated configure guidance.
+- [x] 4. Determine Provider availability from local config/env required fields, following Ray's configured-state pattern but using `money`'s explicit `env:` model.
+- [x] 5. Use Plaid `/institutions/search` with configured products and country codes for Plaid institution discovery.
+- [x] 6. Use a short-lived localhost Link page and callback server only for Plaid Link.
+- [x] 7. Create Plaid Link token with explicit products and country codes.
+- [x] 8. Serve a local page that loads Plaid Link with the link token and posts `public_token`, selected institution/account metadata, and random state back to the localhost helper on success.
+- [x] 9. Exchange public token for access token.
+- [x] 10. Store access token only after the encrypted store is open.
+- [x] 11. Store provider item, institution metadata, products, and initial cursor state.
+- [x] 12. Use random state/nonce values, timeout callback sessions, bind only for the active link flow, and shut down the helper after completion.
+- [x] 13. Follow GitHub CLI browser ergonomics in human mode: print the local Link URL, wait for Enter, then open the browser.
+- [x] 14. Support `--no-open` to print the URL without opening a browser for SSH, cron, and headless environments.
+- [x] 15. Do not automatically run the first sync after link; print help-derived guidance for running `money sync`.
+- [x] 16. Add tests for encrypted-store requirements and link exchange logic using fakes.
 
 Acceptance:
 
@@ -608,17 +608,17 @@ Goal: allow the user to create or reconnect Bridge items.
 
 Steps:
 
-1. Extend `money link` to choose Bridge when Bridge supports the selected Institution.
-2. Implement `money providers bridge link` for explicit Bridge linking.
-3. Use the same supported-versus-available Provider selection rules as Plaid.
-4. Create or reuse a Bridge external user ID.
-5. Create a Bridge connect session.
-6. Print the connect session URL, wait for Enter, then open the browser unless `--no-open` is set.
-7. Poll Bridge items until a new or reconnected item is available.
-8. Store provider item, institution metadata, status, and cursor state in the encrypted store.
-9. Do not automatically run the first sync after link; print help-derived guidance for running `money sync`.
-10. Add tests for Bridge connect/session/state logic using fakes.
-11. If Bridge institution discovery cannot be implemented cleanly in the first adapter, keep `money providers bridge link` working and defer institution-first Bridge selection rather than inventing unsupported discovery.
+- [x] 1. Defer Bridge institution-first selection until Bridge institution discovery is implemented cleanly; explicit `money providers bridge link` remains supported.
+- [x] 2. Implement `money providers bridge link` for explicit Bridge linking.
+- [x] 3. Use the same supported-versus-available Provider selection rules as Plaid.
+- [x] 4. Create or reuse a Bridge external user ID.
+- [x] 5. Create a Bridge connect session.
+- [x] 6. Print the connect session URL, wait for Enter, then open the browser unless `--no-open` is set.
+- [x] 7. Poll Bridge items until a new or reconnected item is available.
+- [x] 8. Store provider item, institution metadata, status, and cursor state in the encrypted store.
+- [x] 9. Do not automatically run the first sync after link; print help-derived guidance for running `money sync`.
+- [x] 10. Add tests for Bridge connect/session/state logic using fakes.
+- [x] 11. If Bridge institution discovery cannot be implemented cleanly in the first adapter, keep `money providers bridge link` working and defer institution-first Bridge selection rather than inventing unsupported discovery.
 
 Acceptance:
 
@@ -633,17 +633,17 @@ Goal: sync Plaid and Bridge accounts and transactions into canonical encrypted S
 
 Steps:
 
-1. Implement `money sync`.
-2. Load linked provider items from the store.
-3. Load provider access tokens from the encrypted store per item.
-4. Sync accounts first.
-5. Sync transactions using Plaid Transactions Sync cursors.
-6. Sync Bridge transactions using Bridge updated-at cursor/state.
-7. Upsert provider transactions by Provider Item plus provider-native transaction ID.
-8. Handle added, modified, and removed transactions.
-9. Store next cursor only after successful transaction processing.
-10. Record a sync run with counts and status.
-11. Add fixture-backed sync tests with fake Plaid client.
+- [x] 1. Implement `money sync`.
+- [x] 2. Load linked provider items from the store.
+- [x] 3. Load provider access tokens from the encrypted store per item.
+- [x] 4. Sync accounts first.
+- [x] 5. Sync transactions using Plaid Transactions Sync cursors.
+- [x] 6. Sync Bridge transactions using Bridge updated-at cursor/state.
+- [x] 7. Upsert provider transactions by Provider Item plus provider-native transaction ID.
+- [x] 8. Handle added, modified, and removed transactions.
+- [x] 9. Store next cursor only after successful transaction processing.
+- [x] 10. Record a sync run with counts and status.
+- [x] 11. Add fixture-backed sync tests with fake Plaid client.
 
 Acceptance:
 
@@ -668,15 +668,15 @@ Goal: make the first-milestone read Command Contracts reliable enough for extern
 
 Steps:
 
-1. Document `accounts.list`, `transactions.list`, `transactions.search`, `categories.list`, `tags.list`, and `recurring.list` schemas.
-2. Add pagination metadata.
-3. Add stable error codes.
-4. Add deterministic ordering:
+- [x] 1. Document `accounts.list`, `transactions.list`, `transactions.search`, `categories.list`, `tags.list`, and `recurring.list` schemas.
+- [x] 2. Add pagination metadata.
+- [x] 3. Add stable error codes.
+- [x] 4. Add deterministic ordering:
    - Accounts: hidden flag, type, name, id.
    - Transactions: date descending, pending status, id.
-5. Add filters for account, category, merchant, tag, date range, needs-review, pending, recurring status, and limit.
-6. Add command examples.
-7. Add compatibility notes for Monarch migration.
+- [x] 5. Add filters for account, category, merchant, tag, date range, needs-review, pending, recurring status, and limit.
+- [x] 6. Add command examples.
+- [x] 7. Add compatibility notes for Monarch migration.
 
 ### Phase 6: Sync Contract Hardening
 
@@ -684,13 +684,13 @@ Goal: promote sync JSON from provisional to stable after real Provider behavior 
 
 Steps:
 
-1. Document sync summary schema.
-2. Define provider error taxonomy.
-3. Define reconnect-required behavior.
-4. Define removed transaction policy as soft delete plus explicit confirmed cleanup.
-5. Define partial failure semantics and exit codes.
-6. Add fixture tests for Plaid and Bridge partial failures.
-7. Add command examples for cron usage.
+- [x] 1. Document sync summary schema.
+- [x] 2. Define provider error taxonomy.
+- [x] 3. Define reconnect-required behavior.
+- [x] 4. Define removed transaction policy as soft delete plus explicit confirmed cleanup.
+- [x] 5. Define partial failure semantics and exit codes.
+- [x] 6. Add fixture tests for Plaid and Bridge partial failures.
+- [x] 7. Add command examples for cron usage.
 
 Acceptance:
 
@@ -710,17 +710,18 @@ Acceptance:
 
 Goal: prove the Provider seam is real with a second adapter.
 
-Choose one:
+Selected path:
 
-- Monarch import from `monarchmoney-cli --json`.
-- CSV import.
-- MX or Finicity provider adapter.
+- [x] Bridge provider adapter as the second live Provider adapter alongside Plaid.
+- [x] Monarch import from `monarchmoney-cli --json` deferred.
+- [x] CSV import deferred.
+- [x] MX or Finicity provider adapter deferred.
 
 Acceptance:
 
-- A second adapter can write the same canonical tables.
-- Existing account and transaction contracts do not change.
-- Source/provider-specific fields remain namespaced or internal.
+- [x] A second adapter can write the same canonical tables.
+- [x] Existing account and transaction contracts do not change.
+- [x] Source/provider-specific fields remain namespaced or internal.
 
 ## Initial Schema Direction
 

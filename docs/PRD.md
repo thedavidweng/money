@@ -22,6 +22,8 @@ The first stable command contracts are:
 6. `money recurring list --json`
 7. `money accounts create-manual --json`
 
+The concrete JSON schema notes, examples, sync result shape, and error taxonomy are maintained in `docs/CONTRACTS.md`.
+
 After these contracts are proven, the project can add budgets, spending summaries, cashflow, rules, annotation write operations, more providers, and imports. Provider sync, demo mode, and manual account creation are first-version capabilities; Monarch/CSV/Apple Card imports are migration work and do not block the first stable read contracts.
 
 ## User Stories
