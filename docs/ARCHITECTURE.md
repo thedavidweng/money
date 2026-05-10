@@ -87,6 +87,10 @@ If a configured DB file already exists but cannot be opened, commands must repor
 
 The concrete encrypted SQLite implementation is an engineering decision. Select the approach through a short spike using these criteria: single-binary feasibility on the target platforms, active maintenance, predictable Go driver behavior, compatibility with SQLite migrations and in-memory demo tests, no plaintext fallback, and clear handling of key material. If no mature single-binary encrypted SQLite option satisfies those constraints, document the trade-off before accepting an external native dependency.
 
+The first implementation uses `github.com/ncruces/go-sqlite3` with its `database/sql` driver and the `github.com/ncruces/go-sqlite3/vfs/adiantum` encrypted VFS. This is the selected MVP path because it is cgo-free, supports app-managed 32-byte key material, keeps the CLI close to a single-binary distribution, works with normal SQLite migrations, and supports the in-memory demo path through the same SQLite implementation. Open encrypted databases with the encrypted VFS and set the key immediately after opening the connection using a PRAGMA rather than putting the key in the URI. Set `PRAGMA temp_store = memory` for encrypted real stores so temporary files do not become an accidental plaintext surface.
+
+This choice provides encryption at rest, not tamper-proof database authentication. The first version treats local tamper detection and signed backups as later hardening work, not a reason to add a custom encryption layer or ship plaintext fallback behavior. If the encrypted VFS fails the implementation spike on the target platforms, the next option is a SQLCipher-backed driver with the native dependency documented explicitly before adoption; do not replace whole-database encryption with ad hoc field encryption.
+
 ## Provider Boundary
 
 Provider support is BYOK-only. `money` talks directly to user-configured financial Providers such as Plaid and Bridge first, with MX and Finicity later. Providers are peers: users link an institution first, then choose a Provider when more than one Provider supports that institution. `money` must not depend on a managed provider proxy, hosted billing, subscription account, or AI API key.
@@ -129,11 +133,13 @@ Demo mode does not require the real database encryption key, does not open the r
 
 Demo data is a small deterministic mock database bundled into the program. Keep it simple enough to inspect by eye, but include at least a few examples for each first-version feature: multiple account types, provider/manual/import provenance, categories, tags, notes, recurring items, pending transactions, removed transactions, and review-state examples. It must not write to or depend on user configuration or the user's real database.
 
-Demo should reuse the main store, migrations, queries, commands, contracts, validation, and safety logic. Prefer in-memory SQLite loaded with bundled fixtures over a separate fake store. Demo-specific code should be limited to selecting the in-memory store, seeding deterministic data, marking output as demo, and preventing real Provider calls.
+Demo should reuse the main store, migrations, queries, commands, contracts, validation, and safety logic. Use in-memory SQLite loaded with bundled fixtures over a separate fake store. Demo-specific code should be limited to selecting the in-memory store, seeding deterministic data, marking output as demo, and preventing real Provider calls. Demo in-memory SQLite is not encrypted and must not accept a file path; this is allowed only because it never stores or opens real user data.
 
 `money doctor` checks the real environment. `money demo doctor --json` checks the demo runtime and returns `meta.demo: true`. Real doctor may report that demo mode is available, but demo readiness must not be treated as real configuration health.
 
 The canonical linking command is `money link`: it starts from an institution search/selection and then asks the user to choose among Providers that support that institution. Provider support and Provider availability are separate concepts. Support means the Provider can connect that institution according to Provider-owned institution discovery, registry metadata, or adapter capability. Availability means the local `money` configuration has the required credentials for that Provider. Ray Finance determines configured Providers from local config/env fields such as Plaid client ID plus secret or Bridge client ID plus client secret; `money` should use the same local configured-state idea, adapted to its explicit `env:` config model. The Provider selection UI should show all Providers known to support the selected institution, including unavailable Providers marked as missing credentials, then block selection of unavailable Providers with generated configure guidance. Provider-specific commands such as `money providers plaid link` and `money providers bridge link` remain available for scripts, tests, and debugging.
+
+Institution-first search is adapter-owned. Plaid uses `/institutions/search` with the configured products and country codes. A Provider that cannot support programmatic institution discovery in the current adapter is not invented into the institution-first result list; it remains reachable through its explicit provider command, such as `money providers bridge link`, with provider-specific prompts or flags. This keeps `money link` honest: every selectable provider/institution pairing must come from provider discovery, checked registry metadata, or an adapter capability that can actually link that institution.
 
 Linking does not automatically run the first sync. A successful link stores the Provider Item and tells the user how to run `money sync` using command-registry/help-derived text. This preserves the project rule that networked data fetching happens only after explicit user direction.
 
@@ -147,6 +153,8 @@ Read contracts show all unmerged Provider data. `accounts.list` and transaction 
 
 Configuration belongs to `money`, not donor projects. Users may configure `money` by editing `~/.money/config.yaml`, loading `~/.money/.env`, setting environment variables, or running setup commands. Config sources complete each other through explicit value references instead of silently overriding one another. Config resolution must use `MONEY_*` names for `money` settings and provider-owned names for provider credentials; it must not silently read `~/.ray`, `RAY_*`, Monarch, donor config paths, or cwd `.env` files.
 
+The concrete config loading contract is maintained in `docs/CONFIG.md`. Implementation and tests should treat that file as the source of truth for config path resolution, `env:` syntax, `.env` loading, database key decoding, and demo-mode config bypass behavior.
+
 The default config path is `~/.money/config.yaml`; the default env companion is `~/.money/.env`. Alternate config paths require explicit selection through `--config` or `MONEY_CONFIG`.
 
 When an alternate config path is selected, its default env companion is `.env` in the same directory as that config file. A config file may also explicitly set `env_file` to a specific secrets file. Relative `env_file` paths resolve relative to the config file's directory, never cwd. Cwd `.env` is never loaded implicitly.
@@ -158,6 +166,10 @@ Plaid defaults to the `transactions` product. Additional products such as `inves
 Bridge link creates or reuses a Bridge external user ID without creating a `money` user account. By default `money` generates and stores the external user ID in Provider Item state during link. Advanced commands may accept an existing external user ID for reconnect or migration cases.
 
 Provider link flows may use a short-lived localhost callback helper when required by the Provider, such as Plaid Link. This helper is not a required persistent server, local API, daemon, or background service. It should bind only for the active link session, use a random state value, shut down after completion or timeout, and fail explicitly when the callback cannot be started. Interactive link commands should follow GitHub CLI's browser flow: print the authorization URL and wait for the user to press Enter before opening the browser. If the user does not press Enter, nothing is opened and the printed URL remains usable for manual/headless handling. `--no-open` suppresses browser opening for SSH, cron, and headless environments while still printing the URL.
+
+Plaid Link in CLI mode is implemented as a short-lived local Link page, not as a raw Plaid redirect URL. The command creates a Plaid `link_token`, starts a localhost callback/page server, prints the local URL, waits for Enter, then opens that local URL unless `--no-open` is set. The page loads Plaid Link from Plaid's CDN with the `link_token`; on `onSuccess`, it posts the `public_token`, Plaid institution metadata, selected account metadata, and random state back to the localhost helper. The CLI validates state, exchanges the `public_token` for an access token, stores only the encrypted access token and mapped metadata, then shuts down the helper. The helper must not expose general API endpoints or serve real financial data.
+
+Bridge link uses the same browser ergonomics but does not pretend to be Plaid Link. The Bridge adapter creates a connect session, prints the connect URL, waits for Enter before opening unless `--no-open` is set, then polls or checks provider item state according to Bridge's API. If Bridge institution discovery is unavailable in the first adapter, `money link` omits Bridge from institution-first choices and `money providers bridge link` remains the supported path.
 
 Secret references use explicit `env:` objects so config loading has no magic environment lookup. Interactive setup and `money providers configure <provider>` must write secrets through `.env` plus YAML `env:` references, not direct YAML secret values. Secret entry prompts display mask characters such as `••••` instead of the raw value while the user types. Direct credential values in `config.yaml` are tolerated only when the user manually edits the file; config loading and doctor should emit a warning recommending `env:` for secrets.
 
@@ -187,6 +199,8 @@ The first `doctor --fix` scope is limited to local configuration repair: create 
 
 Generated database encryption keys must have at least 256 bits of cryptographic randomness. Setup and doctor fix should store the key as `MONEY_DB_ENCRYPTION_KEY`, preferably base64url without padding, and adapt it internally to the selected encrypted SQLite implementation. The key must not be derived from machine identifiers, must not use a weak default, and must not be printed in full in JSON output.
 
+Generated database encryption keys are exactly 32 random bytes encoded as base64url without padding. Config loading decodes the value back to exactly 32 bytes before opening the store. Any malformed value or decoded length other than 32 bytes is a configuration error.
+
 After setup writes configuration, human output should summarize paths and secret creation without revealing secret values, for example `Wrote ~/.money/config.yaml`, `Wrote ~/.money/.env`, and `Generated MONEY_DB_ENCRYPTION_KEY`. JSON setup output should include paths and booleans such as `secret_created: true`, never raw secret values.
 
 After setup finishes writing configuration, it should create or open the encrypted SQLite database, run migrations, then run the same checks as `money doctor` internally against the real environment and report the returned diagnostics. This gives read commands a stable encrypted empty-state immediately after setup. If database open or migrations fail, keep the written config/env files, stop immediately, report the DB or migration failure and the files already written, and let the user repair and rerun setup or doctor. If an existing DB file cannot be opened, setup must not create a replacement DB at that path. Do not roll back config/env for DB initialization failures. Setup should not suggest demo mode as a next step; demo mode remains discoverable through help as an optional sandbox, not part of normal setup completion.
@@ -212,6 +226,29 @@ providers:
     client_secret:
       env: BRIDGE_CLIENT_SECRET
 ```
+
+## Implementation Tooling
+
+Use Cobra for CLI command routing, flags, aliases, help generation, and shell completion. Keep Cobra in the CLI package only; core, store, contracts, and providers must not import Cobra.
+
+Use Go's standard `testing` package for the default test suite. Add `testify` only when repeated assertion or require boilerplate starts obscuring contract tests; do not introduce it preemptively.
+
+Use `github.com/olekukonko/tablewriter` for plain human-mode tables. Use ANSI color only as an auxiliary signal, and keep JSON mode independent of terminal rendering.
+
+Use `charm.land/huh/v2` for human-mode arrow-key selectors and forms. Choice prompts must still be wrapped behind a small internal prompt interface so JSON and non-TTY paths can return validation errors without importing terminal UI code into core logic.
+
+The initial external dependencies are therefore:
+
+- `github.com/spf13/cobra`
+- `github.com/ncruces/go-sqlite3`, `github.com/ncruces/go-sqlite3/driver`, and `github.com/ncruces/go-sqlite3/vfs/adiantum`
+- `github.com/olekukonko/tablewriter`
+- `charm.land/huh/v2`
+
+Do not add Viper for config loading; `money` has explicit config resolution rules and should not inherit implicit environment override behavior.
+
+## Store Schema
+
+The first migration contract is defined in `docs/SCHEMA.md`. Implementation work that changes table names, columns, source mapping, money representation, or migration behavior must update that document, migration files, command contracts, and tests together.
 
 ## First Stable Contracts
 

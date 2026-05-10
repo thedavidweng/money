@@ -9,7 +9,9 @@
 
 ## Phase 1: First Contracts
 
+- Implement `internal/config` using `docs/CONFIG.md`.
 - Implement encrypted SQLite migrations for institutions, provider items, accounts, transactions, categories, tags, recurring items, and sync runs.
+- Keep first migration shape aligned with `docs/SCHEMA.md`.
 - Implement `money accounts list --json`.
 - Implement `money transactions list --json` and `money transactions search <query> --json`, with `tx` aliases.
 - Implement `money categories list --json`, `money tags list --json`, and `money recurring list --json`.

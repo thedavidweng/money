@@ -51,6 +51,8 @@ After these contracts are proven, the project can add budgets, spending summarie
 - The primary implementation language is Go.
 - The primary storage engine is encrypted SQLite.
 - The CLI is the first supported interface.
+- CLI routing uses Cobra.
+- Encrypted SQLite uses `github.com/ncruces/go-sqlite3` with the encrypted `adiantum` VFS for real stores.
 - JSON contracts are the source of truth for automation.
 - Human terminal formatting is secondary.
 - The finance core owns accounts, institutions, transactions, budgets, rules, sync results, and query logic.
@@ -77,6 +79,7 @@ After these contracts are proven, the project can add budgets, spending summarie
 
 - Tests should target external behavior: command output, contract shape, provider mapping, store queries, and migration behavior.
 - Contract tests are required before a command is considered stable.
+- Tests use Go's standard `testing` package by default. Add `testify` only if assertion boilerplate starts hiding test intent.
 - Provider adapters should be tested with fixture responses, not live provider calls.
 - Store tests should run against temporary encrypted SQLite databases.
 - CLI tests should verify stdout/stderr separation for JSON output.

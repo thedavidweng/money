@@ -25,9 +25,11 @@ Read these files before implementation:
 1. `AGENTS.md`
 2. `docs/PRD.md`
 3. `docs/ARCHITECTURE.md`
-4. `docs/DONORS.md`
-5. `donors/ray-finance/CONTEXT.md`
-6. `donors/ray-finance/ARCHITECTURE.md`
+4. `docs/CONFIG.md`
+5. `docs/SCHEMA.md`
+6. `docs/DONORS.md`
+7. `donors/ray-finance/CONTEXT.md`
+8. `donors/ray-finance/ARCHITECTURE.md`
 
 The Ray OpenRay documents are especially important. They define the product language and boundaries that `money` should preserve:
 
@@ -231,7 +233,7 @@ Responsibilities:
 - JSON write commands require explicit `--dry-run` or `--confirm`; they never prompt.
 - Manual transaction commands later support both flags and one-question-at-a-time interactive input for direction and unsigned amount.
 - Store/core money values use integer minor units or equivalent fixed-precision decimals; JSON contracts expose monetary values as decimal strings.
-- The concrete encrypted SQLite driver/library is selected by engineering spike using single-binary feasibility, active maintenance, Go driver behavior, migration compatibility, in-memory demo compatibility, and key-handling safety.
+- Encrypted SQLite uses `github.com/ncruces/go-sqlite3` with its `database/sql` driver and `github.com/ncruces/go-sqlite3/vfs/adiantum` encrypted VFS. Real stores must use the encrypted VFS and the configured 32-byte key. Demo uses in-memory SQLite without encryption because it never opens or writes real user data.
 
 Rules:
 
@@ -246,6 +248,7 @@ Owns configured state.
 Responsibilities:
 
 - Resolve config file path and environment variables.
+- Implement the concrete config loading flow in `docs/CONFIG.md`.
 - Load database path.
 - Load app-managed database encryption key.
 - Load provider credentials.
@@ -253,6 +256,7 @@ Responsibilities:
 - Do not auto-load cwd `.env`; alternate config paths require `--config` or `MONEY_CONFIG`.
 - Alternate config paths load same-directory `.env` by default unless config explicitly sets `env_file`.
 - Resolve explicit `env:` secret references, such as a config field pointing to `PLAID_SECRET`, instead of applying a silent override chain or magic environment lookup.
+- Secret YAML syntax is an object with exactly one `env` key, for example `encryption_key: {env: MONEY_DB_ENCRYPTION_KEY}` or block form with `env: MONEY_DB_ENCRYPTION_KEY`.
 - Interactive setup and `money providers configure <provider>` write secrets to the resolved env file and config `env:` references, not direct YAML secret values.
 - Human secret entry prompts display mask characters such as `••••` while typing.
 - Confirmation, summary, JSON, diagnostics, and errors may show env variable names and boolean secret status only; they must not show raw secret values or reversible partial previews.
@@ -291,6 +295,7 @@ Responsibilities:
 
 - Open local encrypted SQLite database.
 - Run migrations.
+- Implement the migration contract in `docs/SCHEMA.md`.
 - Store institutions, provider items, accounts, transactions, and sync cursors.
 - Query accounts and transactions for CLI contracts.
 - Preserve provider, provider item, and provider account provenance for future merge review.
@@ -308,9 +313,13 @@ Initial schema:
 - `provider_items`
 - `accounts`
 - `transactions`
+- `transaction_tags`
+- `categories`
+- `tags`
+- `recurring`
 - `sync_runs`
 
-Do not create AI tables. Do not add automatic merge/dedupe tables, budgets, goals, scores, holdings, liabilities, or recurring tables until first account and transaction contracts are stable.
+Do not create AI tables. Do not add automatic merge/dedupe tables, budgets, goals, scores, holdings, or liabilities until first account and transaction contracts are stable. A small `recurring` table is part of the first schema only because `recurring.list` is a first stable read contract.
 
 ### `internal/providers`
 
@@ -408,11 +417,20 @@ Owns CLI command wiring.
 
 Responsibilities:
 
+- Use Cobra for command routing, flags, aliases, help generation, and shell completion.
 - Parse commands and flags.
 - Choose human or JSON output.
 - Call core services.
 - Render contracts.
 - Enforce stdout/stderr separation.
+- Use `github.com/olekukonko/tablewriter` for human-mode tables.
+- Use `charm.land/huh/v2` behind an internal prompt interface for arrow-key selectors and human-mode forms.
+
+Rules:
+
+- Use Go's standard `testing` package by default. Add `testify` only if repeated assertion boilerplate obscures test intent.
+- Do not add Viper; config loading is explicit and owned by `internal/config`.
+- Keep terminal UI and table rendering out of core.
 
 Initial commands:
 
@@ -559,20 +577,23 @@ Steps:
 2. Implement `money providers plaid link` for explicit Plaid linking.
 3. Separate Provider support from Provider availability: list all Providers known to support the selected institution, mark locally unavailable Providers as missing credentials, and block selecting unavailable Providers with generated configure guidance.
 4. Determine Provider availability from local config/env required fields, following Ray's configured-state pattern but using `money`'s explicit `env:` model.
-5. Use a short-lived localhost callback server only for Plaid Link.
-6. Create Plaid Link token with explicit products and country codes.
-7. Exchange public token for access token.
-8. Store access token only after the encrypted store is open.
-9. Store provider item, institution metadata, products, and initial cursor state.
-10. Use random state/nonce values, timeout callback sessions, bind only for the active link flow, and shut down the helper after completion.
-11. Follow GitHub CLI browser ergonomics in human mode: print the authorization URL, wait for Enter, then open the browser.
-12. Support `--no-open` to print the URL without opening a browser for SSH, cron, and headless environments.
-13. Do not automatically run the first sync after link; print help-derived guidance for running `money sync`.
-14. Add tests for encrypted-store requirements and link exchange logic using fakes.
+5. Use Plaid `/institutions/search` with configured products and country codes for Plaid institution discovery.
+6. Use a short-lived localhost Link page and callback server only for Plaid Link.
+7. Create Plaid Link token with explicit products and country codes.
+8. Serve a local page that loads Plaid Link with the link token and posts `public_token`, selected institution/account metadata, and random state back to the localhost helper on success.
+9. Exchange public token for access token.
+10. Store access token only after the encrypted store is open.
+11. Store provider item, institution metadata, products, and initial cursor state.
+12. Use random state/nonce values, timeout callback sessions, bind only for the active link flow, and shut down the helper after completion.
+13. Follow GitHub CLI browser ergonomics in human mode: print the local Link URL, wait for Enter, then open the browser.
+14. Support `--no-open` to print the URL without opening a browser for SSH, cron, and headless environments.
+15. Do not automatically run the first sync after link; print help-derived guidance for running `money sync`.
+16. Add tests for encrypted-store requirements and link exchange logic using fakes.
 
 Acceptance:
 
 - Link flow never starts a general Local API server.
+- Plaid Link uses a localhost page backed by a Plaid link token; it does not print a fake raw Plaid authorization URL.
 - Human link flow waits for explicit Enter before opening the browser.
 - If the user does not press Enter, no browser opens and the printed URL remains available for manual/headless handling.
 - `--no-open` does not attempt to open a browser.
@@ -685,7 +706,7 @@ Acceptance:
 - Contract tests cover success, empty state, validation error, and database error.
 - Agents can parse errors without reading stderr.
 
-### Phase 6: Next Provider and Migration Work
+### Phase 7: Next Provider and Migration Work
 
 Goal: prove the Provider seam is real with a second adapter.
 
@@ -708,9 +729,13 @@ Keep the first schema small. Do not copy Ray's full schema.
 Use canonical naming:
 
 - `institutions`: user-visible financial institutions or manual sources.
-- `provider_items`: provider linkage state, encrypted token, products, cursor.
+- `provider_items`: provider linkage state, encrypted token, products, cursor, reconnect/status state.
 - `accounts`: canonical Financial Accounts.
 - `transactions`: canonical Transactions.
+- `transaction_tags`: local transaction/tag relation.
+- `categories`: local category definitions.
+- `tags`: local tag definitions.
+- `recurring`: lightweight recurring streams/items available from local provider data or fixtures.
 - `sync_runs`: sync audit trail.
 
 Keep these for later:
@@ -720,10 +745,11 @@ Keep these for later:
 - liabilities
 - budgets
 - goals
-- recurring
 - rules
 - net_worth_history
 - daily_scores
+
+The concrete first DDL is maintained in `docs/SCHEMA.md`; update that file before changing migration shape.
 
 Never add these:
 
