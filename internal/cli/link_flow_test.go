@@ -1,0 +1,308 @@
+package cli
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/thedavidweng/money/internal/providers"
+	"github.com/thedavidweng/money/internal/store"
+	"github.com/thedavidweng/money/internal/syncer"
+)
+
+func TestRunPlaidLinkFlowNoOpenStoresLinkedItem(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenEncrypted(ctx, t.TempDir()+"/money.db", []byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatalf("open encrypted store: %v", err)
+	}
+	defer db.Close()
+
+	oldStart := startPlaidLinkSessionServer
+	oldOpen := openBrowser
+	t.Cleanup(func() {
+		startPlaidLinkSessionServer = oldStart
+		openBrowser = oldOpen
+	})
+
+	var opened bool
+	startPlaidLinkSessionServer = func(linkToken string, state string, timeout time.Duration) (linkSessionServer, error) {
+		if linkToken != "link-token" || state == "" {
+			t.Fatalf("server input linkToken=%q state=%q", linkToken, state)
+		}
+		return fakeLinkSessionServer{
+			url: "http://127.0.0.1:4000",
+			callback: providers.LinkCallback{
+				PublicToken: "public-token",
+				State:       state,
+			},
+		}, nil
+	}
+	openBrowser = func(url string) error {
+		opened = true
+		return nil
+	}
+
+	var stdout bytes.Buffer
+	state := &runtimeState{store: db}
+	if err := runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, providers.Institution{}, "", true, &stdout); err != nil {
+		t.Fatalf("run plaid link flow: %v", err)
+	}
+	if opened {
+		t.Fatal("browser opened despite --no-open")
+	}
+	if !strings.Contains(stdout.String(), "Plaid Link URL: http://127.0.0.1:4000") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+
+	item, err := db.GetProviderItem(ctx, "pi_cli")
+	if err != nil {
+		t.Fatalf("provider item not stored: %v", err)
+	}
+	if string(item.EncryptedAccessToken) != "access-token" {
+		t.Fatalf("stored token = %q", string(item.EncryptedAccessToken))
+	}
+}
+
+func TestRunPlaidLinkFlowWaitsForEnterBeforeOpeningBrowser(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenEncrypted(ctx, t.TempDir()+"/money.db", []byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatalf("open encrypted store: %v", err)
+	}
+	defer db.Close()
+
+	oldStart := startPlaidLinkSessionServer
+	oldOpen := openBrowser
+	t.Cleanup(func() {
+		startPlaidLinkSessionServer = oldStart
+		openBrowser = oldOpen
+	})
+
+	startPlaidLinkSessionServer = func(linkToken string, state string, timeout time.Duration) (linkSessionServer, error) {
+		return fakeLinkSessionServer{
+			url: "http://127.0.0.1:4000",
+			callback: providers.LinkCallback{
+				PublicToken: "public-token",
+				State:       state,
+			},
+		}, nil
+	}
+	var openedURL string
+	openBrowser = func(url string) error {
+		openedURL = url
+		return nil
+	}
+
+	var stdout bytes.Buffer
+	state := &runtimeState{store: db, stdin: strings.NewReader("\n")}
+	if err := runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, providers.Institution{}, "", false, &stdout); err != nil {
+		t.Fatalf("run plaid link flow: %v", err)
+	}
+	if openedURL != "http://127.0.0.1:4000" {
+		t.Fatalf("opened URL = %q", openedURL)
+	}
+}
+
+func TestRunBridgeLinkFlowNoOpenStoresLinkedItem(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenEncrypted(ctx, t.TempDir()+"/money.db", []byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatalf("open encrypted store: %v", err)
+	}
+	defer db.Close()
+
+	oldOpen := openBrowser
+	t.Cleanup(func() { openBrowser = oldOpen })
+	var opened bool
+	openBrowser = func(url string) error {
+		opened = true
+		return nil
+	}
+
+	var stdout bytes.Buffer
+	state := &runtimeState{store: db}
+	if err := runBridgeLinkFlow(ctx, state, fakeBridgeCLIProvider{}, "", true, &stdout); err != nil {
+		t.Fatalf("run bridge link flow: %v", err)
+	}
+	if opened {
+		t.Fatal("browser opened despite --no-open")
+	}
+	if !strings.Contains(stdout.String(), "Bridge Connect URL: https://connect.bridgeapi.io/session/session-1") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+
+	item, err := db.GetProviderItem(ctx, "bridge:item_cli")
+	if err != nil {
+		t.Fatalf("provider item not stored: %v", err)
+	}
+	if item.ExternalUserID != "bridge-user" {
+		t.Fatalf("external user id = %q", item.ExternalUserID)
+	}
+}
+
+func TestSyncJSONNoLinkedItemsReturnsSuccessWarning(t *testing.T) {
+	configPath := writeTestConfig(t, "")
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Run(context.Background(), []string{"--config", configPath, "sync", "--json"}, nil, &stdout, &stderr)
+
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d; stderr=%s stdout=%s", exitCode, stderr.String(), stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "NO_LINKED_PROVIDER_ITEMS") {
+		t.Fatalf("stdout = %s", stdout.String())
+	}
+}
+
+func TestWriteSyncJSONPartialFailureReturnsExitSentinelWithItemDiagnostics(t *testing.T) {
+	var stdout bytes.Buffer
+	result := syncer.Result{Items: []syncer.ItemResult{
+		{Provider: "plaid", ProviderItemID: "pi_ok", Status: "ok"},
+		{Provider: "bridge", ProviderItemID: "pi_bad", Status: "error", ErrorCode: "NETWORK_ERROR"},
+	}}
+
+	err := writeSyncJSON(&stdout, result, syncer.PartialFailure{Result: result})
+	var exitErr cliExit
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("error = %#v, want cliExit", err)
+	}
+	if exitErr.exitCode != 6 {
+		t.Fatalf("exit code = %d, want 6", exitErr.exitCode)
+	}
+	if !strings.Contains(stdout.String(), `"ok": false`) || !strings.Contains(stdout.String(), `"pi_bad"`) {
+		t.Fatalf("stdout = %s", stdout.String())
+	}
+}
+
+func TestSelectLinkInstitutionRequiresExplicitIDForMultipleMatches(t *testing.T) {
+	institutions := []providers.Institution{
+		{ID: "plaid:ins_1", ProviderInstitutionID: "ins_1", Name: "Bank One"},
+		{ID: "plaid:ins_2", ProviderInstitutionID: "ins_2", Name: "Bank Two"},
+	}
+
+	_, err := selectLinkInstitution(institutions, "")
+	if err == nil {
+		t.Fatal("expected explicit institution id error")
+	}
+
+	selected, err := selectLinkInstitution(institutions, "ins_2")
+	if err != nil {
+		t.Fatalf("select institution: %v", err)
+	}
+	if selected.ProviderInstitutionID != "ins_2" {
+		t.Fatalf("selected = %#v", selected)
+	}
+}
+
+func TestSupportedProviderAvailabilityMarksMissingCredentials(t *testing.T) {
+	rows := supportedProviderAvailability("plaid", []providers.ConfigDiagnostic{{
+		Code:     "PROVIDER_CREDENTIALS_MISSING",
+		Message:  "plaid credentials are missing.",
+		Severity: "warn",
+	}})
+
+	if len(rows) != 1 {
+		t.Fatalf("rows = %#v", rows)
+	}
+	if rows[0].Provider != "plaid" || rows[0].Status != "unavailable" || rows[0].Code != "PROVIDER_CREDENTIALS_MISSING" {
+		t.Fatalf("row = %#v", rows[0])
+	}
+	if !strings.Contains(rows[0].Guidance, "providers.plaid credentials") {
+		t.Fatalf("guidance = %q", rows[0].Guidance)
+	}
+}
+
+type fakeLinkSessionServer struct {
+	url      string
+	callback providers.LinkCallback
+}
+
+func (s fakeLinkSessionServer) LinkURL() string {
+	return s.url
+}
+
+func (s fakeLinkSessionServer) Wait(ctx context.Context) (providers.LinkCallback, error) {
+	return s.callback, nil
+}
+
+func (s fakeLinkSessionServer) Shutdown(ctx context.Context) error {
+	return nil
+}
+
+type fakePlaidCLIProvider struct{}
+
+func (fakePlaidCLIProvider) Name() string { return "plaid" }
+func (fakePlaidCLIProvider) ValidateConfig(ctx context.Context) []providers.ConfigDiagnostic {
+	return nil
+}
+func (fakePlaidCLIProvider) SearchInstitutions(ctx context.Context, query string) ([]providers.Institution, error) {
+	return nil, nil
+}
+func (fakePlaidCLIProvider) CreateLinkSession(ctx context.Context, request providers.LinkRequest) (providers.LinkSession, error) {
+	return providers.LinkSession{Provider: "plaid", LinkToken: "link-token", State: request.State}, nil
+}
+func (fakePlaidCLIProvider) ExchangeLinkToken(ctx context.Context, session providers.LinkSession, callback providers.LinkCallback) (providers.LinkedItem, error) {
+	return providers.LinkedItem{
+		Institution: providers.Institution{
+			ID:                    "inst_cli",
+			Name:                  "CLI Bank",
+			Provider:              "plaid",
+			ProviderInstitutionID: "ins_cli",
+		},
+		ProviderItem: providers.ProviderItem{
+			ID:                     "pi_cli",
+			Provider:               "plaid",
+			InstitutionID:          "inst_cli",
+			ProviderExternalItemID: "item_cli",
+			EncryptedAccessToken:   []byte("access-token"),
+			Status:                 "active",
+		},
+	}, nil
+}
+func (fakePlaidCLIProvider) Sync(ctx context.Context, item providers.ProviderItem, sink providers.SyncSink) (providers.SyncResult, error) {
+	return providers.SyncResult{}, nil
+}
+
+type fakeBridgeCLIProvider struct{}
+
+func (fakeBridgeCLIProvider) Name() string { return "bridge" }
+func (fakeBridgeCLIProvider) ValidateConfig(ctx context.Context) []providers.ConfigDiagnostic {
+	return nil
+}
+func (fakeBridgeCLIProvider) SearchInstitutions(ctx context.Context, query string) ([]providers.Institution, error) {
+	return nil, nil
+}
+func (fakeBridgeCLIProvider) CreateLinkSession(ctx context.Context, request providers.LinkRequest) (providers.LinkSession, error) {
+	return providers.LinkSession{
+		Provider:            "bridge",
+		URL:                 "https://connect.bridgeapi.io/session/session-1",
+		State:               "bridge-user",
+		ProviderAccessToken: "bridge-user-token",
+	}, nil
+}
+func (fakeBridgeCLIProvider) ExchangeLinkToken(ctx context.Context, session providers.LinkSession, callback providers.LinkCallback) (providers.LinkedItem, error) {
+	return providers.LinkedItem{
+		Institution: providers.Institution{
+			ID:                    "bridge:bank_cli",
+			Name:                  "Bridge Bank",
+			Provider:              "bridge",
+			ProviderInstitutionID: "bank_cli",
+		},
+		ProviderItem: providers.ProviderItem{
+			ID:                     "bridge:item_cli",
+			Provider:               "bridge",
+			InstitutionID:          "bridge:bank_cli",
+			ProviderExternalItemID: "item_cli",
+			EncryptedAccessToken:   []byte("bridge-user"),
+			ExternalUserID:         "bridge-user",
+			Status:                 "active",
+		},
+	}, nil
+}
+func (fakeBridgeCLIProvider) Sync(ctx context.Context, item providers.ProviderItem, sink providers.SyncSink) (providers.SyncResult, error) {
+	return providers.SyncResult{}, nil
+}
