@@ -102,12 +102,23 @@ Read commands use local data only. Sync is the explicit boundary where outbound 
 | [`docs/CONFIG.md`](docs/CONFIG.md) | Configuration loading rules |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Development phases |
 
+## Website
+
+The project landing page (Astro, static HTML) lives in [`website/`](website/). Published site: **https://thedavidweng.github.io/money/** (enable **GitHub Pages** → GitHub Actions in the repository settings if it is not live yet).
+
+```bash
+cd website
+npm ci
+npm run dev    # local preview
+npm run build  # output in website/dist
+```
+
 ## Acknowledgements
 
 `money` draws inspiration from several excellent projects:
 
-- [**monarchmoney-cli**](https://github.com/juftin/monarchmoney-cli) — agent-friendly CLI contract design, JSON envelope patterns, and safety model.
-- [**Ray Finance**](https://github.com/rayfinance) — Plaid/Bridge sync architecture, local encrypted database patterns, and provider adapter design.
+- [**monarchmoney-cli**](https://github.com/thedavidweng/monarchmoney-cli) — agent-friendly CLI contract design, JSON envelope patterns, and safety model.
+- [**Ray Finance**](https://github.com/cdinnison/ray-finance) — Plaid/Bridge sync architecture, local encrypted database patterns, and provider adapter design.
 - [**Actual Budget**](https://github.com/actualbudget/actual) — local-first budgeting philosophy and automation API patterns.
 - [**Maybe Finance**](https://github.com/maybe-finance/maybe) — personal finance domain modeling and product vocabulary.
 

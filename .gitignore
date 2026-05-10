@@ -20,6 +20,10 @@ tmp/
 # Build and test outputs.
 bin/
 dist/
+
+# Frontend (Astro).
+website/node_modules/
+website/dist/
 coverage.out
 *.test
 
