@@ -25,3 +25,16 @@ release:
   github:
     owner: thedavidweng
     name: money
+
+brews:
+  - name: money
+    repository:
+      owner: thedavidweng
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/thedavidweng/money"
+    description: "A local-first, self-hostable personal finance backend for AI agents and power users."
+    license: MIT
+    install: |
+      bin.install "money"
