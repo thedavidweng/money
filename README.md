@@ -35,7 +35,10 @@ Existing personal finance tools either lock data behind a paid SaaS, embed opini
 ## Quick Start
 
 ```bash
-# Install
+# Install via Homebrew (macOS/Linux)
+brew install thedavidweng/tap/money
+
+# Or install via Go (cross-platform)
 go install github.com/thedavidweng/money/cmd/money@latest
 
 # Try it without real credentials
