@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/Golden-Toad-logo.png" alt="money" width="160" />
+  <img src="public/Golden-Toad-logo.webp" alt="money" width="160" />
 </p>
 
 <h1 align="center">money</h1>
