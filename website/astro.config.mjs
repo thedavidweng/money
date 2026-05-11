@@ -5,6 +5,7 @@ import { defineConfig } from 'astro/config';
 export default defineConfig({
   site: 'https://thedavidweng.github.io',
   base: '/money/',
+  publicDir: '../public',
   output: 'static',
   devToolbar: {
     enabled: false,
