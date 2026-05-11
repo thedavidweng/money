@@ -38,6 +38,9 @@ const features = [
 	},
 ];
 
+const promoVideoId = 'vjHybT9BPU4';
+const promoEmbedUrl = `https://www.youtube.com/embed/${promoVideoId}?rel=0`;
+
 const docsList = [
 	{ name: 'docs/PRD.md', title: 'Product requirements', desc: 'Why money exists, what it commits to, and what it is not.', path: 'docs/PRD.md' },
 	{ name: 'docs/ARCHITECTURE.md', title: 'Architecture', desc: 'Module boundaries, data flow, and contract design.', path: 'docs/ARCHITECTURE.md' },
@@ -74,6 +77,7 @@ const docsList = [
 					<span>money</span>
 				</a>
 				<nav class="nav" aria-label="Page">
+					<a href="#intro-video">Watch</a>
 					<a href="#problem">Why</a>
 					<a href="#features">Features</a>
 					<a href="#quick-start">Quick start</a>
@@ -153,6 +157,30 @@ const docsList = [
 						<span class="term-line"><span class="term-prompt">$</span> <span class="term-cmd">money</span> tx search <span class="term-str">"Costco"</span><span class="term-cursor" aria-hidden="true"></span></span>
 					</div>
 				</aside>
+			</section>
+
+			<!-- ============================ Promo video ============================ -->
+			<section id="intro-video" class="intro-video" aria-labelledby="intro-video-heading">
+				<p class="section-eyebrow">Introduction</p>
+				<h2 id="intro-video-heading">See money in action</h2>
+				<p class="section-lede intro-video-lede">
+					A product introduction: what money does, how the CLI fits in, and how JSON contracts work for external agents.
+				</p>
+				<div class="video-shell">
+					<div class="video-frame">
+						<iframe
+							src={promoEmbedUrl}
+							title="money — product introduction"
+							loading="lazy"
+							allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+							referrerpolicy="strict-origin-when-cross-origin"
+							allowfullscreen
+						></iframe>
+					</div>
+				</div>
+				<p class="video-caption">
+					Hosted on YouTube · <a href={`https://youtu.be/${promoVideoId}`}>Open in new tab</a>
+				</p>
 			</section>
 
 			<!-- ============================ Why ============================ -->
