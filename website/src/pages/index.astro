@@ -4,11 +4,15 @@ import '../styles/global.css';
 const base = import.meta.env.BASE_URL;
 const repo = 'https://github.com/thedavidweng/money';
 const docs = (path: string) => `${repo}/blob/main/${path}`;
+const siteUrl = 'https://thedavidweng.github.io/money';
+
+const title = 'money — local-first finance backend for AI agents';
+const description = 'money — local-first personal finance backend with encrypted SQLite, a CLI, and stable JSON contracts for AI agents. No embedded AI, no required server.';
 
 const features = [
 	{
 		title: 'Encrypted SQLite',
-		desc: 'Financial data at rest in an encrypted local file you control — not plaintext SQLite, not someone else’s cloud.',
+		desc: 'Financial data at rest in an encrypted local file you control — not plaintext SQLite, not someone else\u2019s cloud.',
 		icon: 'lock',
 	},
 	{
@@ -33,7 +37,7 @@ const features = [
 	},
 	{
 		title: 'Demo mode',
-		desc: '<code>money demo …</code> runs against bundled non-persistent sample data — no credentials required.',
+		desc: '<code>money demo \u2026</code> runs against bundled non-persistent sample data — no credentials required.',
 		icon: 'play',
 	},
 ];
@@ -49,15 +53,89 @@ const docsList = [
 	{ name: 'docs/ROADMAP.md', title: 'Roadmap', desc: 'Phased development, current focus, and deferred work.', path: 'docs/ROADMAP.md' },
 	{ name: 'CONTRIBUTING.md', title: 'Contributing', desc: 'Project rules, donor policy, and contribution discipline.', path: 'CONTRIBUTING.md' },
 ];
+
+const isAgent = Astro.url.searchParams.get('mode') === 'agent';
+
+// JSON-LD objects built in frontmatter for safe injection
+const jsonldPerson = {
+	'@context': 'https://schema.org',
+	'@type': 'Person',
+	name: 'David Weng',
+	url: 'https://github.com/thedavidweng',
+	sameAs: ['https://github.com/thedavidweng', 'https://thedavidweng.github.io'],
+	jobTitle: 'CLI Engineer, personal finance tooling',
+	knowsAbout: ['Local-first software', 'Personal finance data', 'CLI tools', 'AI agent tooling', 'Encrypted databases'],
+	description: 'Creator of money, a local-first personal finance backend for AI agents.',
+};
+
+const jsonldWebSite = {
+	'@context': 'https://schema.org',
+	'@type': 'WebSite',
+	name: 'money',
+	url: siteUrl,
+	description,
+	inLanguage: 'en',
+	applicationCategory: 'FinanceApplication',
+	operatingSystem: 'macOS, Linux',
+	author: {
+		'@type': 'Person',
+		name: 'David Weng',
+		url: 'https://github.com/thedavidweng',
+	},
+};
+
+const jsonldSoftwareApp = {
+	'@context': 'https://schema.org',
+	'@type': 'SoftwareApplication',
+	name: 'money',
+	url: repo,
+	description,
+	applicationCategory: 'FinanceApplication',
+	operatingSystem: 'macOS, Linux',
+	offers: {
+		'@type': 'Offer',
+		price: '0',
+		priceCurrency: 'USD',
+	},
+};
 ---
 
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="description" content="money — local-first personal finance backend with encrypted SQLite, a CLI, and stable JSON contracts for AI agents. No embedded AI, no required server." />
+		<meta name="description" content={description} />
 		<meta name="generator" content={Astro.generator} />
 		<meta name="theme-color" content="#0a0c0b" />
+
+		<!-- Canonical -->
+		<link rel="canonical" href={siteUrl} />
+
+		<!-- Open Graph -->
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content={siteUrl} />
+		<meta property="og:image" content={`${siteUrl}/Golden-Toad.avif`} />
+		<meta property="og:image:width" content="600" />
+		<meta property="og:image:height" content="600" />
+		<meta property="og:locale" content="en_US" />
+		<meta property="og:site_name" content="money" />
+
+		<!-- Twitter Card -->
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content={title} />
+		<meta name="twitter:description" content={description} />
+
+		<!-- JSON-LD: Person (author) -->
+		<script type="application/ld+json" set:html={JSON.stringify(jsonldPerson)} />
+
+		<!-- JSON-LD: WebSite -->
+		<script type="application/ld+json" set:html={JSON.stringify(jsonldWebSite)} />
+
+		<!-- JSON-LD: SoftwareApplication (CLI tool) -->
+		<script type="application/ld+json" set:html={JSON.stringify(jsonldSoftwareApp)} />
+
 		<link rel="icon" type="image/png" href={`${base}favicon.png`} />
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -65,10 +143,63 @@ const docsList = [
 			href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap"
 			rel="stylesheet"
 		/>
-		<title>money — local-first finance backend for AI agents</title>
+		<title>{title}</title>
 	</head>
 	<body>
 		<a class="skip-link" href="#main">Skip to content</a>
+
+		{
+			isAgent ? (
+				<main id="main" class="layout-shell layout-main">
+					<h1>money — local-first finance backend for AI agents</h1>
+
+					<p>CLI · Local-first · For AI agents · v0.x pre-release</p>
+
+					<h2>Overview</h2>
+					<p>money pulls account and transaction data from user-configured financial providers, stores it in a user-owned encrypted SQLite database, and exposes stable CLI + JSON contracts for external agents, scripts, and cron jobs. It does not embed AI chat, model providers, hosted billing, telemetry, or a required long-running server.</p>
+
+					<h2>Key features</h2>
+					<ul>
+						<li><strong>Encrypted SQLite</strong> — financial data at rest in an encrypted local file you control</li>
+						<li><strong>BYOK providers</strong> — Plaid, Bridge, and more as adapters. You bring credentials</li>
+						<li><strong>Stable JSON contracts</strong> — versioned envelopes, deterministic sorting and pagination</li>
+						<li><strong>CLI-first</strong> — human output by default; --json for automation</li>
+						<li><strong>Explicit sync boundary</strong> — read commands use local data only</li>
+						<li><strong>Demo mode</strong> — try without credentials: money demo accounts list --json</li>
+					</ul>
+
+					<h2>Quick start</h2>
+					<pre>brew install thedavidweng/tap/money
+money demo accounts list --json
+money setup
+money link
+money sync</pre>
+
+					<h2>Commands</h2>
+					<ul>
+						<li>money setup — Initialize configuration and encrypted database</li>
+						<li>money doctor — Check configuration and system health</li>
+						<li>money accounts list — List financial accounts</li>
+						<li>money transactions search — Search transactions by text</li>
+						<li>money categories list — List transaction categories</li>
+						<li>money tags list — List transaction tags</li>
+						<li>money link — Link a financial institution</li>
+						<li>money sync — Sync linked provider data</li>
+						<li>money demo &lt;command&gt; — Run against sample data</li>
+					</ul>
+
+					<h2>Links</h2>
+					<ul>
+						<li><a href={repo}>GitHub Repository</a></li>
+						<li><a href={`${repo}/issues`}>Issues</a></li>
+						<li><a href={`${repo}/blob/main/docs/PRD.md`}>Product Requirements</a></li>
+						<li><a href={`${repo}/blob/main/docs/ARCHITECTURE.md`}>Architecture</a></li>
+						<li><a href={`${repo}/releases`}>Releases</a></li>
+					</ul>
+
+					<p>MIT licensed · Single Go binary · No telemetry</p>
+				</main>
+			) : (
 
 		<header class="site-header">
 			<div class="layout-shell header-shell">
@@ -363,3 +494,6 @@ const docsList = [
 		</footer>
 	</body>
 </html>
+	
+		)
+	}
