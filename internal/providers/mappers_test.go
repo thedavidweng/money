@@ -24,14 +24,14 @@ func TestMapPlaidTransactionNormalizesOutflowToNegative(t *testing.T) {
 
 func TestMapPlaidCreditAccountNormalizesLiabilityBalanceToNegative(t *testing.T) {
 	account := MapPlaidAccount(PlaidAccount{
-		ProviderItemID:           "pi_demo",
-		ProviderAccountID:        "plaid_credit_1",
-		Name:                     "Credit Card",
-		Type:                     "credit",
-		Subtype:                  "credit card",
-		CurrentBalance:           456.78,
-		AvailableCredit:          floatPtr(1500),
-		Currency:                 "USD",
+		ProviderItemID:    "pi_demo",
+		ProviderAccountID: "plaid_credit_1",
+		Name:              "Credit Card",
+		Type:              "credit",
+		Subtype:           "credit card",
+		CurrentBalance:    456.78,
+		AvailableCredit:   floatPtr(1500),
+		Currency:          "USD",
 	})
 
 	if account.CurrentBalanceMinorUnits != -45678 {
@@ -75,4 +75,3 @@ func TestMapBridgeTransactionKeepsPositiveCreditAndNegativeDebit(t *testing.T) {
 func floatPtr(v float64) *float64 {
 	return &v
 }
-

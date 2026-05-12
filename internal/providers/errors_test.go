@@ -46,4 +46,3 @@ func TestClassifyProviderErrorKeepsUnknownInternal(t *testing.T) {
 		t.Fatalf("classified = %#v", classified)
 	}
 }
-

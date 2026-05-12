@@ -46,4 +46,3 @@ func TestStoreLinkedProviderItemPersistsInstitutionAndTokenOnlyInStore(t *testin
 		t.Fatalf("access token was not persisted in provider_items")
 	}
 }
-

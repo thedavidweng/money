@@ -327,9 +327,9 @@ func newConfigureCommand(state *runtimeState, stdout io.Writer) *cobra.Command {
 
 			if state.json {
 				env := contracts.NewSuccess("providers.configure", map[string]any{
-					"provider":    result.Provider,
+					"provider":     result.Provider,
 					"keys_written": result.KeysWritten,
-					"diagnostics": providerDiags,
+					"diagnostics":  providerDiags,
 				})
 				return contracts.WriteJSON(stdout, env)
 			}

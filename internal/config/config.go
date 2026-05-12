@@ -19,14 +19,14 @@ type Options struct {
 }
 
 type Config struct {
-	ConfigPath            string
-	EnvPath               string
-	DatabasePath          string
-	DatabaseEncryptionKey string
+	ConfigPath                 string
+	EnvPath                    string
+	DatabasePath               string
+	DatabaseEncryptionKey      string
 	DatabaseEncryptionKeyBytes []byte
-	ReadOnly              bool
-	Providers             map[string]ProviderConfig
-	Warnings              []contracts.Warning
+	ReadOnly                   bool
+	Providers                  map[string]ProviderConfig
+	Warnings                   []contracts.Warning
 }
 
 type ProviderConfig struct {

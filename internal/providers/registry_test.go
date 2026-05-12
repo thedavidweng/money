@@ -33,4 +33,3 @@ func TestMissingProviderCredentialsProduceStableConfigDiagnostics(t *testing.T) 
 		t.Fatalf("bridge diagnostics = %#v", bridgeDiagnostics)
 	}
 }
-

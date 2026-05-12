@@ -85,7 +85,7 @@ providers: {}
 // ProviderSpec defines the fields needed for a provider configuration.
 type ProviderSpec struct {
 	Name           string
-	SecretFields   []string // written to .env
+	SecretFields   []string          // written to .env
 	OptionalFields map[string]string // field -> default value, written to config.yaml
 }
 
