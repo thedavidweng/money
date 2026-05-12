@@ -24,6 +24,11 @@ dist/
 # Frontend (Astro).
 website/node_modules/
 website/dist/
+website/test/
+
+# Local test artifacts
+.playwright-mcp/
+
 coverage.out
 *.test
 
