@@ -15,6 +15,7 @@ import (
 
 type Options struct {
 	ConfigPath string
+	Profile    string
 	Env        map[string]string
 }
 
@@ -75,17 +76,44 @@ type envReference struct {
 	Name string
 }
 
+func validateProfile(profile string) error {
+	if profile == "" || profile == "default" {
+		return nil
+	}
+	for i := 0; i < len(profile); i++ {
+		c := profile[i]
+		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_' {
+			continue
+		}
+		return fmt.Errorf("profile name must be alphanumeric, hyphen, or underscore")
+	}
+	return nil
+}
+
+func DefaultConfigPath(profile string) string {
+	if err := validateProfile(profile); err != nil {
+		return ""
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	if profile != "" && profile != "default" {
+		return filepath.Join(home, ".money", "profiles", profile, "config.yaml")
+	}
+	return filepath.Join(home, ".money", "config.yaml")
+}
+
 func Load(options Options) (Config, error) {
+	if err := validateProfile(options.Profile); err != nil {
+		return Config{}, err
+	}
 	configPath := options.ConfigPath
 	if configPath == "" {
 		configPath = options.Env["MONEY_CONFIG"]
 	}
 	if configPath == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return Config{}, err
-		}
-		configPath = filepath.Join(home, ".money", "config.yaml")
+		configPath = DefaultConfigPath(options.Profile)
 	}
 	configPath = expandHome(configPath)
 	configPath, err := filepath.Abs(configPath)

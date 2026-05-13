@@ -20,13 +20,12 @@ type SetupResult struct {
 	DBCreated     bool   `json:"db_created"`
 }
 
-func Setup(configPath string, force bool) (SetupResult, error) {
+func Setup(configPath string, profile string, force bool) (SetupResult, error) {
+	if err := validateProfile(profile); err != nil {
+		return SetupResult{}, err
+	}
 	if configPath == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return SetupResult{}, err
-		}
-		configPath = filepath.Join(home, ".money", "config.yaml")
+		configPath = DefaultConfigPath(profile)
 	}
 	configPath = expandHome(configPath)
 	configPath, err := filepath.Abs(configPath)
@@ -87,6 +86,7 @@ type ProviderSpec struct {
 	Name           string
 	SecretFields   []string          // written to .env
 	OptionalFields map[string]string // field -> default value, written to config.yaml
+	HelpURL        string            // URL where users can obtain API credentials
 }
 
 var PlaidSpec = ProviderSpec{
@@ -98,6 +98,7 @@ var PlaidSpec = ProviderSpec{
 		"country_codes": "US",
 		"redirect_uri":  "",
 	},
+	HelpURL: "https://dashboard.plaid.com/developers/keys",
 }
 
 var BridgeSpec = ProviderSpec{
@@ -106,6 +107,18 @@ var BridgeSpec = ProviderSpec{
 	OptionalFields: map[string]string{
 		"user_email": "",
 	},
+	HelpURL: "https://dashboard.bridgeapi.io/dashboard/secret-management",
+}
+
+// ProviderSpecByName returns the spec for a known provider.
+func ProviderSpecByName(name string) (ProviderSpec, bool) {
+	switch name {
+	case "plaid":
+		return PlaidSpec, true
+	case "bridge":
+		return BridgeSpec, true
+	}
+	return ProviderSpec{}, false
 }
 
 type ConfigureResult struct {
@@ -116,13 +129,12 @@ type ConfigureResult struct {
 }
 
 // ConfigureProvider writes provider credentials to .env and env: references to config.yaml.
-func ConfigureProvider(configPath string, spec ProviderSpec, secrets map[string]string, options map[string]string, force bool) (ConfigureResult, error) {
+func ConfigureProvider(configPath string, profile string, spec ProviderSpec, secrets map[string]string, options map[string]string, force bool) (ConfigureResult, error) {
+	if err := validateProfile(profile); err != nil {
+		return ConfigureResult{}, err
+	}
 	if configPath == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return ConfigureResult{}, err
-		}
-		configPath = filepath.Join(home, ".money", "config.yaml")
+		configPath = DefaultConfigPath(profile)
 	}
 	configPath = expandHome(configPath)
 	configPath, _ = filepath.Abs(configPath)
@@ -132,13 +144,6 @@ func ConfigureProvider(configPath string, spec ProviderSpec, secrets map[string]
 		Provider:   spec.Name,
 		EnvPath:    envPath,
 		ConfigPath: configPath,
-	}
-
-	// Validate all required secrets are provided
-	for _, field := range spec.SecretFields {
-		if secrets[field] == "" {
-			return result, fmt.Errorf("%s requires --%s", spec.Name, strings.ReplaceAll(field, "_", "-"))
-		}
 	}
 
 	// Write secrets to .env

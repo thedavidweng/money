@@ -72,6 +72,54 @@ func TestLoadDoesNotReadCwdEnvWithoutExplicitConfigReference(t *testing.T) {
 	}
 }
 
+func TestDefaultConfigPathReturnsDefaultForEmptyAndDefaultProfile(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("cannot determine home dir:", err)
+	}
+	defaultPath := filepath.Join(home, ".money", "config.yaml")
+	if p := DefaultConfigPath(""); p != defaultPath {
+		t.Fatalf("DefaultConfigPath(\"\") = %q, want %q", p, defaultPath)
+	}
+	if p := DefaultConfigPath("default"); p != defaultPath {
+		t.Fatalf("DefaultConfigPath(\"default\") = %q, want %q", p, defaultPath)
+	}
+}
+
+func TestDefaultConfigPathReturnsProfilePathForCustomProfile(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("cannot determine home dir:", err)
+	}
+	want := filepath.Join(home, ".money", "profiles", "work", "config.yaml")
+	if p := DefaultConfigPath("work"); p != want {
+		t.Fatalf("DefaultConfigPath(\"work\") = %q, want %q", p, want)
+	}
+}
+
+func TestLoadRejectsInvalidProfile(t *testing.T) {
+	_, err := Load(Options{Profile: "../../etc"})
+	if err == nil {
+		t.Fatal("Load with invalid profile should error")
+	}
+}
+
+func TestSetupRejectsInvalidProfile(t *testing.T) {
+	_, err := Setup("", "../../etc", false)
+	if err == nil {
+		t.Fatal("Setup with invalid profile should error")
+	}
+}
+
+func TestDefaultConfigPathRejectsInvalidProfiles(t *testing.T) {
+	invalid := []string{"../../etc", "pro/file", "pro..file", "profile!", "profile space", "profile*"}
+	for _, profile := range invalid {
+		if p := DefaultConfigPath(profile); p != "" {
+			t.Fatalf("DefaultConfigPath(%q) = %q, want empty string", profile, p)
+		}
+	}
+}
+
 func TestLoadResolvesBridgeExplicitEnvReferences(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
