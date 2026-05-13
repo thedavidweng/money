@@ -35,6 +35,7 @@ type runtimeState struct {
 	demo       bool
 	json       bool
 	configPath string
+	profile    string
 	stdin      io.Reader
 }
 
@@ -77,17 +78,34 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, 
 
 func newRootCommand(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer) *cobra.Command {
 	root := &cobra.Command{
-		Use:           "money",
+		Use:   "money",
+		Short: "A local-first finance backend for external AI agents",
+		Long: `money is a local-first finance CLI.
+
+If this is your first time, run:
+
+  money setup
+
+This creates your config, encryption key, and database. After setup, you can
+link financial institutions and sync transactions locally.
+`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
 
-	root.PersistentFlags().BoolVar(&state.json, "json", false, "write a JSON envelope to stdout")
+	root.PersistentFlags().BoolVarP(&state.json, "json", "j", false, "write a JSON envelope to stdout")
 	root.PersistentFlags().StringVar(&state.configPath, "config", "", "config file path")
+	root.PersistentFlags().StringVar(&state.profile, "profile", "default", "configuration profile")
 
-	root.AddCommand(&cobra.Command{
-		Use:   "version",
-		Short: "Print version",
+	root.AddGroup(&cobra.Group{ID: "start", Title: "Getting Started"})
+	root.AddGroup(&cobra.Group{ID: "data", Title: "Data"})
+	root.AddGroup(&cobra.Group{ID: "config", Title: "Configuration"})
+	root.AddGroup(&cobra.Group{ID: "utils", Title: "Utilities"})
+
+	versionCmd := &cobra.Command{
+		Use:     "version",
+		Short:   "Print version",
+		GroupID: "utils",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if state.json {
 				env := contracts.NewSuccess("version", map[string]string{"version": Version, "commit": Commit})
@@ -97,23 +115,73 @@ func newRootCommand(ctx context.Context, state *runtimeState, stdout io.Writer, 
 			fmt.Fprintf(stdout, "money %s (commit %s)\n", Version, Commit)
 			return nil
 		},
-	})
+	}
+	root.AddCommand(versionCmd)
 
-	root.AddCommand(newSetupCommand(ctx, state, stdout))
-	root.AddCommand(newDoctorCommand(ctx, state, stdout))
-	root.AddCommand(newDemoCommand(ctx, state, stdout, stderr))
-	root.AddCommand(newAccountsCommand(ctx, state, stdout))
-	root.AddCommand(newTransactionsCommand(ctx, state, stdout))
-	root.AddCommand(newCategoriesCommand(ctx, state, stdout))
-	root.AddCommand(newTagsCommand(ctx, state, stdout))
-	root.AddCommand(newRecurringCommand(ctx, state, stdout))
-	root.AddCommand(newProvidersCommand(ctx, state, stdout))
-	root.AddCommand(newLinkCommand(ctx, state, stdout))
-	root.AddCommand(newSyncCommand(ctx, state, stdout))
+	setupCmd := newSetupCommand(ctx, state, stdout)
+	setupCmd.GroupID = "start"
+	root.AddCommand(setupCmd)
+
+	doctorCmd := newDoctorCommand(ctx, state, stdout)
+	doctorCmd.GroupID = "start"
+	root.AddCommand(doctorCmd)
+
+	demoCmd := newDemoCommand(ctx, state, stdout, stderr)
+	demoCmd.GroupID = "start"
+	root.AddCommand(demoCmd)
+
+	accountsCmd := newAccountsCommand(ctx, state, stdout)
+	accountsCmd.GroupID = "data"
+	root.AddCommand(accountsCmd)
+
+	transactionsCmd := newTransactionsCommand(ctx, state, stdout)
+	transactionsCmd.GroupID = "data"
+	root.AddCommand(transactionsCmd)
+
+	categoriesCmd := newCategoriesCommand(ctx, state, stdout)
+	categoriesCmd.GroupID = "data"
+	root.AddCommand(categoriesCmd)
+
+	tagsCmd := newTagsCommand(ctx, state, stdout)
+	tagsCmd.GroupID = "data"
+	root.AddCommand(tagsCmd)
+
+	recurringCmd := newRecurringCommand(ctx, state, stdout)
+	recurringCmd.GroupID = "data"
+	root.AddCommand(recurringCmd)
+
+	itemsCmd := newItemsCommand(ctx, state, stdout)
+	itemsCmd.GroupID = "data"
+	root.AddCommand(itemsCmd)
+
+	investmentsCmd := newInvestmentsCommand(ctx, state, stdout)
+	investmentsCmd.GroupID = "data"
+	root.AddCommand(investmentsCmd)
+
+	liabilitiesCmd := newLiabilitiesCommand(ctx, state, stdout)
+	liabilitiesCmd.GroupID = "data"
+	root.AddCommand(liabilitiesCmd)
+
+	syncCmd := newSyncCommand(ctx, state, stdout)
+	syncCmd.GroupID = "data"
+	root.AddCommand(syncCmd)
+
+	linkCmd := newLinkCommand(ctx, state, stdout)
+	linkCmd.GroupID = "config"
+	root.AddCommand(linkCmd)
+
+	providersCmd := newProvidersCommand(ctx, state, stdout)
+	providersCmd.GroupID = "config"
+	root.AddCommand(providersCmd)
+
+	feedbackCmd := newFeedbackCommand(state, stdout)
+	feedbackCmd.GroupID = "utils"
+	root.AddCommand(feedbackCmd)
 
 	txAlias := newTransactionsCommand(ctx, state, stdout)
 	txAlias.Use = "tx"
 	txAlias.Aliases = nil
+	txAlias.GroupID = "data"
 	root.AddCommand(txAlias)
 
 	return root
@@ -140,10 +208,129 @@ func (e cliExit) Error() string {
 	return fmt.Sprintf("exit %d", e.exitCode)
 }
 
+func newInvestmentsCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
+	cmd := &cobra.Command{Use: "investments"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "holdings",
+		Short: "List investment holdings",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return err
+			}
+			holdings, err := activeStore.ListHoldings(ctx)
+			if err != nil {
+				return err
+			}
+			if !state.json {
+				table := tablewriter.NewWriter(stdout)
+				table.SetHeader([]string{"ACCOUNT", "SECURITY", "QUANTITY", "PRICE", "VALUE", "CURRENCY"})
+				table.SetBorder(false)
+				for _, h := range holdings {
+					table.Append([]string{h.AccountID, h.SecurityID, fmt.Sprintf("%.4f", h.Quantity), fmt.Sprintf("%.2f", h.InstitutionPrice), fmt.Sprintf("%.2f", h.InstitutionValue), h.Currency})
+				}
+				table.Render()
+				return nil
+			}
+			env := contracts.NewSuccess("investments.holdings", map[string]any{"holdings": holdings})
+			env.Meta.Demo = state.demo
+			return contracts.WriteJSON(stdout, env)
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "securities",
+		Short: "List investment securities",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return err
+			}
+			securities, err := activeStore.ListSecurities(ctx)
+			if err != nil {
+				return err
+			}
+			if !state.json {
+				table := tablewriter.NewWriter(stdout)
+				table.SetHeader([]string{"SECURITY ID", "NAME", "TICKER", "TYPE", "CLOSE PRICE", "CURRENCY"})
+				table.SetBorder(false)
+				for _, sec := range securities {
+					ticker := "-"
+					if sec.TickerSymbol != nil {
+						ticker = *sec.TickerSymbol
+					}
+					table.Append([]string{sec.SecurityID, sec.Name, ticker, sec.Type, fmt.Sprintf("%.2f", sec.ClosePrice), sec.Currency})
+				}
+				table.Render()
+				return nil
+			}
+			env := contracts.NewSuccess("investments.securities", map[string]any{"securities": securities})
+			env.Meta.Demo = state.demo
+			return contracts.WriteJSON(stdout, env)
+		},
+	})
+	return cmd
+}
+
+func newLiabilitiesCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
+	cmd := &cobra.Command{Use: "liabilities"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "list",
+		Short: "List liabilities",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return err
+			}
+			liabilities, err := activeStore.ListLiabilities(ctx)
+			if err != nil {
+				return err
+			}
+			if !state.json {
+				table := tablewriter.NewWriter(stdout)
+				table.SetHeader([]string{"ACCOUNT", "TYPE", "NAME", "BALANCE", "CURRENCY"})
+				table.SetBorder(false)
+				for _, l := range liabilities {
+					table.Append([]string{l.AccountID, l.Type, l.Name, fmt.Sprintf("%.2f", l.CurrentBalance), l.Currency})
+				}
+				table.Render()
+				return nil
+			}
+			env := contracts.NewSuccess("liabilities.list", map[string]any{"liabilities": liabilities})
+			env.Meta.Demo = state.demo
+			return contracts.WriteJSON(stdout, env)
+		},
+	})
+	return cmd
+}
+
+func newFeedbackCommand(state *runtimeState, stdout io.Writer) *cobra.Command {
+	return &cobra.Command{
+		Use:   "feedback",
+		Short: "Open the project's GitHub issues page in a browser",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			url := "https://github.com/thedavidweng/money/issues"
+			if state.json {
+				env := contracts.NewSuccess("feedback", map[string]string{"url": url})
+				return contracts.WriteJSON(stdout, env)
+			}
+			fmt.Fprintf(stdout, "Opening %s\n", url)
+			if err := openBrowser(url); err != nil {
+				fmt.Fprintf(stdout, "Could not open browser automatically. Visit %s\n", url)
+			}
+			return nil
+		},
+	}
+}
+
 func newDemoCommand(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "demo <command...>",
 		Short: "Run a command against bundled non-persistent sample data",
+		Long: `demo runs money commands against bundled non-persistent sample data.
+
+This is a safe sandbox to explore the CLI without linking real institutions.
+All data is stored in memory and discarded when the command exits.
+`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			demoStore, err := store.OpenDemo(ctx)
 			if err != nil {
@@ -162,14 +349,45 @@ func newDemoCommand(ctx context.Context, state *runtimeState, stdout io.Writer, 
 			return cmd.Help()
 		},
 	}
-	cmd.AddCommand(newAccountsCommand(ctx, state, stdout))
-	cmd.AddCommand(newTransactionsCommand(ctx, state, stdout))
-	cmd.AddCommand(newCategoriesCommand(ctx, state, stdout))
-	cmd.AddCommand(newTagsCommand(ctx, state, stdout))
-	cmd.AddCommand(newRecurringCommand(ctx, state, stdout))
+
+	cmd.AddGroup(&cobra.Group{ID: "data", Title: "Data"})
+
+	accountsCmd := newAccountsCommand(ctx, state, stdout)
+	accountsCmd.GroupID = "data"
+	cmd.AddCommand(accountsCmd)
+
+	transactionsCmd := newTransactionsCommand(ctx, state, stdout)
+	transactionsCmd.GroupID = "data"
+	cmd.AddCommand(transactionsCmd)
+
+	categoriesCmd := newCategoriesCommand(ctx, state, stdout)
+	categoriesCmd.GroupID = "data"
+	cmd.AddCommand(categoriesCmd)
+
+	tagsCmd := newTagsCommand(ctx, state, stdout)
+	tagsCmd.GroupID = "data"
+	cmd.AddCommand(tagsCmd)
+
+	recurringCmd := newRecurringCommand(ctx, state, stdout)
+	recurringCmd.GroupID = "data"
+	cmd.AddCommand(recurringCmd)
+
+	itemsCmd := newItemsCommand(ctx, state, stdout)
+	itemsCmd.GroupID = "data"
+	cmd.AddCommand(itemsCmd)
+
+	investmentsCmd := newInvestmentsCommand(ctx, state, stdout)
+	investmentsCmd.GroupID = "data"
+	cmd.AddCommand(investmentsCmd)
+
+	liabilitiesCmd := newLiabilitiesCommand(ctx, state, stdout)
+	liabilitiesCmd.GroupID = "data"
+	cmd.AddCommand(liabilitiesCmd)
+
 	txAlias := newTransactionsCommand(ctx, state, stdout)
 	txAlias.Use = "tx"
 	txAlias.Aliases = nil
+	txAlias.GroupID = "data"
 	cmd.AddCommand(txAlias)
 	return cmd
 }
@@ -409,6 +627,103 @@ func newTagsCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 	return cmd
 }
 
+func newItemsCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
+	cmd := &cobra.Command{Use: "items"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "list",
+		Short: "List linked provider items",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return err
+			}
+			items, err := activeStore.ListProviderItems(ctx, store.ProviderItemQuery{})
+			if err != nil {
+				return err
+			}
+			if !state.json {
+				table := tablewriter.NewWriter(stdout)
+				table.SetHeader([]string{"ID", "PROVIDER", "INSTITUTION", "ALIAS", "STATUS", "PRODUCTS"})
+				table.SetBorder(false)
+				for _, item := range items {
+					alias := item.Alias
+					if alias == "" {
+						alias = "-"
+					}
+					table.Append([]string{item.ID, item.Provider, item.InstitutionID, alias, item.Status, strings.Join(item.Products, ",")})
+				}
+				table.Render()
+				return nil
+			}
+			env := contracts.NewSuccess("items.list", map[string]any{"items": items})
+			env.Meta.Demo = state.demo
+			return contracts.WriteJSON(stdout, env)
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "get <id>",
+		Short: "Get a linked provider item",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return err
+			}
+			item, err := activeStore.GetProviderItem(ctx, args[0])
+			if err != nil {
+				return err
+			}
+			env := contracts.NewSuccess("items.get", map[string]any{"item": item})
+			env.Meta.Demo = state.demo
+			return contracts.WriteJSON(stdout, env)
+		},
+	})
+	renameCmd := &cobra.Command{
+		Use:   "rename <id> <name>",
+		Short: "Rename a linked provider item alias",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return err
+			}
+			if err := activeStore.UpdateProviderItemName(ctx, args[0], args[1]); err != nil {
+				return err
+			}
+			if state.json {
+				env := contracts.NewSuccess("items.rename", map[string]string{"id": args[0], "alias": args[1]})
+				env.Meta.Demo = state.demo
+				return contracts.WriteJSON(stdout, env)
+			}
+			fmt.Fprintf(stdout, "Renamed %s to %s\n", args[0], args[1])
+			return nil
+		},
+	}
+	cmd.AddCommand(renameCmd)
+	cmd.AddCommand(&cobra.Command{
+		Use:   "remove <id>",
+		Short: "Remove a linked provider item",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return err
+			}
+			if err := activeStore.RemoveProviderItem(ctx, args[0]); err != nil {
+				return err
+			}
+			if state.json {
+				env := contracts.NewSuccess("items.remove", map[string]string{"id": args[0]})
+				env.Meta.Demo = state.demo
+				return contracts.WriteJSON(stdout, env)
+			}
+			fmt.Fprintf(stdout, "Removed %s\n", args[0])
+			return nil
+		},
+	})
+	return cmd
+}
+
 func newRecurringCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
 	cmd := &cobra.Command{Use: "recurring"}
 	cmd.AddCommand(&cobra.Command{
@@ -432,7 +747,7 @@ func newRecurringCommand(ctx context.Context, state *runtimeState, stdout io.Wri
 }
 
 func newSyncCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
-	var providerName, providerItemID string
+	var providerName, providerItemID, startDate, endDate string
 	var verbose bool
 	cmd := &cobra.Command{
 		Use:   "sync",
@@ -446,13 +761,15 @@ func newSyncCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 			if !ok {
 				return fmt.Errorf("active store cannot sync provider items")
 			}
-			cfg, err := config.Load(config.Options{ConfigPath: state.configPath})
+			cfg, err := config.Load(config.Options{ConfigPath: state.configPath, Profile: state.profile})
 			if err != nil {
 				return err
 			}
 			result, err := syncer.Sync(ctx, syncStore, providers.NewRegistry(cfg), syncer.Options{
 				Provider:       providerName,
 				ProviderItemID: providerItemID,
+				StartDate:      startDate,
+				EndDate:        endDate,
 			})
 			if state.json {
 				return writeSyncJSON(stdout, result, err)
@@ -463,6 +780,8 @@ func newSyncCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 	}
 	cmd.Flags().StringVar(&providerName, "provider", "", "sync only one provider")
 	cmd.Flags().StringVar(&providerItemID, "provider-item", "", "sync only one provider item")
+	cmd.Flags().StringVar(&startDate, "start-date", "", "backfill transactions from this date (YYYY-MM-DD); requires --end-date")
+	cmd.Flags().StringVar(&endDate, "end-date", "", "backfill transactions until this date (YYYY-MM-DD); requires --start-date")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "show per-provider-item sync details")
 	return cmd
 }
@@ -493,7 +812,7 @@ func newLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 					exitCode:  6,
 				}
 			}
-			cfg, err := config.Load(config.Options{ConfigPath: state.configPath})
+			cfg, err := config.Load(config.Options{ConfigPath: state.configPath, Profile: state.profile})
 			if err != nil {
 				return err
 			}
@@ -508,10 +827,14 @@ func newLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 				if !state.json {
 					writeProviderAvailability(stdout, availability)
 				}
+				msg := providerName + " is supported for institution linking but unavailable locally: " + diagnostics[0].Message + " " + availability[0].Guidance
+				if spec, ok := config.ProviderSpecByName(providerName); ok && spec.HelpURL != "" {
+					msg += " Get credentials: " + spec.HelpURL
+				}
 				return cliError{
 					command:   "link",
 					code:      diagnostics[0].Code,
-					message:   providerName + " is supported for institution linking but unavailable locally: " + diagnostics[0].Message + " " + availability[0].Guidance,
+					message:   msg,
 					category:  contracts.CategoryAuth,
 					retryable: false,
 					exitCode:  3,
@@ -563,7 +886,7 @@ func newProviderLinkCommand(ctx context.Context, state *runtimeState, providerNa
 		Use:   "link",
 		Short: "Link a " + providerName + " Provider Item",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := config.Load(config.Options{ConfigPath: state.configPath})
+			cfg, err := config.Load(config.Options{ConfigPath: state.configPath, Profile: state.profile})
 			if err != nil {
 				return err
 			}
@@ -574,10 +897,14 @@ func newProviderLinkCommand(ctx context.Context, state *runtimeState, providerNa
 			}
 			diagnostics := provider.ValidateConfig(ctx)
 			if len(diagnostics) > 0 {
+				msg := diagnostics[0].Message
+				if spec, ok := config.ProviderSpecByName(providerName); ok && spec.HelpURL != "" {
+					msg += " Get credentials: " + spec.HelpURL
+				}
 				return cliError{
 					command:   "providers." + providerName + ".link",
 					code:      diagnostics[0].Code,
-					message:   diagnostics[0].Message,
+					message:   msg,
 					category:  contracts.CategoryAuth,
 					retryable: false,
 					exitCode:  3,
@@ -651,10 +978,16 @@ var startPlaidLinkSessionServer = func(linkToken string, state string, timeout t
 }
 
 var openBrowser = func(url string) error {
-	if runtime.GOOS != "darwin" {
-		return fmt.Errorf("browser opening is only implemented on darwin")
+	switch runtime.GOOS {
+	case "darwin":
+		return exec.Command("open", url).Run()
+	case "linux":
+		return exec.Command("xdg-open", url).Run()
+	case "windows":
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Run()
+	default:
+		return fmt.Errorf("browser opening is not implemented on %s", runtime.GOOS)
 	}
-	return exec.Command("open", url).Run()
 }
 
 func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider providers.Provider, institution providers.Institution, redirectURI string, noOpen bool, stdout io.Writer) error {
@@ -831,9 +1164,10 @@ func writeManualPlan(stdout io.Writer, state *runtimeState, plan manualAccountPl
 func writeTransactionsPage(stdout io.Writer, state *runtimeState, command string, transactions []core.Transaction, limit int, offset int) error {
 	if !state.json {
 		table := tablewriter.NewWriter(stdout)
-		table.SetHeader([]string{"DATE", "MERCHANT", "AMOUNT", "CATEGORY", "STATUS"})
+		table.SetHeader([]string{"DATE", "ACCOUNT", "MERCHANT", "AMOUNT", "CATEGORY", "STATUS"})
 		table.SetBorder(false)
 		table.SetAutoWrapText(false)
+		table.SetAlignment(tablewriter.ALIGN_LEFT)
 		for _, tx := range transactions {
 			cat := ""
 			if tx.CategoryName != nil {
@@ -856,7 +1190,11 @@ func writeTransactionsPage(stdout io.Writer, state *runtimeState, command string
 			if merchant == "" {
 				merchant = tx.Name
 			}
-			table.Append([]string{tx.Date, merchant, tx.Amount, cat, status})
+			accountName := tx.AccountName
+			if accountName == "" {
+				accountName = "-"
+			}
+			table.Append([]string{tx.Date, accountName, merchant, tx.Amount, cat, status})
 		}
 		table.Render()
 		return nil
@@ -925,7 +1263,7 @@ func writeSyncHuman(stdout io.Writer, result syncer.Result, verbose bool) {
 
 func requireStore(state *runtimeState) (store.Store, error) {
 	if state.store == nil {
-		cfg, err := config.Load(config.Options{ConfigPath: state.configPath})
+		cfg, err := config.Load(config.Options{ConfigPath: state.configPath, Profile: state.profile})
 		if err != nil {
 			return nil, err
 		}

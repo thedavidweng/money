@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -21,7 +23,7 @@ func newSetupCommand(_ context.Context, state *runtimeState, stdout io.Writer) *
 		Use:   "setup",
 		Short: "Initialize money configuration and encrypted database",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			result, err := config.Setup(state.configPath, force)
+			result, err := config.Setup(state.configPath, state.profile, force)
 			if err != nil {
 				return cliError{
 					command:  "setup",
@@ -33,7 +35,7 @@ func newSetupCommand(_ context.Context, state *runtimeState, stdout io.Writer) *
 			}
 
 			// Open the store to run migrations
-			cfg, loadErr := config.Load(config.Options{ConfigPath: result.ConfigPath})
+			cfg, loadErr := config.Load(config.Options{ConfigPath: result.ConfigPath, Profile: state.profile})
 			if loadErr == nil {
 				opened, openErr := store.OpenEncrypted(context.Background(), cfg.DatabasePath, cfg.DatabaseEncryptionKeyBytes)
 				if openErr == nil {
@@ -54,7 +56,7 @@ func newSetupCommand(_ context.Context, state *runtimeState, stdout io.Writer) *
 			}
 
 			// Run doctor diagnostics
-			diagnostics := runDiagnostics(result.ConfigPath)
+			diagnostics := runDiagnostics(result.ConfigPath, state.profile)
 
 			if state.json {
 				env := contracts.NewSuccess("setup", map[string]any{
@@ -80,6 +82,13 @@ func newSetupCommand(_ context.Context, state *runtimeState, stdout io.Writer) *
 				fmt.Fprintln(stdout, "Database: ready")
 			}
 			printDiagnostics(stdout, diagnostics)
+
+			// Post-setup interactive wizard: offer to configure providers
+			if !state.json && state.stdin != nil {
+				if err := runSetupWizard(cmd.Context(), state, stdout, diagnostics); err != nil {
+					return err
+				}
+			}
 			return nil
 		},
 	}
@@ -105,7 +114,7 @@ func newDoctorCommand(_ context.Context, state *runtimeState, stdout io.Writer) 
 			if fix {
 				return runDoctorFix(state, stdout, dryRun)
 			}
-			diagnostics := runDiagnostics(state.configPath)
+			diagnostics := runDiagnostics(state.configPath, state.profile)
 			if state.json {
 				env := contracts.NewSuccess("doctor", map[string]any{"diagnostics": diagnostics})
 				return contracts.WriteJSON(stdout, env)
@@ -130,7 +139,7 @@ func newDoctorCommand(_ context.Context, state *runtimeState, stdout io.Writer) 
 }
 
 func runDoctorFix(state *runtimeState, stdout io.Writer, dryRun bool) error {
-	result, err := config.Setup(state.configPath, false)
+	result, err := config.Setup(state.configPath, state.profile, false)
 	if dryRun {
 		if state.json {
 			env := contracts.NewSuccess("doctor", map[string]any{
@@ -153,7 +162,7 @@ func runDoctorFix(state *runtimeState, stdout io.Writer, dryRun bool) error {
 		}
 	}
 	// Open DB to ensure migrations run
-	cfg, loadErr := config.Load(config.Options{ConfigPath: result.ConfigPath})
+	cfg, loadErr := config.Load(config.Options{ConfigPath: result.ConfigPath, Profile: state.profile})
 	if loadErr == nil {
 		opened, openErr := store.OpenEncrypted(context.Background(), cfg.DatabasePath, cfg.DatabaseEncryptionKeyBytes)
 		if openErr == nil {
@@ -161,7 +170,7 @@ func runDoctorFix(state *runtimeState, stdout io.Writer, dryRun bool) error {
 			result.DBCreated = true
 		}
 	}
-	diagnostics := runDiagnostics(result.ConfigPath)
+	diagnostics := runDiagnostics(result.ConfigPath, state.profile)
 	if state.json {
 		env := contracts.NewSuccess("doctor", map[string]any{
 			"mode":        "fix",
@@ -175,11 +184,11 @@ func runDoctorFix(state *runtimeState, stdout io.Writer, dryRun bool) error {
 	return nil
 }
 
-func runDiagnostics(configPath string) []Diagnostic {
+func runDiagnostics(configPath string, profile string) []Diagnostic {
 	var diags []Diagnostic
 
 	// Config section
-	cfg, err := config.Load(config.Options{ConfigPath: configPath})
+	cfg, err := config.Load(config.Options{ConfigPath: configPath, Profile: profile})
 	if err != nil {
 		diags = append(diags, Diagnostic{
 			Section: "Config", Code: "CONFIG_LOAD_FAILED", Status: "error",
@@ -234,9 +243,17 @@ func runDiagnostics(configPath string) []Diagnostic {
 	for _, name := range []string{"plaid", "bridge"} {
 		pc, ok := cfg.Providers[name]
 		if !ok || len(pc.Fields) == 0 {
+			var helpURL string
+			if spec, ok := config.ProviderSpecByName(name); ok {
+				helpURL = spec.HelpURL
+			}
+			msg := name + " is not configured. Run `money providers configure " + name + "` to add credentials."
+			if helpURL != "" {
+				msg += " Get credentials: " + helpURL
+			}
 			diags = append(diags, Diagnostic{
 				Section: "Providers", Code: "PROVIDER_NOT_CONFIGURED", Status: "warn",
-				Message:  name + " is not configured. Run `money providers configure " + name + "` to add credentials.",
+				Message:  msg,
 				Category: "config",
 			})
 		} else {
@@ -270,77 +287,274 @@ func errString(err error) string {
 	return err.Error()
 }
 
+func runSetupWizard(ctx context.Context, state *runtimeState, stdout io.Writer, diags []Diagnostic) error {
+	// Count unconfigured providers
+	unconfigured := []string{}
+	for _, d := range diags {
+		if d.Section == "Providers" && d.Status == "warn" && strings.HasPrefix(d.Code, "PROVIDER_NOT_CONFIGURED") {
+			for _, name := range []string{"plaid", "bridge"} {
+				if strings.Contains(d.Message, name) {
+					unconfigured = append(unconfigured, name)
+					break
+				}
+			}
+		}
+	}
+	if len(unconfigured) == 0 {
+		return nil
+	}
+
+	reader := bufio.NewReader(state.stdin)
+	for {
+		fmt.Fprintln(stdout)
+		fmt.Fprintf(stdout, "No providers are configured yet. To link financial institutions, you need at least one provider.\n")
+		fmt.Fprintln(stdout)
+		for i, name := range unconfigured {
+			if spec, ok := config.ProviderSpecByName(name); ok {
+				fmt.Fprintf(stdout, "  %d) %s — %s\n", i+1, name, spec.HelpURL)
+			}
+		}
+		fmt.Fprintf(stdout, "  %d) Skip for now\n", len(unconfigured)+1)
+		fmt.Fprintln(stdout)
+		fmt.Fprintf(stdout, "Select a provider to configure (1-%d): ", len(unconfigured)+1)
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("failed to read selection: %w", err)
+		}
+		choice := strings.TrimSpace(input)
+		idx := -1
+		if n, err := strconv.Atoi(choice); err == nil {
+			idx = n - 1
+		}
+		if idx >= 0 && idx < len(unconfigured) {
+			providerName := unconfigured[idx]
+			// Build a minimal cobra.Command just to hold flags for runInteractiveProviderConfigure
+			fakeCmd := &cobra.Command{}
+			fakeCmd.Flags().Bool("force", false, "")
+			selectedSpec, _ := providerSpecByName(providerName)
+			for _, field := range selectedSpec.SecretFields {
+				fakeCmd.Flags().String(strings.ReplaceAll(field, "_", "-"), "", "")
+			}
+			for field := range selectedSpec.OptionalFields {
+				fakeCmd.Flags().String(strings.ReplaceAll(field, "_", "-"), "", "")
+			}
+			if err := runInteractiveProviderConfigure(state, stdout, providerName, fakeCmd, reader); err != nil {
+				return err
+			}
+			// Refresh diagnostics to see if there are still unconfigured providers
+			_, loadErr := config.Load(config.Options{ConfigPath: state.configPath, Profile: state.profile})
+			if loadErr == nil {
+				diags = runDiagnostics(state.configPath, state.profile)
+				unconfigured = []string{}
+				for _, d := range diags {
+					if d.Section == "Providers" && d.Status == "warn" && strings.HasPrefix(d.Code, "PROVIDER_NOT_CONFIGURED") {
+						for _, name := range []string{"plaid", "bridge"} {
+							if strings.Contains(d.Message, name) {
+								unconfigured = append(unconfigured, name)
+								break
+							}
+						}
+					}
+				}
+			}
+			if len(unconfigured) == 0 {
+				fmt.Fprintln(stdout)
+				fmt.Fprintf(stdout, "All providers configured. Run `money link <institution>` to connect an institution.\n")
+				return nil
+			}
+			fmt.Fprintln(stdout)
+			fmt.Fprintf(stdout, "Would you like to configure another provider? (y/n): ")
+			resp, err := reader.ReadString('\n')
+			if err != nil {
+				return fmt.Errorf("failed to read response: %w", err)
+			}
+			if strings.ToLower(strings.TrimSpace(resp)) != "y" {
+				fmt.Fprintln(stdout)
+				fmt.Fprintf(stdout, "You can always run `money providers configure <provider>` later.\n")
+				return nil
+			}
+		} else if idx == len(unconfigured) {
+			fmt.Fprintln(stdout)
+			fmt.Fprintf(stdout, "You can always run `money providers configure <provider>` later.\n")
+			return nil
+		} else {
+			fmt.Fprintf(stdout, "  ! Invalid choice. Please enter a number between 1 and %d.\n", len(unconfigured)+1)
+		}
+	}
+}
+
+func providerSpecByName(name string) (config.ProviderSpec, error) {
+	switch name {
+	case "plaid":
+		return config.PlaidSpec, nil
+	case "bridge":
+		return config.BridgeSpec, nil
+	}
+	return config.ProviderSpec{}, fmt.Errorf("unknown provider: %s", name)
+}
+
+func promptForProviderCredentials(stdout io.Writer, reader *bufio.Reader, spec config.ProviderSpec, secrets map[string]string) error {
+	// Skip entirely if all fields are already filled.
+	allFilled := true
+	for _, field := range spec.SecretFields {
+		if secrets[field] == "" {
+			allFilled = false
+			break
+		}
+	}
+	if allFilled {
+		return nil
+	}
+
+	if spec.HelpURL != "" {
+		fmt.Fprintf(stdout, "\n! %s credentials are required.\n", spec.Name)
+		fmt.Fprintf(stdout, "\n  1. Open %s in your browser\n", spec.HelpURL)
+		fmt.Fprintf(stdout, "     (or copy the URL and open it manually)\n")
+		if err := openBrowser(spec.HelpURL); err != nil {
+			fmt.Fprintf(stdout, "     ! Could not open browser automatically.\n")
+		}
+		fmt.Fprintln(stdout)
+		fmt.Fprintf(stdout, "  2. Copy the following fields from your %s dashboard:\n", spec.Name)
+		for i, field := range spec.SecretFields {
+			fmt.Fprintf(stdout, "     %d. %s\n", i+1, strings.ReplaceAll(field, "_", "-"))
+		}
+		fmt.Fprintln(stdout)
+		fmt.Fprintf(stdout, "  Press Enter once you have copied them.")
+		if _, err := reader.ReadString('\n'); err != nil {
+			return fmt.Errorf("failed to read ready signal: %w", err)
+		}
+	}
+
+	fmt.Fprintln(stdout)
+	for _, field := range spec.SecretFields {
+		if secrets[field] != "" {
+			continue
+		}
+		for {
+			fmt.Fprintf(stdout, "%s: ", strings.ReplaceAll(field, "_", "-"))
+			input, err := reader.ReadString('\n')
+			if err != nil {
+				return fmt.Errorf("failed to read %s: %w", field, err)
+			}
+			secrets[field] = strings.TrimSpace(input)
+			if secrets[field] != "" {
+				break
+			}
+			fmt.Fprintf(stdout, "  ! %s is required. Please provide a value.\n", strings.ReplaceAll(field, "_", "-"))
+		}
+	}
+	fmt.Fprintln(stdout)
+	return nil
+}
+
+func runInteractiveProviderConfigure(state *runtimeState, stdout io.Writer, providerName string, cmd *cobra.Command, reader *bufio.Reader) error {
+	spec, err := providerSpecByName(providerName)
+	if err != nil {
+		return cliError{
+			command:  "providers.configure",
+			code:     "UNKNOWN_PROVIDER",
+			message:  err.Error(),
+			category: contracts.CategoryValidation,
+			exitCode: 2,
+		}
+	}
+
+	force, _ := cmd.Flags().GetBool("force")
+	secrets := map[string]string{}
+	options := map[string]string{}
+	for _, field := range spec.SecretFields {
+		val, _ := cmd.Flags().GetString(strings.ReplaceAll(field, "_", "-"))
+		secrets[field] = val
+	}
+	for field := range spec.OptionalFields {
+		val, _ := cmd.Flags().GetString(strings.ReplaceAll(field, "_", "-"))
+		options[field] = val
+	}
+
+	// Interactive prompt for missing secrets
+	if !state.json && state.stdin != nil {
+		needsPrompt := false
+		for _, field := range spec.SecretFields {
+			if secrets[field] == "" {
+				needsPrompt = true
+				break
+			}
+		}
+		if needsPrompt {
+			if reader == nil {
+				reader = bufio.NewReader(state.stdin)
+			}
+			if err := promptForProviderCredentials(stdout, reader, spec, secrets); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Final validation before writing
+	var missing []string
+	for _, field := range spec.SecretFields {
+		if secrets[field] == "" {
+			missing = append(missing, strings.ReplaceAll(field, "_", "-"))
+		}
+	}
+	if len(missing) > 0 {
+		return cliError{
+			command:  "providers.configure",
+			code:     "MISSING_CREDENTIALS",
+			message:  fmt.Sprintf("%s is missing required credentials: %s. Run interactively or pass them as flags.", providerName, strings.Join(missing, ", ")),
+			category: contracts.CategoryValidation,
+			exitCode: 2,
+		}
+	}
+
+	result, err := config.ConfigureProvider(state.configPath, state.profile, spec, secrets, options, force)
+	if err != nil {
+		return cliError{
+			command:  "providers.configure",
+			code:     "CONFIG_WRITE_FAILED",
+			message:  err.Error(),
+			category: contracts.CategoryConfig,
+			exitCode: 1,
+		}
+	}
+
+	diagnostics := runDiagnostics(result.ConfigPath, state.profile)
+	providerDiags := []Diagnostic{}
+	for _, d := range diagnostics {
+		if d.Section == "Config" || d.Section == "Providers" {
+			providerDiags = append(providerDiags, d)
+		}
+	}
+
+	if state.json {
+		env := contracts.NewSuccess("providers.configure", map[string]any{
+			"provider":     result.Provider,
+			"keys_written": result.KeysWritten,
+			"diagnostics":  providerDiags,
+		})
+		return contracts.WriteJSON(stdout, env)
+	}
+
+	if result.KeysWritten > 0 {
+		fmt.Fprintf(stdout, "%s configured (%d credentials written).\n", providerName, result.KeysWritten)
+	} else {
+		fmt.Fprintf(stdout, "%s credentials already present (use --force to overwrite).\n", providerName)
+	}
+	printDiagnostics(stdout, providerDiags)
+	return nil
+}
+
 func newConfigureCommand(state *runtimeState, stdout io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "configure <provider>",
 		Short: "Configure provider credentials",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			providerName := args[0]
-			var spec config.ProviderSpec
-			switch providerName {
-			case "plaid":
-				spec = config.PlaidSpec
-			case "bridge":
-				spec = config.BridgeSpec
-			default:
-				return cliError{
-					command:  "providers.configure",
-					code:     "UNKNOWN_PROVIDER",
-					message:  "unknown provider: " + providerName,
-					category: contracts.CategoryValidation,
-					exitCode: 2,
-				}
+			var reader *bufio.Reader
+			if state.stdin != nil {
+				reader = bufio.NewReader(state.stdin)
 			}
-
-			force, _ := cmd.Flags().GetBool("force")
-			secrets := map[string]string{}
-			options := map[string]string{}
-			for _, field := range spec.SecretFields {
-				val, _ := cmd.Flags().GetString(strings.ReplaceAll(field, "_", "-"))
-				secrets[field] = val
-			}
-			for field := range spec.OptionalFields {
-				val, _ := cmd.Flags().GetString(strings.ReplaceAll(field, "_", "-"))
-				options[field] = val
-			}
-
-			result, err := config.ConfigureProvider(state.configPath, spec, secrets, options, force)
-			if err != nil {
-				return cliError{
-					command:  "providers.configure",
-					code:     "CONFIG_WRITE_FAILED",
-					message:  err.Error(),
-					category: contracts.CategoryConfig,
-					exitCode: 1,
-				}
-			}
-
-			// Run provider-specific diagnostics
-			diagnostics := runDiagnostics(result.ConfigPath)
-			providerDiags := []Diagnostic{}
-			for _, d := range diagnostics {
-				if d.Section == "Config" || d.Section == "Providers" {
-					providerDiags = append(providerDiags, d)
-				}
-			}
-
-			if state.json {
-				env := contracts.NewSuccess("providers.configure", map[string]any{
-					"provider":     result.Provider,
-					"keys_written": result.KeysWritten,
-					"diagnostics":  providerDiags,
-				})
-				return contracts.WriteJSON(stdout, env)
-			}
-
-			if result.KeysWritten > 0 {
-				fmt.Fprintf(stdout, "%s configured (%d credentials written).\n", providerName, result.KeysWritten)
-			} else {
-				fmt.Fprintf(stdout, "%s credentials already present (use --force to overwrite).\n", providerName)
-			}
-			printDiagnostics(stdout, providerDiags)
-			return nil
+			return runInteractiveProviderConfigure(state, stdout, args[0], cmd, reader)
 		},
 	}
 
