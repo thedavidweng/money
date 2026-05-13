@@ -26,6 +26,7 @@ type LinkedItem struct {
 	Provider               string
 	InstitutionID          string
 	ProviderExternalItemID string
+	Alias                  string
 	AccessToken            string
 	EncryptedAccessToken   []byte
 	Status                 string
@@ -90,8 +91,8 @@ ON CONFLICT(provider, provider_external_item_id) DO UPDATE SET
 
 func (s *SQLiteStore) ListProviderItems(ctx context.Context, query ProviderItemQuery) ([]LinkedItem, error) {
 	sqlText := `
-SELECT id, provider, institution_id, provider_external_item_id, encrypted_access_token,
-       external_user_id, status, products_json, transaction_cursor
+SELECT id, provider, institution_id, provider_external_item_id, COALESCE(alias, ''),
+       encrypted_access_token, external_user_id, status, products_json, transaction_cursor
 FROM provider_items
 WHERE (? = '' OR provider = ?)
   AND (? = '' OR id = ?)
@@ -108,8 +109,8 @@ ORDER BY provider, id`
 		var externalUserID, cursor sql.NullString
 		var productsJSON string
 		if err := rows.Scan(
-			&item.ID, &item.Provider, &item.InstitutionID, &item.ProviderExternalItemID, &item.EncryptedAccessToken,
-			&externalUserID, &item.Status, &productsJSON, &cursor,
+			&item.ID, &item.Provider, &item.InstitutionID, &item.ProviderExternalItemID, &item.Alias,
+			&item.EncryptedAccessToken, &externalUserID, &item.Status, &productsJSON, &cursor,
 		); err != nil {
 			return nil, err
 		}
@@ -128,12 +129,12 @@ func (s *SQLiteStore) GetProviderItem(ctx context.Context, id string) (LinkedIte
 	var externalUserID, cursor sql.NullString
 	var productsJSON string
 	err := s.db.QueryRowContext(ctx, `
-SELECT id, provider, institution_id, provider_external_item_id, encrypted_access_token,
-       external_user_id, status, products_json, transaction_cursor
+SELECT id, provider, institution_id, provider_external_item_id, COALESCE(alias, ''),
+       encrypted_access_token, external_user_id, status, products_json, transaction_cursor
 FROM provider_items
 WHERE id = ?`, id).Scan(
-		&item.ID, &item.Provider, &item.InstitutionID, &item.ProviderExternalItemID, &item.EncryptedAccessToken,
-		&externalUserID, &item.Status, &productsJSON, &cursor,
+		&item.ID, &item.Provider, &item.InstitutionID, &item.ProviderExternalItemID, &item.Alias,
+		&item.EncryptedAccessToken, &externalUserID, &item.Status, &productsJSON, &cursor,
 	)
 	if err != nil {
 		return LinkedItem{}, err
@@ -156,6 +157,50 @@ ON CONFLICT(provider, provider_institution_id) DO UPDATE SET
   updated_at = excluded.updated_at`,
 		institution.ID, institution.Name, institution.Provider, institution.ProviderInstitutionID, now, now)
 	return err
+}
+
+func (s *SQLiteStore) UpdateProviderItemName(ctx context.Context, id string, name string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := s.db.ExecContext(ctx, `
+UPDATE provider_items
+SET alias = ?, updated_at = ?
+WHERE id = ?`, name, now, id)
+	return err
+}
+
+func (s *SQLiteStore) RemoveProviderItem(ctx context.Context, id string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Cascade-delete in dependency order:
+	// transaction_tags → transactions → recurring → sync_runs → accounts → provider_items
+	// holdings and liabilities have ON DELETE CASCADE in schema.
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM transaction_tags WHERE transaction_id IN (
+			SELECT id FROM transactions WHERE provider_item_id = ?
+		)`, id); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM transactions WHERE provider_item_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM recurring WHERE provider_item_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM sync_runs WHERE provider_item_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM accounts WHERE provider_item_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM provider_items WHERE id = ?`, id); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func (s *SQLiteStore) UpsertProviderItem(ctx context.Context, item providers.ProviderItem) error {

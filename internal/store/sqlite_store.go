@@ -20,6 +20,9 @@ import (
 //go:embed migrations/0001_initial.sql
 var initialMigration string
 
+//go:embed migrations/0002_investments_liabilities.sql
+var investmentsLiabilitiesMigration string
+
 type SQLiteStore struct {
 	db *sql.DB
 }
@@ -76,11 +79,53 @@ func (s *SQLiteStore) runMigrations(ctx context.Context) error {
 	if err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'institutions'`).Scan(&count); err != nil {
 		return fmt.Errorf("check migration state: %w", err)
 	}
-	if count > 0 {
-		return nil
+	if count == 0 {
+		if _, err := s.db.ExecContext(ctx, initialMigration); err != nil {
+			return fmt.Errorf("run initial migration: %w", err)
+		}
 	}
-	if _, err := s.db.ExecContext(ctx, initialMigration); err != nil {
-		return fmt.Errorf("run initial migration: %w", err)
+	if err := s.migrateProviderItemAlias(ctx); err != nil {
+		return err
+	}
+	if err := s.migrateInvestmentsLiabilities(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *SQLiteStore) migrateInvestmentsLiabilities(ctx context.Context) error {
+	var count int
+	if err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'securities'`).Scan(&count); err != nil {
+		return fmt.Errorf("check investments_liabilities migration state: %w", err)
+	}
+	if count == 0 {
+		if _, err := s.db.ExecContext(ctx, investmentsLiabilitiesMigration); err != nil {
+			return fmt.Errorf("run investments_liabilities migration: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *SQLiteStore) migrateProviderItemAlias(ctx context.Context) error {
+	rows, err := s.db.QueryContext(ctx, `PRAGMA table_info(provider_items)`)
+	if err != nil {
+		return fmt.Errorf("check provider_items columns: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull, pk int
+		var dfltValue sql.NullString
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		if name == "alias" {
+			return nil
+		}
+	}
+	if _, err := s.db.ExecContext(ctx, `ALTER TABLE provider_items ADD COLUMN alias TEXT`); err != nil {
+		return fmt.Errorf("add provider_items alias column: %w", err)
 	}
 	return nil
 }
@@ -236,9 +281,11 @@ SELECT
   t.pending, t.removed, t.needs_review, t.note, t.recurring_id, t.updated_at,
   t.source_kind, COALESCE(pi.provider, ''), t.provider_item_id, COALESCE(pi.provider_external_item_id, ''),
   COALESCE(pi.institution_id, ''), t.provider_account_id, t.provider_transaction_id,
-  t.import_source_id, t.import_batch_id
+  t.import_source_id, t.import_batch_id,
+  COALESCE(NULLIF(a.alias, ''), NULLIF(a.name, ''), NULLIF(a.official_name, ''), '') AS account_name
 FROM transactions t
 LEFT JOIN provider_items pi ON pi.id = t.provider_item_id
+LEFT JOIN accounts a ON a.id = t.account_id
 WHERE `+where+`
 ORDER BY t.date DESC, t.pending DESC, t.id ASC
 LIMIT ? OFFSET ?`, args...)
@@ -262,7 +309,7 @@ LIMIT ? OFFSET ?`, args...)
 			&tx.Pending, &tx.Removed, &tx.NeedsReview, &note, &recurringID, &tx.LastChangedAt,
 			&tx.Source.Kind, &provider, &providerItemID, &providerExternalItemID,
 			&institutionID, &providerAccountID, &providerTransactionID,
-			&importSourceID, &importBatchID,
+			&importSourceID, &importBatchID, &tx.AccountName,
 		); err != nil {
 			return nil, err
 		}
@@ -351,6 +398,96 @@ ORDER BY r.next_date ASC, r.merchant_name ASC, r.id ASC`)
 		recurringItems = append(recurringItems, item)
 	}
 	return recurringItems, rows.Err()
+}
+
+func (s *SQLiteStore) ListHoldings(ctx context.Context) ([]core.InvestmentHolding, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT h.id, h.account_id, h.security_id, h.quantity, h.institution_price, h.institution_value, h.cost_basis, h.currency, h.updated_at
+FROM holdings h
+ORDER BY h.institution_value DESC, h.id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []core.InvestmentHolding{}
+	for rows.Next() {
+		var h core.InvestmentHolding
+		var costBasis sql.NullFloat64
+		if err := rows.Scan(&h.ID, &h.AccountID, &h.SecurityID, &h.Quantity, &h.InstitutionPrice, &h.InstitutionValue, &costBasis, &h.Currency, &h.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if costBasis.Valid {
+			h.CostBasis = &costBasis.Float64
+		}
+		items = append(items, h)
+	}
+	return items, rows.Err()
+}
+
+func (s *SQLiteStore) ListSecurities(ctx context.Context) ([]core.InvestmentSecurity, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id, security_id, isin, cusip, sedol, name, ticker_symbol, type, close_price, close_price_as_of, currency, updated_at
+FROM securities
+ORDER BY name ASC, id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []core.InvestmentSecurity{}
+	for rows.Next() {
+		var sec core.InvestmentSecurity
+		var isin, cusip, sedol, ticker, typ, closePriceAsOf sql.NullString
+		if err := rows.Scan(&sec.ID, &sec.SecurityID, &isin, &cusip, &sedol, &sec.Name, &ticker, &typ, &sec.ClosePrice, &closePriceAsOf, &sec.Currency, &sec.UpdatedAt); err != nil {
+			return nil, err
+		}
+		sec.ISIN = stringPtr(isin)
+		sec.CUSIP = stringPtr(cusip)
+		sec.SEDOL = stringPtr(sedol)
+		if ticker.Valid && ticker.String != "" {
+			sec.TickerSymbol = &ticker.String
+		}
+		if typ.Valid && typ.String != "" {
+			sec.Type = typ.String
+		}
+		sec.ClosePriceAsOf = stringPtr(closePriceAsOf)
+		items = append(items, sec)
+	}
+	return items, rows.Err()
+}
+
+func (s *SQLiteStore) ListLiabilities(ctx context.Context) ([]core.Liability, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id, account_id, type, current_balance, original_balance, currency, name,
+       last_payment_date, last_payment_amount, next_payment_due_date, apr, updated_at
+FROM liabilities
+ORDER BY current_balance DESC, name ASC, id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []core.Liability{}
+	for rows.Next() {
+		var l core.Liability
+		var originalBalance, lastPaymentAmount, apr sql.NullFloat64
+		var lastPaymentDate, nextPaymentDueDate sql.NullString
+		if err := rows.Scan(&l.ID, &l.AccountID, &l.Type, &l.CurrentBalance, &originalBalance, &l.Currency, &l.Name,
+			&lastPaymentDate, &lastPaymentAmount, &nextPaymentDueDate, &apr, &l.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if originalBalance.Valid {
+			l.OriginalBalance = &originalBalance.Float64
+		}
+		if lastPaymentAmount.Valid {
+			l.LastPaymentAmount = &lastPaymentAmount.Float64
+		}
+		if apr.Valid {
+			l.APR = &apr.Float64
+		}
+		l.LastPaymentDate = stringPtr(lastPaymentDate)
+		l.NextPaymentDueDate = stringPtr(nextPaymentDueDate)
+		items = append(items, l)
+	}
+	return items, rows.Err()
 }
 
 func (s *SQLiteStore) hydrateTransactionTags(ctx context.Context, transactions []core.Transaction) error {

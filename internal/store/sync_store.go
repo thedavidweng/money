@@ -203,6 +203,147 @@ WHERE provider_item_id = ? AND provider_recurring_id = ?`, providerItemID, provi
 	return core.NewLocalID("rec_")
 }
 
+func (s *SQLiteStore) UpsertSecurity(ctx context.Context, security providers.InvestmentSecurity) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	id, err := s.localSecurityIDForSecurityID(ctx, security.SecurityID)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `
+INSERT INTO securities (
+  id, security_id, isin, cusip, sedol, name, ticker_symbol, type,
+  close_price, close_price_as_of, currency, created_at, updated_at
+) VALUES (?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, NULLIF(?, ''), NULLIF(?, ''), ?, NULLIF(?, ''), ?, ?, ?)
+ON CONFLICT(security_id) DO UPDATE SET
+  isin = excluded.isin,
+  cusip = excluded.cusip,
+  sedol = excluded.sedol,
+  name = excluded.name,
+  ticker_symbol = excluded.ticker_symbol,
+  type = excluded.type,
+  close_price = excluded.close_price,
+  close_price_as_of = excluded.close_price_as_of,
+  currency = excluded.currency,
+  updated_at = excluded.updated_at`,
+		id, security.SecurityID, ptrNullableString(security.ISIN), ptrNullableString(security.CUSIP), ptrNullableString(security.SEDOL),
+		security.Name, ptrNullableString(security.TickerSymbol), ptrNullableString(&security.Type), security.ClosePrice,
+		ptrNullableString(security.ClosePriceAsOf), security.Currency, now, now)
+	return err
+}
+
+func (s *SQLiteStore) localSecurityIDForSecurityID(ctx context.Context, securityID string) (string, error) {
+	var id string
+	err := s.db.QueryRowContext(ctx, `SELECT id FROM securities WHERE security_id = ?`, securityID).Scan(&id)
+	if err == nil {
+		return id, nil
+	}
+	if err != sql.ErrNoRows {
+		return "", err
+	}
+	return core.NewLocalID("sec_")
+}
+
+func (s *SQLiteStore) UpsertHolding(ctx context.Context, providerItemID string, holding providers.InvestmentHolding) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	id, err := s.localHoldingID(ctx, providerItemID, holding.AccountID, holding.SecurityID)
+	if err != nil {
+		return err
+	}
+	accountID, err := s.existingAccountIDForProviderAccount(ctx, providerItemID, holding.AccountID)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `
+INSERT INTO holdings (
+  id, provider_item_id, account_id, provider_account_id, security_id,
+  quantity, institution_price, institution_value, cost_basis, currency, created_at, updated_at
+) VALUES (?, ?, ?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(provider_item_id, provider_account_id, security_id) DO UPDATE SET
+  account_id = excluded.account_id,
+  security_id = excluded.security_id,
+  quantity = excluded.quantity,
+  institution_price = excluded.institution_price,
+  institution_value = excluded.institution_value,
+  cost_basis = excluded.cost_basis,
+  currency = excluded.currency,
+  updated_at = excluded.updated_at`,
+		id, providerItemID, accountID, holding.AccountID, holding.SecurityID,
+		holding.Quantity, holding.InstitutionPrice, holding.InstitutionValue, holding.CostBasis, holding.Currency, now, now)
+	return err
+}
+
+func (s *SQLiteStore) localHoldingID(ctx context.Context, providerItemID string, providerAccountID string, securityID string) (string, error) {
+	var id string
+	err := s.db.QueryRowContext(ctx, `
+SELECT id FROM holdings WHERE provider_item_id = ? AND provider_account_id = ? AND security_id = ?`,
+		providerItemID, providerAccountID, securityID).Scan(&id)
+	if err == nil {
+		return id, nil
+	}
+	if err != sql.ErrNoRows {
+		return "", err
+	}
+	return core.NewLocalID("hld_")
+}
+
+func (s *SQLiteStore) ClearHoldings(ctx context.Context, providerItemID string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM holdings WHERE provider_item_id = ?`, providerItemID)
+	return err
+}
+
+func (s *SQLiteStore) UpsertLiability(ctx context.Context, providerItemID string, liability providers.Liability) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	id, err := s.localLiabilityID(ctx, providerItemID, liability.AccountID, liability.Type, liability.Name)
+	if err != nil {
+		return err
+	}
+	accountID, err := s.existingAccountIDForProviderAccount(ctx, providerItemID, liability.AccountID)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `
+INSERT INTO liabilities (
+  id, provider_item_id, account_id, provider_account_id, type,
+  current_balance, original_balance, currency, name,
+  last_payment_date, last_payment_amount, next_payment_due_date, apr, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''), ?, NULLIF(?, ''), ?, ?, ?)
+ON CONFLICT(provider_item_id, provider_account_id, type, name) DO UPDATE SET
+  account_id = excluded.account_id,
+  current_balance = excluded.current_balance,
+  original_balance = excluded.original_balance,
+  currency = excluded.currency,
+  name = excluded.name,
+  last_payment_date = excluded.last_payment_date,
+  last_payment_amount = excluded.last_payment_amount,
+  next_payment_due_date = excluded.next_payment_due_date,
+  apr = excluded.apr,
+  updated_at = excluded.updated_at`,
+		id, providerItemID, accountID, liability.AccountID, liability.Type,
+		liability.CurrentBalance, liability.OriginalBalance, liability.Currency, liability.Name,
+		ptrNullableString(liability.LastPaymentDate), liability.LastPaymentAmount,
+		ptrNullableString(liability.NextPaymentDueDate), liability.APR, now, now)
+	return err
+}
+
+func (s *SQLiteStore) localLiabilityID(ctx context.Context, providerItemID string, providerAccountID string, liabilityType string, name string) (string, error) {
+	var id string
+	err := s.db.QueryRowContext(ctx, `
+SELECT id FROM liabilities WHERE provider_item_id = ? AND provider_account_id = ? AND type = ? AND name = ?`,
+		providerItemID, providerAccountID, liabilityType, name).Scan(&id)
+	if err == nil {
+		return id, nil
+	}
+	if err != sql.ErrNoRows {
+		return "", err
+	}
+	return core.NewLocalID("lia_")
+}
+
+func (s *SQLiteStore) ClearLiabilities(ctx context.Context, providerItemID string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM liabilities WHERE provider_item_id = ?`, providerItemID)
+	return err
+}
+
 func ptrNullableString(value *string) sql.NullString {
 	if value == nil {
 		return sql.NullString{}

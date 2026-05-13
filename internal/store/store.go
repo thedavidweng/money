@@ -14,6 +14,13 @@ type Store interface {
 	ListCategories(ctx context.Context) ([]core.Category, error)
 	ListTags(ctx context.Context) ([]core.Tag, error)
 	ListRecurring(ctx context.Context) ([]core.Recurring, error)
+	ListProviderItems(ctx context.Context, query ProviderItemQuery) ([]LinkedItem, error)
+	GetProviderItem(ctx context.Context, id string) (LinkedItem, error)
+	UpdateProviderItemName(ctx context.Context, id string, name string) error
+	RemoveProviderItem(ctx context.Context, id string) error
+	ListHoldings(ctx context.Context) ([]core.InvestmentHolding, error)
+	ListSecurities(ctx context.Context) ([]core.InvestmentSecurity, error)
+	ListLiabilities(ctx context.Context) ([]core.Liability, error)
 }
 
 type TransactionListQuery struct {
