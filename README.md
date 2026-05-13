@@ -32,7 +32,11 @@ Existing personal finance tools either lock data behind a paid SaaS, embed opini
 - **Provider-neutral** — Plaid, Bridge, MX, Finicity, CSV imports — providers are replaceable adapters.
 - **No server required** — runs as a CLI on your laptop, in cron, or in CI.
 
-## Quick Start
+## Getting Started
+
+👉 **New to money?** Read the full [Getting Started guide](docs/GETTING_STARTED.md) for step-by-step installation, setup, and pricing details.
+
+### Quick Start
 
 ```bash
 # Install via Homebrew (macOS/Linux)
@@ -41,20 +45,23 @@ brew install thedavidweng/tap/money
 # Or install via Go (cross-platform)
 go install github.com/thedavidweng/money/cmd/money@latest
 
-# Try it without real credentials
-money demo accounts list --json
-
-# Initialize configuration and encrypted database
+# Initialize configuration and encrypted database (interactive)
 money setup
 
-# Configure a provider
-money providers configure plaid --client-id ... --secret ... --environment sandbox
-
-# Link and sync
+# Link your bank and sync data
 money link
 money sync
+
+# Query your local data
 money accounts list --json
 money transactions search "Costco" --json
+```
+
+Try it without real credentials:
+
+```bash
+money demo accounts list --json
+money demo transactions search "coffee" --json
 ```
 
 ## Commands
@@ -106,6 +113,7 @@ Read commands use local data only. Sync is the explicit boundary where outbound 
 
 | Document | Purpose |
 |----------|---------|
+| [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) | Install, setup, and pricing guide |
 | [`docs/PRD.md`](docs/PRD.md) | Product requirements |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Module boundaries and data flow |
 | [`docs/CONTRACTS.md`](docs/CONTRACTS.md) | Current CLI JSON contracts |
