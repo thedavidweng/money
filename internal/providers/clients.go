@@ -138,6 +138,74 @@ func (c PlaidClient) SyncTransactions(ctx context.Context, accessToken string, c
 	return response, nil
 }
 
+func (c PlaidClient) GetTransactions(ctx context.Context, accessToken string, startDate string, endDate string) ([]plaid.Transaction, error) {
+	request := plaid.NewTransactionsGetRequest(accessToken, startDate, endDate)
+	var all []plaid.Transaction
+	offset := int32(0)
+	for {
+		request.Options = &plaid.TransactionsGetRequestOptions{
+			Offset: plaid.PtrInt32(offset),
+			Count:  plaid.PtrInt32(500),
+		}
+		response, httpResponse, err := c.APIClient.PlaidApi.TransactionsGet(ctx).TransactionsGetRequest(*request).Execute()
+		if err != nil {
+			if httpResponse != nil {
+				return nil, ProviderAPIError{
+					Provider:   "plaid",
+					StatusCode: httpResponse.StatusCode,
+					Code:       httpResponse.Status,
+					Message:    err.Error(),
+				}
+			}
+			return nil, err
+		}
+		page := response.GetTransactions()
+		if len(page) == 0 {
+			break
+		}
+		all = append(all, page...)
+		if len(all) >= int(response.GetTotalTransactions()) {
+			break
+		}
+		offset = int32(len(all))
+	}
+	return all, nil
+}
+
+func (c PlaidClient) GetHoldings(ctx context.Context, accessToken string) (plaid.InvestmentsHoldingsGetResponse, error) {
+	request := plaid.NewInvestmentsHoldingsGetRequest(accessToken)
+	response, httpResponse, err := c.APIClient.PlaidApi.InvestmentsHoldingsGet(ctx).InvestmentsHoldingsGetRequest(*request).Execute()
+	if err != nil {
+		if httpResponse != nil {
+			return plaid.InvestmentsHoldingsGetResponse{}, ProviderAPIError{
+				Provider:   "plaid",
+				StatusCode: httpResponse.StatusCode,
+				Code:       httpResponse.Status,
+				Message:    err.Error(),
+			}
+		}
+		return plaid.InvestmentsHoldingsGetResponse{}, err
+	}
+	return response, nil
+}
+
+func (c PlaidClient) GetLiabilities(ctx context.Context, accessToken string) (plaid.LiabilitiesGetResponse, error) {
+	request := plaid.NewLiabilitiesGetRequest(accessToken)
+	response, httpResponse, err := c.APIClient.PlaidApi.LiabilitiesGet(ctx).LiabilitiesGetRequest(*request).Execute()
+	if err != nil {
+		if httpResponse != nil {
+			return plaid.LiabilitiesGetResponse{}, ProviderAPIError{
+				Provider:   "plaid",
+				StatusCode: httpResponse.StatusCode,
+				Code:       httpResponse.Status,
+				Message:    err.Error(),
+			}
+		}
+		return plaid.LiabilitiesGetResponse{}, err
+	}
+	return response, nil
+}
+
 type BridgeClientConfig struct {
 	ClientID     string
 	ClientSecret string

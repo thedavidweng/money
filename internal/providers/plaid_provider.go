@@ -16,6 +16,9 @@ type plaidClient interface {
 	SearchInstitutions(ctx context.Context, request plaid.InstitutionsSearchRequest) ([]plaid.Institution, error)
 	GetAccounts(ctx context.Context, accessToken string) ([]plaid.AccountBase, error)
 	SyncTransactions(ctx context.Context, accessToken string, cursor string) (plaid.TransactionsSyncResponse, error)
+	GetTransactions(ctx context.Context, accessToken string, startDate string, endDate string) ([]plaid.Transaction, error)
+	GetHoldings(ctx context.Context, accessToken string) (plaid.InvestmentsHoldingsGetResponse, error)
+	GetLiabilities(ctx context.Context, accessToken string) (plaid.LiabilitiesGetResponse, error)
 }
 
 type PlaidPublicTokenExchangeResult struct {
@@ -141,6 +144,26 @@ func (p plaidProvider) ExchangeLinkToken(ctx context.Context, session LinkSessio
 			Products:               providerListField(p.cfg, "products"),
 		},
 	}, nil
+}
+
+func (p plaidProvider) QueryTransactions(ctx context.Context, item ProviderItem, startDate string, endDate string) ([]Transaction, error) {
+	client, err := p.plaidClient()
+	if err != nil {
+		return nil, err
+	}
+	accessToken := string(item.EncryptedAccessToken)
+	if accessToken == "" {
+		return nil, fmt.Errorf("Plaid access token is required")
+	}
+	plaidTxs, err := client.GetTransactions(ctx, accessToken, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+	transactions := make([]Transaction, 0, len(plaidTxs))
+	for _, tx := range plaidTxs {
+		transactions = append(transactions, mapPlaidSDKTransaction(item.ID, tx))
+	}
+	return transactions, nil
 }
 
 func (p plaidProvider) Sync(ctx context.Context, item ProviderItem, sink SyncSink) (SyncResult, error) {

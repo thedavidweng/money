@@ -295,6 +295,18 @@ func (c *fakePlaidLinkTokenClient) SyncTransactions(ctx context.Context, accessT
 	return c.transactionPages[index], nil
 }
 
+func (c *fakePlaidLinkTokenClient) GetTransactions(ctx context.Context, accessToken string, startDate string, endDate string) ([]plaid.Transaction, error) {
+	return nil, nil
+}
+
+func (c *fakePlaidLinkTokenClient) GetHoldings(ctx context.Context, accessToken string) (plaid.InvestmentsHoldingsGetResponse, error) {
+	return plaid.InvestmentsHoldingsGetResponse{}, nil
+}
+
+func (c *fakePlaidLinkTokenClient) GetLiabilities(ctx context.Context, accessToken string) (plaid.LiabilitiesGetResponse, error) {
+	return plaid.LiabilitiesGetResponse{}, nil
+}
+
 type plaidTransactionRequest struct {
 	accessToken string
 	cursor      string
@@ -330,6 +342,11 @@ func (s *recordingSyncSink) MarkTransactionRemoved(ctx context.Context, provider
 	return nil
 }
 func (s *recordingSyncSink) RecordSyncRun(ctx context.Context, run SyncRun) error { return nil }
+func (s *recordingSyncSink) UpsertSecurity(ctx context.Context, security InvestmentSecurity) error { return nil }
+func (s *recordingSyncSink) UpsertHolding(ctx context.Context, providerItemID string, holding InvestmentHolding) error { return nil }
+func (s *recordingSyncSink) ClearHoldings(ctx context.Context, providerItemID string) error { return nil }
+func (s *recordingSyncSink) UpsertLiability(ctx context.Context, providerItemID string, liability Liability) error { return nil }
+func (s *recordingSyncSink) ClearLiabilities(ctx context.Context, providerItemID string) error { return nil }
 
 func nullablePlaidString(value string) plaid.NullableString {
 	var nullable plaid.NullableString
