@@ -124,6 +124,7 @@ type Account struct {
 type Transaction struct {
 	ID                     string   `json:"id"`
 	AccountID              string   `json:"account_id"`
+	AccountName            string   `json:"account_name,omitempty"`
 	Date                   string   `json:"date"`
 	AuthorizedDate         *string  `json:"authorized_date,omitempty"`
 	Datetime               *string  `json:"datetime,omitempty"`
@@ -161,6 +162,48 @@ type Tag struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	UpdatedAt string `json:"updated_at,omitempty"`
+}
+
+type InvestmentHolding struct {
+	ID               string   `json:"id"`
+	AccountID        string   `json:"account_id"`
+	SecurityID       string   `json:"security_id"`
+	Quantity         float64  `json:"quantity"`
+	InstitutionPrice float64  `json:"institution_price"`
+	InstitutionValue float64  `json:"institution_value"`
+	CostBasis        *float64 `json:"cost_basis,omitempty"`
+	Currency         string   `json:"currency"`
+	UpdatedAt        string   `json:"updated_at,omitempty"`
+}
+
+type InvestmentSecurity struct {
+	ID             string  `json:"id"`
+	SecurityID     string  `json:"security_id"`
+	ISIN           *string `json:"isin,omitempty"`
+	CUSIP          *string `json:"cusip,omitempty"`
+	SEDOL          *string `json:"sedol,omitempty"`
+	Name           string  `json:"name"`
+	TickerSymbol   *string `json:"ticker_symbol,omitempty"`
+	Type           string  `json:"type"`
+	ClosePrice     float64 `json:"close_price"`
+	ClosePriceAsOf *string `json:"close_price_as_of,omitempty"`
+	Currency       string  `json:"currency"`
+	UpdatedAt      string  `json:"updated_at,omitempty"`
+}
+
+type Liability struct {
+	ID                 string   `json:"id"`
+	AccountID          string   `json:"account_id"`
+	Type               string   `json:"type"`
+	CurrentBalance     float64  `json:"current_balance"`
+	OriginalBalance    *float64 `json:"original_balance,omitempty"`
+	Currency           string   `json:"currency"`
+	Name               string   `json:"name"`
+	LastPaymentDate    *string  `json:"last_payment_date,omitempty"`
+	LastPaymentAmount  *float64 `json:"last_payment_amount,omitempty"`
+	NextPaymentDueDate *string  `json:"next_payment_due_date,omitempty"`
+	APR                *float64 `json:"apr,omitempty"`
+	UpdatedAt          string   `json:"updated_at,omitempty"`
 }
 
 type Recurring struct {

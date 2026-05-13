@@ -15,6 +15,71 @@ type Provider interface {
 	Sync(ctx context.Context, item ProviderItem, sink SyncSink) (SyncResult, error)
 }
 
+// TransactionQuerier is an optional interface for providers that support
+// querying transactions by date range without syncing.
+type TransactionQuerier interface {
+	QueryTransactions(ctx context.Context, item ProviderItem, startDate string, endDate string) ([]Transaction, error)
+}
+
+// HoldingQuerier is an optional interface for providers that support
+// querying investment holdings.
+type HoldingQuerier interface {
+	QueryHoldings(ctx context.Context, item ProviderItem) (InvestmentHoldings, error)
+}
+
+// LiabilityQuerier is an optional interface for providers that support
+// querying liabilities.
+type LiabilityQuerier interface {
+	QueryLiabilities(ctx context.Context, item ProviderItem) (Liabilities, error)
+}
+
+type InvestmentHoldings struct {
+	Accounts   []FinancialAccount     `json:"accounts"`
+	Holdings   []InvestmentHolding    `json:"holdings"`
+	Securities []InvestmentSecurity   `json:"securities"`
+}
+
+type InvestmentHolding struct {
+	AccountID        string   `json:"account_id"`
+	SecurityID       string   `json:"security_id"`
+	Quantity         float64  `json:"quantity"`
+	InstitutionPrice float64  `json:"institution_price"`
+	InstitutionValue float64  `json:"institution_value"`
+	CostBasis        *float64 `json:"cost_basis,omitempty"`
+	Currency         string   `json:"currency"`
+}
+
+type InvestmentSecurity struct {
+	SecurityID      string  `json:"security_id"`
+	ISIN            *string `json:"isin,omitempty"`
+	CUSIP           *string `json:"cusip,omitempty"`
+	SEDOL           *string `json:"sedol,omitempty"`
+	Name            string  `json:"name"`
+	TickerSymbol    *string `json:"ticker_symbol,omitempty"`
+	Type            string  `json:"type"`
+	ClosePrice      float64 `json:"close_price"`
+	ClosePriceAsOf  *string `json:"close_price_as_of,omitempty"`
+	Currency        string  `json:"currency"`
+}
+
+type Liabilities struct {
+	Accounts    []FinancialAccount `json:"accounts"`
+	Liabilities []Liability        `json:"liabilities"`
+}
+
+type Liability struct {
+	AccountID       string  `json:"account_id"`
+	Type            string  `json:"type"`
+	CurrentBalance  float64 `json:"current_balance"`
+	OriginalBalance *float64 `json:"original_balance,omitempty"`
+	Currency        string  `json:"currency"`
+	Name            string  `json:"name"`
+	LastPaymentDate *string `json:"last_payment_date,omitempty"`
+	LastPaymentAmount *float64 `json:"last_payment_amount,omitempty"`
+	NextPaymentDueDate *string `json:"next_payment_due_date,omitempty"`
+	APR             *float64 `json:"apr,omitempty"`
+}
+
 type SyncSink interface {
 	UpsertInstitution(ctx context.Context, institution Institution) error
 	UpsertProviderItem(ctx context.Context, item ProviderItem) error
@@ -23,6 +88,11 @@ type SyncSink interface {
 	UpsertRecurring(ctx context.Context, recurring Recurring) error
 	MarkTransactionRemoved(ctx context.Context, providerItemID string, providerTransactionID string) error
 	RecordSyncRun(ctx context.Context, run SyncRun) error
+	UpsertSecurity(ctx context.Context, security InvestmentSecurity) error
+	UpsertHolding(ctx context.Context, providerItemID string, holding InvestmentHolding) error
+	ClearHoldings(ctx context.Context, providerItemID string) error
+	UpsertLiability(ctx context.Context, providerItemID string, liability Liability) error
+	ClearLiabilities(ctx context.Context, providerItemID string) error
 }
 
 type SyncResult struct {
