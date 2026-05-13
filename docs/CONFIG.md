@@ -36,10 +36,14 @@ Direct scalar values are allowed only for non-secrets such as `database.path`, `
 
 1. If `--config <path>` is present, use it.
 2. Else if `MONEY_CONFIG` is set, use it.
-3. Else use `~/.money/config.yaml`.
+3. Else use the `--profile` flag to determine the default config path:
+   - `default` (or not specified): `~/.money/config.yaml`
+   - Any other profile name: `~/.money/profiles/<name>/config.yaml`
 4. If config has `env_file`, resolve it relative to the config file's directory when it is not absolute.
 5. Else the env companion is `.env` in the config file's directory.
 6. Never load cwd `.env` implicitly.
+
+Profile names must be alphanumeric, hyphen, or underscore only; path traversal characters are rejected.
 
 `~` expansion is supported only at the start of configured paths.
 

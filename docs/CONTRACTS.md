@@ -89,8 +89,52 @@ Partial failures return `ok: false`, error code `SYNC_PARTIAL_FAILURE`, exit cod
 - `--provider`
 - `--provider-item`
 - `--verbose`
+- `--start-date` (backfill transactions from this date, YYYY-MM-DD; requires --end-date)
+- `--end-date` (backfill transactions until this date, YYYY-MM-DD; requires --start-date)
 
 Human mode defaults to a compact summary. `--verbose` prints per-item status.
+
+## Investments, Liabilities, and Items Commands
+
+These are read-only commands that query local data only.
+
+### Investments
+
+`investments holdings --json` returns `data.holdings[]`.
+
+InvestmentHolding records include `id`, `account_id`, `security_id`, `quantity`, `institution_price`, `institution_value`, optional `cost_basis`, and `currency`.
+
+`investments securities --json` returns `data.securities[]`.
+
+InvestmentSecurity records include `id`, `security_id`, optional `isin`, `cusip`, `sedol`, `name`, optional `ticker_symbol`, `type`, `close_price`, optional `close_price_as_of`, and `currency`.
+
+### Liabilities
+
+`liabilities list --json` returns `data.liabilities[]`.
+
+Liability records include `id`, `account_id`, `type`, `current_balance`, optional `original_balance`, `currency`, `name`, optional `last_payment_date`, optional `last_payment_amount`, optional `next_payment_due_date`, optional `apr`, and `updated_at`.
+
+### Provider Items
+
+`items list --json` returns `data.items[]`.
+
+Provider item records include `id`, `provider`, `institution_id`, `alias`, `status`, `products`, and `transaction_cursor`.
+
+`items get <id> --json` returns a single `data.item` object with the same fields.
+
+`items rename <id> <name>` updates the alias for a provider item. No JSON contract output is produced in non-JSON mode; in JSON mode it returns `data.id` and `data.alias`.
+
+`items remove <id>` removes a provider item and cascades delete all associated transactions, accounts, sync runs, recurring streams, and tags.
+
+## Global Flags
+
+All commands support:
+
+- `--config` (config file path)
+- `--profile` (configuration profile, default "default")
+- `-j, --json` (write JSON envelope to stdout)
+
+The `--profile` flag selects a named configuration profile. The default profile uses `~/.money/config.yaml`; custom profiles use `~/.money/profiles/<name>/config.yaml`.
 
 ## Error Taxonomy
 
@@ -120,6 +164,14 @@ money demo transactions list --json --merchant Coffee --pending true --limit 10
 money demo transactions search coffee --json --limit 5
 money sync --json
 money sync --provider plaid --provider-item pi_example --json
+money sync --start-date 2024-01-01 --end-date 2024-03-01 --json
+
+# Read synced data
+money investments holdings --json
+money investments securities --json
+money liabilities list --json
+money items list --json
+money items rename <id> "My Bank" --json
 ```
 
 ## Setup Command
@@ -136,6 +188,11 @@ money sync --provider plaid --provider-item pi_example --json
   "diagnostics": []
 }
 ```
+
+`setup` supports:
+
+- `--force` (overwrite existing encryption key)
+- `--profile` (use a named configuration profile)
 
 ## Doctor Command
 

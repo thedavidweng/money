@@ -67,8 +67,12 @@ money demo transactions search "coffee" --json
 ## Commands
 
 ```text
+# Getting Started
 money setup                         Initialize configuration and encrypted database
 money doctor                        Check configuration and system health
+money demo <command>                Run against non-persistent sample data
+
+# Data Queries
 money accounts list                 List financial accounts
 money accounts create-manual        Create a local manual account
 money transactions list             List transactions with filters
@@ -76,13 +80,32 @@ money transactions search           Search transactions by text
 money categories list               List transaction categories
 money tags list                     List transaction tags
 money recurring list                List recurring transactions
+money investments holdings          List investment holdings
+money investments securities        List investment securities
+money liabilities list              List liabilities
+money items list                    List linked provider items
+money items get <id>                Get a linked provider item
+money items rename <id> <name>      Rename a provider item alias
+money items remove <id>             Remove a linked provider item with cascade delete
+
+# Provider Management
 money link                          Link a financial institution
 money providers configure <provider> Configure provider credentials
 money providers plaid link          Link a Plaid Provider Item
 money providers bridge link         Link a Bridge Provider Item
-money sync                          Sync linked provider data
-money demo <command>                Run against non-persistent sample data
+money sync                          Sync linked provider data (supports --start-date/--end-date)
+
+# Utilities
+money feedback                      Open the project GitHub issues page
 money version                       Print version
+```
+
+### Global Flags
+
+```text
+--config string            config file path
+--profile string           configuration profile (default "default")
+-j, --json                 write a JSON envelope to stdout
 ```
 
 Read commands and provisional sync diagnostics support `--json` for machine-readable output. Manual write operations require `--dry-run` or `--confirm`.

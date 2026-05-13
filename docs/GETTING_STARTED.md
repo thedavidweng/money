@@ -111,6 +111,15 @@ After syncing, query your local data:
 money accounts list --json
 money transactions list --json
 money transactions search "Costco" --json
+
+# Investments and liabilities (synced via Plaid investments/liabilities products)
+money investments holdings --json
+money investments securities --json
+money liabilities list --json
+
+# Manage provider items
+money items list
+money items rename <id> "My Chase Savings"
 ```
 
 ---
