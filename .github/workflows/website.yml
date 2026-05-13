@@ -31,6 +31,7 @@ jobs:
       - name: Install and build
         run: |
           npm ci
+          npm audit --audit-level=high
           npm run build
         working-directory: website
       - name: Upload Pages artifact
