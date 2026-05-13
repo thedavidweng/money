@@ -21,6 +21,8 @@ type Registry interface {
 type Options struct {
 	Provider       string
 	ProviderItemID string
+	StartDate      string
+	EndDate        string
 }
 
 type Result struct {
@@ -67,7 +69,7 @@ func Sync(ctx context.Context, target Store, registry Registry, options Options)
 	result := Result{Items: []ItemResult{}, Warnings: []Warning{}}
 	var failed bool
 	for _, linked := range linkedItems {
-		itemResult := syncOne(ctx, target, registry, linked)
+		itemResult := syncOne(ctx, target, registry, linked, options.StartDate, options.EndDate)
 		if itemResult.Status == "error" {
 			failed = true
 		}
@@ -79,7 +81,7 @@ func Sync(ctx context.Context, target Store, registry Registry, options Options)
 	return result, nil
 }
 
-func syncOne(ctx context.Context, target Store, registry Registry, linked store.LinkedItem) ItemResult {
+func syncOne(ctx context.Context, target Store, registry Registry, linked store.LinkedItem, startDate string, endDate string) ItemResult {
 	started := time.Now().UTC().Format(time.RFC3339)
 	itemResult := ItemResult{Provider: linked.Provider, ProviderItemID: linked.ID, Status: "ok"}
 	provider, ok := registry.Get(linked.Provider)
@@ -115,6 +117,129 @@ func syncOne(ctx context.Context, target Store, registry Registry, linked store.
 	itemResult.TransactionsRemoved = syncResult.TransactionsRemoved
 	itemResult.RecurringStreamsSeen = syncResult.RecurringStreamsSeen
 	itemResult.NextTransactionCursor = syncResult.NextTransactionCursor
+
+	// If a date range is specified and the provider supports TransactionQuerier, backfill transactions for that range.
+	if startDate != "" && endDate != "" {
+		if querier, ok := provider.(providers.TransactionQuerier); ok {
+			backfillTxs, err := querier.QueryTransactions(ctx, providers.ProviderItem{
+				ID:                     linked.ID,
+				Provider:               linked.Provider,
+				InstitutionID:          linked.InstitutionID,
+				ProviderExternalItemID: linked.ProviderExternalItemID,
+				EncryptedAccessToken:   linked.EncryptedAccessToken,
+				TransactionCursor:      linked.TransactionCursor,
+				ExternalUserID:         linked.ExternalUserID,
+				Status:                 linked.Status,
+				Products:               linked.Products,
+			}, startDate, endDate)
+			if err != nil {
+				classified := providers.ClassifyProviderError(linked.Provider, err)
+				itemResult.Status = "error"
+				itemResult.ErrorCode = classified.Code
+				itemResult.ErrorMessage = "date-range backfill failed: " + classified.Message
+				recordSyncRun(ctx, target, itemResult, started)
+				return itemResult
+			}
+			for _, tx := range backfillTxs {
+				if err := target.UpsertTransaction(ctx, tx); err != nil {
+					itemResult.Status = "error"
+					itemResult.ErrorCode = "BACKFILL_TRANSACTION_UPSERT_FAILED"
+					itemResult.ErrorMessage = err.Error()
+					recordSyncRun(ctx, target, itemResult, started)
+					return itemResult
+				}
+				itemResult.TransactionsAdded++
+			}
+		}
+	}
+
+	// Sync investment holdings if provider supports them and the item has the product.
+	if holder, ok := provider.(providers.HoldingQuerier); ok && hasProduct(linked.Products, "investments") {
+		holdings, err := holder.QueryHoldings(ctx, providers.ProviderItem{
+			ID:                     linked.ID,
+			Provider:               linked.Provider,
+			InstitutionID:          linked.InstitutionID,
+			ProviderExternalItemID: linked.ProviderExternalItemID,
+			EncryptedAccessToken:   linked.EncryptedAccessToken,
+			TransactionCursor:      linked.TransactionCursor,
+			ExternalUserID:         linked.ExternalUserID,
+			Status:                 linked.Status,
+			Products:               linked.Products,
+		})
+		if err != nil {
+			classified := providers.ClassifyProviderError(linked.Provider, err)
+			itemResult.Status = "error"
+			itemResult.ErrorCode = classified.Code
+			itemResult.ErrorMessage = "holdings sync failed: " + classified.Message
+			recordSyncRun(ctx, target, itemResult, started)
+			return itemResult
+		}
+		if err := target.ClearHoldings(ctx, linked.ID); err != nil {
+			itemResult.Status = "error"
+			itemResult.ErrorCode = "CLEAR_HOLDINGS_FAILED"
+			itemResult.ErrorMessage = err.Error()
+			recordSyncRun(ctx, target, itemResult, started)
+			return itemResult
+		}
+		for _, sec := range holdings.Securities {
+			if err := target.UpsertSecurity(ctx, sec); err != nil {
+				itemResult.Status = "error"
+				itemResult.ErrorCode = "SECURITY_UPSERT_FAILED"
+				itemResult.ErrorMessage = err.Error()
+				recordSyncRun(ctx, target, itemResult, started)
+				return itemResult
+			}
+		}
+		for _, h := range holdings.Holdings {
+			if err := target.UpsertHolding(ctx, linked.ID, h); err != nil {
+				itemResult.Status = "error"
+				itemResult.ErrorCode = "HOLDING_UPSERT_FAILED"
+				itemResult.ErrorMessage = err.Error()
+				recordSyncRun(ctx, target, itemResult, started)
+				return itemResult
+			}
+		}
+	}
+
+	// Sync liabilities if provider supports them and the item has the product.
+	if liabilityQuerier, ok := provider.(providers.LiabilityQuerier); ok && hasProduct(linked.Products, "liabilities") {
+		liabilities, err := liabilityQuerier.QueryLiabilities(ctx, providers.ProviderItem{
+			ID:                     linked.ID,
+			Provider:               linked.Provider,
+			InstitutionID:          linked.InstitutionID,
+			ProviderExternalItemID: linked.ProviderExternalItemID,
+			EncryptedAccessToken:   linked.EncryptedAccessToken,
+			TransactionCursor:      linked.TransactionCursor,
+			ExternalUserID:         linked.ExternalUserID,
+			Status:                 linked.Status,
+			Products:               linked.Products,
+		})
+		if err != nil {
+			classified := providers.ClassifyProviderError(linked.Provider, err)
+			itemResult.Status = "error"
+			itemResult.ErrorCode = classified.Code
+			itemResult.ErrorMessage = "liabilities sync failed: " + classified.Message
+			recordSyncRun(ctx, target, itemResult, started)
+			return itemResult
+		}
+		if err := target.ClearLiabilities(ctx, linked.ID); err != nil {
+			itemResult.Status = "error"
+			itemResult.ErrorCode = "CLEAR_LIABILITIES_FAILED"
+			itemResult.ErrorMessage = err.Error()
+			recordSyncRun(ctx, target, itemResult, started)
+			return itemResult
+		}
+		for _, l := range liabilities.Liabilities {
+			if err := target.UpsertLiability(ctx, linked.ID, l); err != nil {
+				itemResult.Status = "error"
+				itemResult.ErrorCode = "LIABILITY_UPSERT_FAILED"
+				itemResult.ErrorMessage = err.Error()
+				recordSyncRun(ctx, target, itemResult, started)
+				return itemResult
+			}
+		}
+	}
+
 	if syncResult.NextTransactionCursor != "" {
 		if err := target.UpsertProviderItem(ctx, providers.ProviderItem{
 			ID:                     linked.ID,
@@ -136,6 +261,15 @@ func syncOne(ctx context.Context, target Store, registry Registry, linked store.
 	}
 	recordSyncRun(ctx, target, itemResult, started)
 	return itemResult
+}
+
+func hasProduct(products []string, target string) bool {
+	for _, p := range products {
+		if p == target {
+			return true
+		}
+	}
+	return false
 }
 
 func recordSyncRun(ctx context.Context, target Store, itemResult ItemResult, started string) {
