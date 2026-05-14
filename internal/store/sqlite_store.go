@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -74,6 +75,9 @@ func (s *SQLiteStore) Close() error {
 	return s.db.Close()
 }
 
+//go:embed migrations/0003_budgets.sql
+var budgetsMigration string
+
 func (s *SQLiteStore) runMigrations(ctx context.Context) error {
 	var count int
 	if err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'institutions'`).Scan(&count); err != nil {
@@ -90,6 +94,9 @@ func (s *SQLiteStore) runMigrations(ctx context.Context) error {
 	if err := s.migrateInvestmentsLiabilities(ctx); err != nil {
 		return err
 	}
+	if err := s.migrateBudgets(ctx); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -101,6 +108,19 @@ func (s *SQLiteStore) migrateInvestmentsLiabilities(ctx context.Context) error {
 	if count == 0 {
 		if _, err := s.db.ExecContext(ctx, investmentsLiabilitiesMigration); err != nil {
 			return fmt.Errorf("run investments_liabilities migration: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *SQLiteStore) migrateBudgets(ctx context.Context) error {
+	var count int
+	if err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'budgets'`).Scan(&count); err != nil {
+		return fmt.Errorf("check budgets migration state: %w", err)
+	}
+	if count == 0 {
+		if _, err := s.db.ExecContext(ctx, budgetsMigration); err != nil {
+			return fmt.Errorf("run budgets migration: %w", err)
 		}
 	}
 	return nil
@@ -553,6 +573,151 @@ ORDER BY current_balance DESC, name ASC, id ASC`)
 		items = append(items, l)
 	}
 	return items, rows.Err()
+}
+
+func (s *SQLiteStore) ListBudgets(ctx context.Context) ([]core.Budget, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id, name, currency, period, start_date, end_date, created_at, updated_at
+FROM budgets
+ORDER BY start_date DESC, name ASC, id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	budgets := []core.Budget{}
+	for rows.Next() {
+		var b core.Budget
+		if err := rows.Scan(&b.ID, &b.Name, &b.Currency, &b.Period, &b.StartDate, &b.EndDate, &b.CreatedAt, &b.UpdatedAt); err != nil {
+			return nil, err
+		}
+		budgets = append(budgets, b)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for i := range budgets {
+		cats, err := s.ListBudgetCategories(ctx, budgets[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		budgets[i].Categories = cats
+	}
+	return budgets, nil
+}
+
+func (s *SQLiteStore) GetBudget(ctx context.Context, id string) (core.Budget, error) {
+	var b core.Budget
+	if err := s.db.QueryRowContext(ctx, `
+SELECT id, name, currency, period, start_date, end_date, created_at, updated_at
+FROM budgets WHERE id = ?`, id).Scan(&b.ID, &b.Name, &b.Currency, &b.Period, &b.StartDate, &b.EndDate, &b.CreatedAt, &b.UpdatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return core.Budget{}, fmt.Errorf("budget %s not found", id)
+		}
+		return core.Budget{}, err
+	}
+	cats, err := s.ListBudgetCategories(ctx, b.ID)
+	if err != nil {
+		return core.Budget{}, err
+	}
+	b.Categories = cats
+	return b, nil
+}
+
+func (s *SQLiteStore) CreateBudget(ctx context.Context, budget core.Budget) (core.Budget, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	if budget.ID == "" {
+		id, err := core.NewLocalID("bdg_")
+		if err != nil {
+			return core.Budget{}, err
+		}
+		budget.ID = id
+	}
+	if budget.CreatedAt == "" {
+		budget.CreatedAt = now
+	}
+	if budget.UpdatedAt == "" {
+		budget.UpdatedAt = now
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO budgets (id, name, currency, period, start_date, end_date, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		budget.ID, budget.Name, budget.Currency, budget.Period, budget.StartDate, budget.EndDate, budget.CreatedAt, budget.UpdatedAt)
+	if err != nil {
+		return core.Budget{}, err
+	}
+	return budget, nil
+}
+
+func (s *SQLiteStore) UpdateBudget(ctx context.Context, budget core.Budget) (core.Budget, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := s.db.ExecContext(ctx, `
+UPDATE budgets SET name = ?, currency = ?, period = ?, start_date = ?, end_date = ?, updated_at = ?
+WHERE id = ?`,
+		budget.Name, budget.Currency, budget.Period, budget.StartDate, budget.EndDate, now, budget.ID)
+	if err != nil {
+		return core.Budget{}, err
+	}
+	return s.GetBudget(ctx, budget.ID)
+}
+
+func (s *SQLiteStore) DeleteBudget(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM budgets WHERE id = ?`, id)
+	return err
+}
+
+func (s *SQLiteStore) ListBudgetCategories(ctx context.Context, budgetID string) ([]core.BudgetCategory, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id, budget_id, category_id, name, limit_minor_units, currency, created_at, updated_at
+FROM budget_categories
+WHERE budget_id = ?
+ORDER BY name ASC, id ASC`, budgetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []core.BudgetCategory{}
+	for rows.Next() {
+		var bc core.BudgetCategory
+		var categoryID sql.NullString
+		if err := rows.Scan(&bc.ID, &bc.BudgetID, &categoryID, &bc.Name, &bc.LimitMinorUnits, &bc.Currency, &bc.CreatedAt, &bc.UpdatedAt); err != nil {
+			return nil, err
+		}
+		bc.CategoryID = stringPtr(categoryID)
+		bc.Limit = core.FormatMinorUnits(bc.LimitMinorUnits, bc.Currency)
+		items = append(items, bc)
+	}
+	return items, rows.Err()
+}
+
+func (s *SQLiteStore) CreateBudgetCategory(ctx context.Context, bc core.BudgetCategory) (core.BudgetCategory, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	if bc.ID == "" {
+		id, err := core.NewLocalID("bc_")
+		if err != nil {
+			return core.BudgetCategory{}, err
+		}
+		bc.ID = id
+	}
+	if bc.CreatedAt == "" {
+		bc.CreatedAt = now
+	}
+	if bc.UpdatedAt == "" {
+		bc.UpdatedAt = now
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO budget_categories (id, budget_id, category_id, name, limit_minor_units, currency, created_at, updated_at)
+VALUES (?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?)`,
+		bc.ID, bc.BudgetID, nullString(bc.CategoryID), bc.Name, bc.LimitMinorUnits, bc.Currency, bc.CreatedAt, bc.UpdatedAt)
+	if err != nil {
+		return core.BudgetCategory{}, err
+	}
+	bc.Limit = core.FormatMinorUnits(bc.LimitMinorUnits, bc.Currency)
+	return bc, nil
+}
+
+func (s *SQLiteStore) DeleteBudgetCategory(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM budget_categories WHERE id = ?`, id)
+	return err
 }
 
 func (s *SQLiteStore) hydrateTransactionTags(ctx context.Context, transactions []core.Transaction) error {

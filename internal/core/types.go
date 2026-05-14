@@ -238,3 +238,27 @@ type Recurring struct {
 	Source                  Source  `json:"source"`
 	UpdatedAt               string  `json:"updated_at,omitempty"`
 }
+
+type Budget struct {
+	ID         string           `json:"id"`
+	Name       string           `json:"name"`
+	Currency   string           `json:"currency"`
+	Period     string           `json:"period"`
+	StartDate  string           `json:"start_date"`
+	EndDate    string           `json:"end_date"`
+	Categories []BudgetCategory `json:"categories,omitempty"`
+	CreatedAt  string           `json:"created_at,omitempty"`
+	UpdatedAt  string           `json:"updated_at,omitempty"`
+}
+
+type BudgetCategory struct {
+	ID              string  `json:"id"`
+	BudgetID        string  `json:"budget_id"`
+	CategoryID      *string `json:"category_id"`
+	Name            string  `json:"name"`
+	LimitMinorUnits int64   `json:"-"`
+	Limit           string  `json:"limit"`
+	Currency        string  `json:"currency"`
+	CreatedAt       string  `json:"created_at,omitempty"`
+	UpdatedAt       string  `json:"updated_at,omitempty"`
+}
