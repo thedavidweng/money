@@ -2,6 +2,7 @@ package linking
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/thedavidweng/money/internal/providers"
@@ -68,6 +69,34 @@ func TestCompleteProviderLinkStoresTokenInEncryptedStore(t *testing.T) {
 	}
 }
 
+func TestCompleteProviderLinkDoesNotExchangeTokenForCancelOrError(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenDemo(ctx)
+	if err != nil {
+		t.Fatalf("open demo: %v", err)
+	}
+	defer db.Close()
+
+	_, err = CompleteProviderLink(ctx, db, exchangeCountingProvider{}, providers.LinkSession{Provider: "plaid", State: "state"}, providers.LinkCallback{
+		Status: "cancel",
+		State:  "state",
+	})
+	var canceled LinkCanceledError
+	if !errors.As(err, &canceled) {
+		t.Fatalf("cancel err = %#v", err)
+	}
+
+	_, err = CompleteProviderLink(ctx, db, exchangeCountingProvider{}, providers.LinkSession{Provider: "plaid", State: "state"}, providers.LinkCallback{
+		Status: "error",
+		State:  "state",
+		Error:  providers.LinkError{Code: "INVALID_CREDENTIALS"},
+	})
+	var linkErr LinkFlowError
+	if !errors.As(err, &linkErr) || linkErr.Code != "INVALID_CREDENTIALS" {
+		t.Fatalf("link err = %#v", err)
+	}
+}
+
 type fakeProvider struct{}
 
 func (fakeProvider) Name() string                                                    { return "plaid" }
@@ -99,4 +128,12 @@ func (fakeProvider) ExchangeLinkToken(ctx context.Context, session providers.Lin
 }
 func (fakeProvider) Sync(ctx context.Context, item providers.ProviderItem, sink providers.SyncSink) (providers.SyncResult, error) {
 	return providers.SyncResult{}, nil
+}
+
+type exchangeCountingProvider struct {
+	fakeProvider
+}
+
+func (exchangeCountingProvider) ExchangeLinkToken(ctx context.Context, session providers.LinkSession, callback providers.LinkCallback) (providers.LinkedItem, error) {
+	panic("ExchangeLinkToken should not be called for canceled or errored Link callbacks")
 }

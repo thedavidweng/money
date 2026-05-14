@@ -41,6 +41,7 @@ The Ray OpenRay documents are especially important. They define the product lang
 - A **Sync** updates local data only.
 - Read commands must not require AI keys or provider credentials.
 - Provider commands require provider credentials and should fail explicitly when missing.
+- Plaid Dashboard login may bootstrap local Plaid API credentials, but it remains a Plaid-specific setup convenience: it writes the same Provider credential contract as manual configuration, stores Dashboard auth beside the resolved config, and keeps manual `money providers configure plaid` as the supported fallback if Dashboard contracts reject or drift.
 
 When command, data model, or Provider behavior can be answered by donor code, prefer donor evidence before asking product questions. Use Ray Finance as the primary engineering donor for local data model decisions, Provider sync, Plaid/Bridge flow, encrypted local storage behavior, imports, local annotations, and query fields. Use `monarchmoney-cli` for command naming habits, JSON envelopes, stdout/stderr behavior, exit codes, safety gates, and agent-facing ergonomics. If Ray lacks a feature, do not invent a first-version stable contract from Monarch alone; defer it unless it is required by `money`'s goals. Ask only when donor behavior conflicts with `money` boundaries or a real product trade-off remains.
 
@@ -451,6 +452,10 @@ Initial commands:
 - `money link`
 - `money providers configure plaid`
 - `money providers configure bridge`
+- `money plaid login`
+- `money plaid logout`
+- `money providers plaid login`
+- `money providers plaid logout`
 - `money providers plaid link`
 - `money providers bridge link`
 - `money sync`

@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"time"
 
 	"github.com/thedavidweng/money/internal/providers"
@@ -112,10 +113,16 @@ func (h *PlaidLinkHelper) handleCallback(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if !validCallbackOrigin(r) {
+		http.Error(w, "invalid origin", http.StatusForbidden)
+		return
+	}
 	var payload struct {
 		PublicToken string                 `json:"public_token"`
 		State       string                 `json:"state"`
+		Status      string                 `json:"status"`
 		Metadata    providers.LinkMetadata `json:"metadata"`
+		Error       providers.LinkError    `json:"error"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "invalid callback", http.StatusBadRequest)
@@ -125,7 +132,17 @@ func (h *PlaidLinkHelper) handleCallback(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "invalid state", http.StatusForbidden)
 		return
 	}
-	callback := providers.LinkCallback{PublicToken: payload.PublicToken, State: payload.State, Metadata: payload.Metadata}
+	status := payload.Status
+	if status == "" {
+		status = "success"
+	}
+	callback := providers.LinkCallback{
+		PublicToken: payload.PublicToken,
+		State:       payload.State,
+		Status:      status,
+		Metadata:    payload.Metadata,
+		Error:       payload.Error,
+	}
 	select {
 	case h.callback <- callback:
 	default:
@@ -133,6 +150,18 @@ func (h *PlaidLinkHelper) handleCallback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	fmt.Fprint(w, "ok")
+}
+
+func validCallbackOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Scheme != "http" || parsed.Host == "" {
+		return false
+	}
+	return parsed.Host == r.Host
 }
 
 var plaidLinkPage = template.Must(template.New("plaid-link").Parse(`<!doctype html>
@@ -147,7 +176,14 @@ const handler = Plaid.create({
     fetch("/callback", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({public_token: public_token, state: {{printf "%q" .State}}, metadata: metadata})
+      body: JSON.stringify({status: "success", public_token: public_token, state: {{printf "%q" .State}}, metadata: metadata})
+    });
+  },
+  onExit: function(err, metadata) {
+    fetch("/callback", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({status: err ? "error" : "cancel", state: {{printf "%q" .State}}, error: err, metadata: metadata})
     });
   }
 });

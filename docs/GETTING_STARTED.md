@@ -35,8 +35,8 @@ money setup
 After setup, if no financial provider is configured yet, `money` walks you through an interactive wizard:
 
 1. **Choose a provider** — select Plaid, Bridge, or skip for now.
-2. **Get credentials** — `money` opens your provider dashboard in the browser and tells you exactly which fields to copy.
-3. **Paste credentials** — enter them one by one in the terminal.
+2. **Configure credentials** — for Plaid, sign in to the Plaid Dashboard and fetch API keys automatically, or paste `client_id` and `secret` manually.
+3. **Store credentials locally** — API keys are written to `.env`; config keeps explicit `env:` references.
 4. **Repeat or finish** — configure additional providers, or skip and come back later with `money providers configure <provider>`.
 
 Example interactive flow:
@@ -51,28 +51,20 @@ Database: ready
 
 No providers are configured yet. To link financial institutions, you need at least one provider.
 
-  1) plaid — https://dashboard.plaid.com/developers/keys
-  2) Skip for now
-
-Select a provider to configure (1-2): 1
-
-! plaid credentials are required.
-
-  1. Open https://dashboard.plaid.com/developers/keys in your browser
-     (or copy the URL and open it manually)
-
-  2. Copy the following fields from your plaid dashboard:
-     1. client-id
-     2. secret
-
-  Press Enter once you have copied them.
-
-client-id: <paste>
-secret: <paste>
+How do you want to configure Plaid?
+> Sign in with Plaid Dashboard and fetch API keys automatically
+  Paste client ID and secret manually
+  Skip Plaid for now
 
 plaid configured (2 credentials written).
   ✓ [Config] Config loaded from /Users/you/.money/config.yaml
   ✓ [Providers] plaid credentials present.
+```
+
+Plaid Dashboard login is best-effort because it follows Plaid CLI-compatible Dashboard behavior. Manual configuration remains the durable path:
+
+```bash
+money providers configure plaid --client-id <client-id> --secret <secret> --environment sandbox
 ```
 
 ### Try it without real credentials
@@ -103,6 +95,12 @@ Then sync data into your local encrypted database:
 
 ```bash
 money sync
+```
+
+For local Plaid Sandbox testing without the browser Link flow, use:
+
+```bash
+money plaid sandbox link --products transactions --institution-id ins_56
 ```
 
 After syncing, query your local data:

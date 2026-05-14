@@ -21,6 +21,7 @@
 ## Phase 2: Plaid and Bridge Sync
 
 - Add Plaid configuration.
+- Add Plaid Dashboard login as an optional credential-bootstrap path while preserving manual BYOK configuration.
 - Add Bridge configuration.
 - Add explicit provider link/sync commands.
 - Store Plaid and Bridge item, account, and transaction data in canonical tables.

@@ -33,6 +33,7 @@ Use as the strongest donor for:
 
 - Plaid and Bridge sync lessons.
 - Local configured-state checks for Providers: Ray treats Plaid as configured when local BYOK config has client ID plus secret, and Bridge as configured when local config has client ID plus client secret. This is local configuration state, not a bank/API-discovered property.
+- Plaid CLI `20260507-4d1b0ca0` is discovery evidence for Plaid Dashboard OAuth bootstrap only: `plaid login` uses Dashboard OAuth, lists teams, and fetches API keys automatically. The Dashboard API endpoints are private Plaid CLI-compatible behavior, so `money` must fail clearly if the contract changes and keep manual `money providers configure plaid` available.
 - Local database schema experiments.
 - Apple Card import.
 - Recategorization rules.

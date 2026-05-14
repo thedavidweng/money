@@ -8,13 +8,16 @@ import (
 )
 
 type PlaidLinkTokenRequestConfig struct {
-	ClientName    string
-	Language      string
-	ClientUserID  string
-	Products      []string
-	CountryCodes  []string
-	RedirectURI   string
-	InstitutionID string
+	ClientName                  string
+	Language                    string
+	ClientUserID                string
+	Products                    []string
+	CountryCodes                []string
+	RedirectURI                 string
+	InstitutionID               string
+	AdditionalConsentedProducts []string
+	RequiredIfSupportedProducts []string
+	OptionalProducts            []string
 }
 
 func BuildPlaidLinkTokenCreateRequest(cfg PlaidLinkTokenRequestConfig) (plaid.LinkTokenCreateRequest, error) {
@@ -42,10 +45,31 @@ func BuildPlaidLinkTokenCreateRequest(cfg PlaidLinkTokenRequestConfig) (plaid.Li
 	if err != nil {
 		return plaid.LinkTokenCreateRequest{}, err
 	}
+	additionalConsentedProducts, err := plaidLinkProducts(cfg.AdditionalConsentedProducts)
+	if err != nil {
+		return plaid.LinkTokenCreateRequest{}, err
+	}
+	requiredIfSupportedProducts, err := plaidLinkProducts(cfg.RequiredIfSupportedProducts)
+	if err != nil {
+		return plaid.LinkTokenCreateRequest{}, err
+	}
+	optionalProducts, err := plaidLinkProducts(cfg.OptionalProducts)
+	if err != nil {
+		return plaid.LinkTokenCreateRequest{}, err
+	}
 
 	request := plaid.NewLinkTokenCreateRequest(cfg.ClientName, cfg.Language, countries)
 	request.User = plaid.NewLinkTokenCreateRequestUser(cfg.ClientUserID)
 	request.SetProducts(products)
+	if len(additionalConsentedProducts) > 0 {
+		request.SetAdditionalConsentedProducts(additionalConsentedProducts)
+	}
+	if len(requiredIfSupportedProducts) > 0 {
+		request.SetRequiredIfSupportedProducts(requiredIfSupportedProducts)
+	}
+	if len(optionalProducts) > 0 {
+		request.SetOptionalProducts(optionalProducts)
+	}
 	if cfg.RedirectURI != "" {
 		request.SetRedirectUri(cfg.RedirectURI)
 	}
@@ -58,9 +82,12 @@ func BuildPlaidLinkTokenCreateRequest(cfg PlaidLinkTokenRequestConfig) (plaid.Li
 func plaidLinkProducts(values []string) ([]plaid.Products, error) {
 	products := make([]plaid.Products, 0, len(values))
 	for _, value := range values {
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
 		product := plaid.Products(strings.TrimSpace(value))
 		switch product {
-		case plaid.PRODUCTS_TRANSACTIONS, plaid.PRODUCTS_INVESTMENTS, plaid.PRODUCTS_LIABILITIES:
+		case plaid.PRODUCTS_AUTH, plaid.PRODUCTS_TRANSACTIONS, plaid.PRODUCTS_INVESTMENTS, plaid.PRODUCTS_LIABILITIES:
 			products = append(products, product)
 		default:
 			return nil, fmt.Errorf("unsupported Plaid Link product %q", value)

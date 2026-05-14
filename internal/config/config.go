@@ -30,6 +30,13 @@ type Config struct {
 	Warnings                   []contracts.Warning
 }
 
+type Metadata struct {
+	ConfigPath   string
+	EnvPath      string
+	DatabasePath string
+	ReadOnly     bool
+}
+
 type ProviderConfig struct {
 	Fields map[string]string
 }
@@ -105,40 +112,21 @@ func DefaultConfigPath(profile string) string {
 }
 
 func Load(options Options) (Config, error) {
-	if err := validateProfile(options.Profile); err != nil {
-		return Config{}, err
-	}
-	configPath := options.ConfigPath
-	if configPath == "" {
-		configPath = options.Env["MONEY_CONFIG"]
-	}
-	if configPath == "" {
-		configPath = DefaultConfigPath(options.Profile)
-	}
-	configPath = expandHome(configPath)
-	configPath, err := filepath.Abs(configPath)
+	meta, raw, err := resolveMetadataAndRaw(options)
 	if err != nil {
 		return Config{}, err
 	}
-
+	configPath := meta.ConfigPath
 	content, err := os.ReadFile(configPath)
 	if err != nil {
 		return Config{}, fmt.Errorf("read config %s: %w", configPath, err)
 	}
-	var raw rawConfig
 	if err := yaml.Unmarshal(content, &raw); err != nil {
 		return Config{}, err
 	}
 
-	envPath := raw.EnvFile
-	if envPath == "" {
-		envPath = filepath.Join(filepath.Dir(configPath), ".env")
-	} else if !filepath.IsAbs(envPath) {
-		envPath = filepath.Join(filepath.Dir(configPath), envPath)
-	}
-
 	mergedEnv := map[string]string{}
-	fileEnv, err := readDotEnv(envPath)
+	fileEnv, err := readDotEnv(meta.EnvPath)
 	if err != nil {
 		return Config{}, err
 	}
@@ -154,8 +142,8 @@ func Load(options Options) (Config, error) {
 
 	cfg := Config{
 		ConfigPath: configPath,
-		EnvPath:    envPath,
-		ReadOnly:   raw.ReadOnly || mergedEnv["MONEY_READ_ONLY"] == "1",
+		EnvPath:    meta.EnvPath,
+		ReadOnly:   meta.ReadOnly,
 		Providers:  map[string]ProviderConfig{},
 	}
 	if raw.Database.Path == "" {
@@ -188,6 +176,58 @@ func Load(options Options) (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func ResolveMetadata(options Options) (Metadata, error) {
+	meta, _, err := resolveMetadataAndRaw(options)
+	return meta, err
+}
+
+func resolveMetadataAndRaw(options Options) (Metadata, rawConfig, error) {
+	if err := validateProfile(options.Profile); err != nil {
+		return Metadata{}, rawConfig{}, err
+	}
+	if options.Env == nil {
+		options.Env = processEnv()
+	}
+	configPath := options.ConfigPath
+	if configPath == "" {
+		configPath = options.Env["MONEY_CONFIG"]
+	}
+	if configPath == "" {
+		configPath = DefaultConfigPath(options.Profile)
+	}
+	configPath = expandHome(configPath)
+	absConfigPath, err := filepath.Abs(configPath)
+	if err != nil {
+		return Metadata{}, rawConfig{}, err
+	}
+	content, err := os.ReadFile(absConfigPath)
+	if err != nil {
+		return Metadata{}, rawConfig{}, fmt.Errorf("read config %s: %w", absConfigPath, err)
+	}
+	var raw rawConfig
+	if err := yaml.Unmarshal(content, &raw); err != nil {
+		return Metadata{}, rawConfig{}, err
+	}
+	envPath := raw.EnvFile
+	if envPath == "" {
+		envPath = filepath.Join(filepath.Dir(absConfigPath), ".env")
+	} else {
+		envPath = expandHome(envPath)
+		if !filepath.IsAbs(envPath) {
+			envPath = filepath.Join(filepath.Dir(absConfigPath), envPath)
+		}
+	}
+	meta := Metadata{
+		ConfigPath: absConfigPath,
+		EnvPath:    filepath.Clean(envPath),
+		ReadOnly:   raw.ReadOnly || options.Env["MONEY_READ_ONLY"] == "1",
+	}
+	if raw.Database.Path != "" {
+		meta.DatabasePath = resolvePath(raw.Database.Path, filepath.Dir(absConfigPath))
+	}
+	return meta, raw, nil
 }
 
 func decodeDatabaseKey(value string) ([]byte, error) {

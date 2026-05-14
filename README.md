@@ -91,6 +91,9 @@ money items remove <id>             Remove a linked provider item with cascade d
 # Provider Management
 money link                          Link a financial institution
 money providers configure <provider> Configure provider credentials
+money plaid login                    Sign in to Plaid Dashboard and fetch API keys
+money plaid logout                   Remove Plaid Dashboard auth; keep API keys
+money plaid sandbox link             Create and store a Plaid Sandbox Provider Item
 money providers plaid link          Link a Plaid Provider Item
 money providers bridge link         Link a Bridge Provider Item
 money sync                          Sync linked provider data (supports --start-date/--end-date)

@@ -152,6 +152,20 @@ Provider errors are classified as:
 
 Reconnect-required provider states are machine-readable through item status or classified provider errors. Removed provider transactions are soft-deleted: normal reads exclude them, `--removed include|only` can show them, and permanent purge is reserved for an explicit confirmed cleanup command.
 
+Shared command error codes include:
+
+| Code | Category | Retryable | Exit code | Meaning |
+| --- | --- | --- | --- | --- |
+| `BASE_CONFIG_MISSING` | `config` | false | 3 | `money plaid login` was run before the base config exists. |
+| `NOT_LOGGED_IN` | `auth` | false | 3 | Dashboard-only operation needs Plaid Dashboard auth. |
+| `TEAM_SELECTION_REQUIRED` | `validation` | false | 2 | Multiple Plaid Dashboard teams exist and no interactive or `--team` selection was available. |
+| `API_KEYS_FETCH_REQUIRED` | `auth` | true | 3 | Dashboard auth exists but Plaid API keys still need to be fetched. |
+| `DASHBOARD_TOKEN_REFRESH_FAILED` | `auth` | false | 3 | Stored Dashboard refresh token cannot refresh; rerun `money plaid login`. |
+| `DASHBOARD_CONTRACT_CHANGED` | `api` | false | 6 | Plaid Dashboard private response shape no longer matches the known CLI-compatible contract. |
+| `PLAID_DASHBOARD_LOGIN_REJECTED` | `auth` | false | 3 | Plaid rejected the CLI-compatible Dashboard OAuth path. |
+| `PLAID_ENVIRONMENT_NOT_PROVISIONED` | `validation` | false | 2 | Dashboard returned no secret for the selected Plaid environment. |
+| `READ_ONLY_VIOLATION` | `safety` | false | 4 | The command would mutate local config, env, store, or auth files while read-only mode is enabled. |
+
 ## Examples
 
 ```bash
@@ -159,12 +173,17 @@ money setup --json
 money doctor --json
 money version --json
 money providers configure plaid --client-id ... --secret ... --environment sandbox --json
+money plaid login --json
+money providers plaid login --json
+money plaid logout --json
 money demo accounts list --json
 money demo transactions list --json --merchant Coffee --pending true --limit 10
 money demo transactions search coffee --json --limit 5
 money sync --json
 money sync --provider plaid --provider-item pi_example --json
 money sync --start-date 2024-01-01 --end-date 2024-03-01 --json
+money providers plaid link --optional-products auth --additional-consented-products investments
+money plaid sandbox link --products transactions --institution-id ins_56
 
 # Read synced data
 money investments holdings --json
@@ -173,6 +192,21 @@ money liabilities list --json
 money items list --json
 money items rename <id> "My Bank" --json
 ```
+
+## Link Commands
+
+Plaid link commands are human-mode browser flows. JSON mode is rejected for live Link because completion depends on a local callback.
+
+`money link <institution-query>` and `money providers plaid link` support:
+
+- `--no-open`
+- `--additional-consented-products`
+- `--required-if-supported-products`
+- `--optional-products`
+
+The three consent flags accept comma-separated Plaid product names and are validated before Plaid is called. `products` remains the configured initial product set. Canceling Plaid Link exits without exchanging a public token or writing a Provider Item. Plaid Link errors preserve Plaid error type/code/message plus request and link session metadata internally for diagnostics.
+
+`money plaid sandbox link` creates a Plaid Sandbox public token, exchanges it through the same Provider Item persistence path as browser Link, and stores the linked item in the encrypted local store. It only runs when `providers.plaid.environment` is `sandbox`. `balance` is rejected as an initial product instead of being remapped.
 
 ## Setup Command
 
@@ -238,6 +272,38 @@ Default output is plain text: `money 0.1.0 (commit abc1234)`.
   "diagnostics": []
 }
 ```
+
+## Plaid Dashboard Login Commands
+
+`plaid login --json` and `providers plaid login --json` return:
+
+```json
+{
+  "provider": "plaid",
+  "team_id": "team_...",
+  "environment": "sandbox",
+  "keys_written": 2,
+  "credential_action": "written",
+  "dashboard_auth_path": "/Users/you/.money/plaid-dashboard-auth.json",
+  "next_command": "money link <institution-query>",
+  "config_path": "/Users/you/.money/config.yaml",
+  "env_path": "/Users/you/.money/.env"
+}
+```
+
+`plaid logout --json` and `providers plaid logout --json` return:
+
+```json
+{
+  "provider": "plaid",
+  "dashboard_auth_removed": true,
+  "dashboard_auth_path": "/Users/you/.money/plaid-dashboard-auth.json",
+  "api_keys_preserved": true,
+  "env_path": "/Users/you/.money/.env"
+}
+```
+
+These commands never include Plaid API secrets, Dashboard OAuth tokens, masked secrets, or reversible previews.
 
 ## Monarch Compatibility Notes
 

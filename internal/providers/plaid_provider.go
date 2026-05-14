@@ -12,6 +12,7 @@ import (
 
 type plaidClient interface {
 	CreateLinkToken(ctx context.Context, request plaid.LinkTokenCreateRequest) (string, error)
+	CreateSandboxPublicToken(ctx context.Context, institutionID string, products []plaid.Products) (string, error)
 	ExchangePublicToken(ctx context.Context, publicToken string) (PlaidPublicTokenExchangeResult, error)
 	SearchInstitutions(ctx context.Context, request plaid.InstitutionsSearchRequest) ([]plaid.Institution, error)
 	GetAccounts(ctx context.Context, accessToken string) ([]plaid.AccountBase, error)
@@ -89,13 +90,16 @@ func (p plaidProvider) CreateLinkSession(ctx context.Context, request LinkReques
 		return LinkSession{}, err
 	}
 	linkTokenRequest, err := BuildPlaidLinkTokenCreateRequest(PlaidLinkTokenRequestConfig{
-		ClientName:    "money",
-		Language:      "en",
-		ClientUserID:  request.State,
-		Products:      providerListField(p.cfg, "products"),
-		CountryCodes:  providerListField(p.cfg, "country_codes"),
-		RedirectURI:   request.RedirectURI,
-		InstitutionID: request.Institution.ProviderInstitutionID,
+		ClientName:                  "money",
+		Language:                    "en",
+		ClientUserID:                request.State,
+		Products:                    providerListField(p.cfg, "products"),
+		CountryCodes:                providerListField(p.cfg, "country_codes"),
+		RedirectURI:                 request.RedirectURI,
+		InstitutionID:               request.Institution.ProviderInstitutionID,
+		AdditionalConsentedProducts: linkProductsOrConfig(request.AdditionalConsentedProducts, p.cfg, "additional_consented_products"),
+		RequiredIfSupportedProducts: linkProductsOrConfig(request.RequiredIfSupportedProducts, p.cfg, "required_if_supported_products"),
+		OptionalProducts:            linkProductsOrConfig(request.OptionalProducts, p.cfg, "optional_products"),
 	})
 	if err != nil {
 		return LinkSession{}, err
@@ -105,6 +109,21 @@ func (p plaidProvider) CreateLinkSession(ctx context.Context, request LinkReques
 		return LinkSession{}, err
 	}
 	return LinkSession{Provider: "plaid", LinkToken: linkToken, State: request.State}, nil
+}
+
+func (p plaidProvider) CreateSandboxPublicToken(ctx context.Context, request SandboxPublicTokenRequest) (string, error) {
+	client, err := p.plaidClient()
+	if err != nil {
+		return "", err
+	}
+	products, err := plaidLinkProducts(request.Products)
+	if err != nil {
+		return "", err
+	}
+	if len(products) == 0 {
+		return "", fmt.Errorf("Plaid Sandbox products are required")
+	}
+	return client.CreateSandboxPublicToken(ctx, request.InstitutionID, products)
 }
 
 func (p plaidProvider) ExchangeLinkToken(ctx context.Context, session LinkSession, callback LinkCallback) (LinkedItem, error) {
@@ -141,7 +160,7 @@ func (p plaidProvider) ExchangeLinkToken(ctx context.Context, session LinkSessio
 			EncryptedAccessToken:   []byte(exchanged.AccessToken),
 			ExternalUserID:         session.State,
 			Status:                 "active",
-			Products:               providerListField(p.cfg, "products"),
+			Products:               linkProductsOrConfig(session.Products, p.cfg, "products"),
 		},
 	}, nil
 }
@@ -241,6 +260,13 @@ func providerListField(cfg config.ProviderConfig, name string) []string {
 		values = append(values, strings.TrimSpace(part))
 	}
 	return values
+}
+
+func linkProductsOrConfig(requestValues []string, cfg config.ProviderConfig, name string) []string {
+	if len(requestValues) > 0 {
+		return requestValues
+	}
+	return providerListField(cfg, name)
 }
 
 func providerScopedID(provider string, externalID string) string {

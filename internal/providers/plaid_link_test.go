@@ -41,6 +41,31 @@ func TestBuildPlaidLinkTokenCreateRequestUsesExplicitProductsAndCountries(t *tes
 	}
 }
 
+func TestBuildPlaidLinkTokenCreateRequestUsesConsentProductOptions(t *testing.T) {
+	request, err := BuildPlaidLinkTokenCreateRequest(PlaidLinkTokenRequestConfig{
+		ClientName:                  "money",
+		Language:                    "en",
+		ClientUserID:                "local-user",
+		Products:                    []string{"transactions"},
+		CountryCodes:                []string{"US"},
+		AdditionalConsentedProducts: []string{"investments"},
+		RequiredIfSupportedProducts: []string{"liabilities"},
+		OptionalProducts:            []string{"auth"},
+	})
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	if len(request.AdditionalConsentedProducts) != 1 || request.AdditionalConsentedProducts[0] != plaid.PRODUCTS_INVESTMENTS {
+		t.Fatalf("additional consented products = %#v", request.AdditionalConsentedProducts)
+	}
+	if len(request.RequiredIfSupportedProducts) != 1 || request.RequiredIfSupportedProducts[0] != plaid.PRODUCTS_LIABILITIES {
+		t.Fatalf("required if supported products = %#v", request.RequiredIfSupportedProducts)
+	}
+	if len(request.OptionalProducts) != 1 || request.OptionalProducts[0] != plaid.PRODUCTS_AUTH {
+		t.Fatalf("optional products = %#v", request.OptionalProducts)
+	}
+}
+
 func TestBuildPlaidLinkTokenCreateRequestRejectsUnsupportedProduct(t *testing.T) {
 	_, err := BuildPlaidLinkTokenCreateRequest(PlaidLinkTokenRequestConfig{
 		ClientName:   "money",
@@ -48,6 +73,20 @@ func TestBuildPlaidLinkTokenCreateRequestRejectsUnsupportedProduct(t *testing.T)
 		ClientUserID: "local-user",
 		Products:     []string{"balance"},
 		CountryCodes: []string{"US"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "unsupported Plaid Link product") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestBuildPlaidLinkTokenCreateRequestRejectsUnsupportedConsentProduct(t *testing.T) {
+	_, err := BuildPlaidLinkTokenCreateRequest(PlaidLinkTokenRequestConfig{
+		ClientName:                  "money",
+		Language:                    "en",
+		ClientUserID:                "local-user",
+		Products:                    []string{"transactions"},
+		CountryCodes:                []string{"US"},
+		AdditionalConsentedProducts: []string{"balance"},
 	})
 	if err == nil || !strings.Contains(err.Error(), "unsupported Plaid Link product") {
 		t.Fatalf("error = %v", err)

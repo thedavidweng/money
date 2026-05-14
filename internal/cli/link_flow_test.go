@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -48,7 +49,7 @@ func TestRunPlaidLinkFlowNoOpenStoresLinkedItem(t *testing.T) {
 
 	var stdout bytes.Buffer
 	state := &runtimeState{store: db}
-	if err := runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, providers.Institution{}, "", true, &stdout); err != nil {
+	if err := runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, plaidLinkFlowOptions{NoOpen: true}, &stdout); err != nil {
 		t.Fatalf("run plaid link flow: %v", err)
 	}
 	if opened {
@@ -99,11 +100,111 @@ func TestRunPlaidLinkFlowWaitsForEnterBeforeOpeningBrowser(t *testing.T) {
 
 	var stdout bytes.Buffer
 	state := &runtimeState{store: db, stdin: strings.NewReader("\n")}
-	if err := runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, providers.Institution{}, "", false, &stdout); err != nil {
+	if err := runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, plaidLinkFlowOptions{}, &stdout); err != nil {
 		t.Fatalf("run plaid link flow: %v", err)
 	}
 	if openedURL != "http://127.0.0.1:4000" {
 		t.Fatalf("opened URL = %q", openedURL)
+	}
+}
+
+func TestRunPlaidLinkFlowPassesConsentProductOptions(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenEncrypted(ctx, t.TempDir()+"/money.db", []byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatalf("open encrypted store: %v", err)
+	}
+	defer db.Close()
+
+	oldStart := startPlaidLinkSessionServer
+	t.Cleanup(func() { startPlaidLinkSessionServer = oldStart })
+	startPlaidLinkSessionServer = func(linkToken string, state string, timeout time.Duration) (linkSessionServer, error) {
+		return fakeLinkSessionServer{
+			url: "http://127.0.0.1:4000",
+			callback: providers.LinkCallback{
+				PublicToken: "public-token",
+				State:       state,
+			},
+		}, nil
+	}
+
+	provider := &recordingPlaidCLIProvider{}
+	var stdout bytes.Buffer
+	state := &runtimeState{store: db}
+	err = runPlaidLinkFlow(ctx, state, provider, plaidLinkFlowOptions{
+		NoOpen:                      true,
+		AdditionalConsentedProducts: "investments",
+		RequiredIfSupportedProducts: "liabilities",
+		OptionalProducts:            "auth",
+	}, &stdout)
+	if err != nil {
+		t.Fatalf("run plaid link flow: %v", err)
+	}
+	if strings.Join(provider.request.AdditionalConsentedProducts, ",") != "investments" {
+		t.Fatalf("additional consented products = %#v", provider.request.AdditionalConsentedProducts)
+	}
+	if strings.Join(provider.request.RequiredIfSupportedProducts, ",") != "liabilities" {
+		t.Fatalf("required if supported products = %#v", provider.request.RequiredIfSupportedProducts)
+	}
+	if strings.Join(provider.request.OptionalProducts, ",") != "auth" {
+		t.Fatalf("optional products = %#v", provider.request.OptionalProducts)
+	}
+}
+
+func TestRunPlaidSandboxLinkStoresLinkedItem(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenEncrypted(ctx, t.TempDir()+"/money.db", []byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatalf("open encrypted store: %v", err)
+	}
+	defer db.Close()
+
+	provider := &fakePlaidSandboxProvider{publicToken: "public-sandbox"}
+	var stdout bytes.Buffer
+	state := &runtimeState{store: db}
+	if err := runPlaidSandboxLink(ctx, state, provider, provider, plaidSandboxLinkOptions{
+		InstitutionID: "ins_56",
+		Products:      "transactions,liabilities",
+	}, &stdout); err != nil {
+		t.Fatalf("run plaid sandbox link: %v", err)
+	}
+	if provider.sandboxRequest.InstitutionID != "ins_56" || strings.Join(provider.sandboxRequest.Products, ",") != "transactions,liabilities" {
+		t.Fatalf("request = %#v", provider.sandboxRequest)
+	}
+	if provider.callback.PublicToken != "public-sandbox" {
+		t.Fatalf("callback = %#v", provider.callback)
+	}
+	item, err := db.GetProviderItem(ctx, "pi_sandbox")
+	if err != nil {
+		t.Fatalf("provider item not stored: %v", err)
+	}
+	if string(item.EncryptedAccessToken) != "sandbox-access-token" || strings.Join(item.Products, ",") != "transactions,liabilities" {
+		t.Fatalf("item = %#v", item)
+	}
+	if !strings.Contains(stdout.String(), "Linked plaid Sandbox Provider Item pi_sandbox") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+}
+
+func TestRunPlaidSandboxLinkValidation(t *testing.T) {
+	db, err := store.OpenDemo(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	state := &runtimeState{store: db}
+	for name, opts := range map[string]plaidSandboxLinkOptions{
+		"production": {Environment: "production", InstitutionID: "ins_56", Products: "transactions"},
+		"balance":    {Environment: "sandbox", InstitutionID: "ins_56", Products: "balance"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			provider := &fakePlaidSandboxProvider{}
+			err := runPlaidSandboxLink(context.Background(), state, provider, provider, opts, io.Discard)
+			var cliErr cliError
+			if !errors.As(err, &cliErr) || cliErr.category != "validation" {
+				t.Fatalf("err = %#v", err)
+			}
+		})
 	}
 }
 
@@ -265,6 +366,49 @@ func (fakePlaidCLIProvider) ExchangeLinkToken(ctx context.Context, session provi
 }
 func (fakePlaidCLIProvider) Sync(ctx context.Context, item providers.ProviderItem, sink providers.SyncSink) (providers.SyncResult, error) {
 	return providers.SyncResult{}, nil
+}
+
+type recordingPlaidCLIProvider struct {
+	fakePlaidCLIProvider
+	request providers.LinkRequest
+}
+
+func (p *recordingPlaidCLIProvider) CreateLinkSession(ctx context.Context, request providers.LinkRequest) (providers.LinkSession, error) {
+	p.request = request
+	return providers.LinkSession{Provider: "plaid", LinkToken: "link-token", State: request.State}, nil
+}
+
+type fakePlaidSandboxProvider struct {
+	fakePlaidCLIProvider
+	publicToken    string
+	sandboxRequest providers.SandboxPublicTokenRequest
+	callback       providers.LinkCallback
+}
+
+func (p *fakePlaidSandboxProvider) CreateSandboxPublicToken(ctx context.Context, request providers.SandboxPublicTokenRequest) (string, error) {
+	p.sandboxRequest = request
+	return p.publicToken, nil
+}
+
+func (p *fakePlaidSandboxProvider) ExchangeLinkToken(ctx context.Context, session providers.LinkSession, callback providers.LinkCallback) (providers.LinkedItem, error) {
+	p.callback = callback
+	return providers.LinkedItem{
+		Institution: providers.Institution{
+			ID:                    "plaid:ins_56",
+			Name:                  "Plaid Sandbox",
+			Provider:              "plaid",
+			ProviderInstitutionID: "ins_56",
+		},
+		ProviderItem: providers.ProviderItem{
+			ID:                     "pi_sandbox",
+			Provider:               "plaid",
+			InstitutionID:          "plaid:ins_56",
+			ProviderExternalItemID: "item_sandbox",
+			EncryptedAccessToken:   []byte("sandbox-access-token"),
+			Status:                 "active",
+			Products:               session.Products,
+		},
+	}, nil
 }
 
 type fakeBridgeCLIProvider struct{}

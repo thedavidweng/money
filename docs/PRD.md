@@ -47,6 +47,7 @@ After these contracts are proven, the project can add budgets, spending summarie
 17. As a BYOK user, I want to provide financial provider credentials locally without registering a `money` account or subscription, so that sync remains under my control.
 18. As a CLI user, I want to configure `money` through `~/.money/config.yaml`, `.env`, environment variables, or setup commands, so that it fits both interactive and automated local workflows.
 19. As a user with overlapping Provider coverage, I want duplicate-looking linked data to stay separate until I explicitly review and approve a merge.
+20. As a Plaid BYOK user, I want an optional Plaid Dashboard login bootstrap command, so that local API keys can be fetched into my resolved `.env` without making `money` a hosted credential proxy.
 
 ## Implementation Decisions
 
@@ -61,6 +62,7 @@ After these contracts are proven, the project can add budgets, spending summarie
 - Provider adapters own communication with external financial Providers and map provider data into canonical records.
 - Provider support is BYOK-only; `money` does not require registered accounts, subscriptions, managed proxy credentials, or AI API keys.
 - The first networked Providers are Plaid and Bridge.
+- Plaid Dashboard login is a credential-bootstrap convenience for local Plaid API keys. It is not a general hosted account model and must preserve manual `money providers configure plaid` as the stable fallback.
 - Providers are peers; users choose based on institution support, not a global provider hierarchy.
 - Linking the same institution through multiple Providers creates separate Provider Items.
 - Merging or deduplicating Provider Items or accounts requires explicit user review and approval.

@@ -93,3 +93,76 @@ func TestPlaidLinkHelperValidatesStateBeforeReturningCallback(t *testing.T) {
 		t.Fatalf("callback = %s", encoded)
 	}
 }
+
+func TestPlaidLinkHelperHandlesSuccessCancelAndLinkErrorPayloads(t *testing.T) {
+	for name, payload := range map[string]string{
+		"success": `{"status":"success","public_token":"public","state":"state","metadata":{"institution":{"institution_id":"ins_123","name":"Bank"}}}`,
+		"cancel":  `{"status":"cancel","state":"state","metadata":{"link_session_id":"link-session"}}`,
+		"error":   `{"status":"error","state":"state","error":{"error_type":"ITEM_ERROR","error_code":"INVALID_CREDENTIALS","error_message":"bad credentials","display_message":"try again"},"metadata":{"request_id":"req_123","link_session_id":"link-session"}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			helper := NewPlaidLinkHelper(PlaidLinkHelperConfig{LinkToken: "link-token", State: "state", Timeout: time.Second})
+			resp := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, "/callback", strings.NewReader(payload))
+			req.Header.Set("Origin", "http://example.com")
+			req.Host = "example.com"
+			helper.Handler().ServeHTTP(resp, req)
+			if resp.Code != http.StatusOK {
+				t.Fatalf("callback status = %d", resp.Code)
+			}
+			callback, err := helper.Wait(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if callback.Status != name {
+				t.Fatalf("callback status = %q", callback.Status)
+			}
+			if name == "error" && (callback.Error.Code != "INVALID_CREDENTIALS" || callback.Metadata.RequestID != "req_123") {
+				t.Fatalf("callback = %#v", callback)
+			}
+			if name == "cancel" && callback.Metadata.LinkSessionID != "link-session" {
+				t.Fatalf("callback = %#v", callback)
+			}
+		})
+	}
+}
+
+func TestPlaidLinkHelperRejectsWrongOriginAndDuplicateCallback(t *testing.T) {
+	helper := NewPlaidLinkHelper(PlaidLinkHelperConfig{LinkToken: "link-token", State: "state", Timeout: time.Second})
+	handler := helper.Handler()
+
+	badOrigin := httptest.NewRecorder()
+	badReq := httptest.NewRequest(http.MethodPost, "/callback", strings.NewReader(`{"status":"cancel","state":"state"}`))
+	badReq.Host = "127.0.0.1"
+	badReq.Header.Set("Origin", "http://evil.test")
+	handler.ServeHTTP(badOrigin, badReq)
+	if badOrigin.Code != http.StatusForbidden {
+		t.Fatalf("bad origin status = %d", badOrigin.Code)
+	}
+
+	first := httptest.NewRecorder()
+	firstReq := httptest.NewRequest(http.MethodPost, "/callback", strings.NewReader(`{"status":"cancel","state":"state"}`))
+	firstReq.Host = "127.0.0.1"
+	firstReq.Header.Set("Origin", "http://127.0.0.1")
+	handler.ServeHTTP(first, firstReq)
+	if first.Code != http.StatusOK {
+		t.Fatalf("first status = %d", first.Code)
+	}
+
+	second := httptest.NewRecorder()
+	secondReq := httptest.NewRequest(http.MethodPost, "/callback", strings.NewReader(`{"status":"cancel","state":"state"}`))
+	secondReq.Host = "127.0.0.1"
+	secondReq.Header.Set("Origin", "http://127.0.0.1")
+	handler.ServeHTTP(second, secondReq)
+	if second.Code != http.StatusConflict {
+		t.Fatalf("second status = %d", second.Code)
+	}
+}
+
+func TestPlaidLinkHelperWaitTimesOut(t *testing.T) {
+	helper := NewPlaidLinkHelper(PlaidLinkHelperConfig{LinkToken: "link-token", State: "state", Timeout: time.Millisecond})
+	_, err := helper.Wait(context.Background())
+	if err == nil {
+		t.Fatal("expected timeout")
+	}
+}

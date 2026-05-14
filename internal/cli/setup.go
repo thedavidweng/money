@@ -7,13 +7,14 @@ import (
 	"io"
 	"os"
 	"runtime"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/thedavidweng/money/internal/config"
 	"github.com/thedavidweng/money/internal/contracts"
+	"github.com/thedavidweng/money/internal/plaidlogin"
+	"github.com/thedavidweng/money/internal/prompt"
 	"github.com/thedavidweng/money/internal/store"
 )
 
@@ -222,6 +223,18 @@ func runDiagnostics(configPath string, profile string) []Diagnostic {
 				})
 			}
 		}
+		authPath := plaidlogin.DashboardAuthPath(cfg.ConfigPath)
+		if info, err := os.Stat(authPath); err == nil {
+			perm := info.Mode().Perm()
+			if perm&0o077 != 0 {
+				diags = append(diags, Diagnostic{
+					Section: "Warnings", Code: "PLAID_DASHBOARD_AUTH_PERMISSIONS",
+					Status:   "warn",
+					Message:  fmt.Sprintf("%s has permissions %o; recommend 600.", authPath, perm),
+					Category: "config",
+				})
+			}
+		}
 	}
 
 	// Store section
@@ -305,29 +318,51 @@ func runSetupWizard(ctx context.Context, state *runtimeState, stdout io.Writer, 
 	}
 
 	reader := bufio.NewReader(state.stdin)
+	selector := state.prompter
+	if selector == nil {
+		selector = prompt.HuhSelector{Input: state.stdin, Output: stdout}
+	}
 	for {
 		fmt.Fprintln(stdout)
 		fmt.Fprintf(stdout, "No providers are configured yet. To link financial institutions, you need at least one provider.\n")
 		fmt.Fprintln(stdout)
-		for i, name := range unconfigured {
+		choices := make([]prompt.Choice, 0, len(unconfigured)+1)
+		for _, name := range unconfigured {
 			if spec, ok := config.ProviderSpecByName(name); ok {
-				fmt.Fprintf(stdout, "  %d) %s — %s\n", i+1, name, spec.HelpURL)
+				choices = append(choices, prompt.Choice{Label: name + " - " + spec.HelpURL, Value: name})
 			}
 		}
-		fmt.Fprintf(stdout, "  %d) Skip for now\n", len(unconfigured)+1)
-		fmt.Fprintln(stdout)
-		fmt.Fprintf(stdout, "Select a provider to configure (1-%d): ", len(unconfigured)+1)
-		input, err := reader.ReadString('\n')
+		choices = append(choices, prompt.Choice{Label: "Skip for now", Value: "skip"})
+		choice, err := selector.Select("Choose a provider to configure", choices)
 		if err != nil {
 			return fmt.Errorf("failed to read selection: %w", err)
 		}
-		choice := strings.TrimSpace(input)
-		idx := -1
-		if n, err := strconv.Atoi(choice); err == nil {
-			idx = n - 1
-		}
-		if idx >= 0 && idx < len(unconfigured) {
-			providerName := unconfigured[idx]
+		if choice != "skip" {
+			providerName := choice
+			if providerName == "plaid" {
+				method, err := selector.Select("How do you want to configure Plaid?", []prompt.Choice{
+					{Label: "Sign in with Plaid Dashboard and fetch API keys automatically", Value: "dashboard"},
+					{Label: "Paste client ID and secret manually", Value: "manual"},
+					{Label: "Skip Plaid for now", Value: "skip"},
+				})
+				if err != nil {
+					return err
+				}
+				switch method {
+				case "skip":
+					fmt.Fprintln(stdout)
+					fmt.Fprintf(stdout, "You can always run `money providers configure plaid` later.\n")
+					return nil
+				case "dashboard":
+					return runPlaidLoginCLI(ctx, state, stdout, stdout, plaidLoginCLIOptions{
+						CommandName: "plaid.login",
+						Environment: "sandbox",
+					})
+				case "manual":
+				default:
+					return fmt.Errorf("unknown Plaid setup method %q", method)
+				}
+			}
 			// Build a minimal cobra.Command just to hold flags for runInteractiveProviderConfigure
 			fakeCmd := &cobra.Command{}
 			fakeCmd.Flags().Bool("force", false, "")
@@ -373,12 +408,10 @@ func runSetupWizard(ctx context.Context, state *runtimeState, stdout io.Writer, 
 				fmt.Fprintf(stdout, "You can always run `money providers configure <provider>` later.\n")
 				return nil
 			}
-		} else if idx == len(unconfigured) {
+		} else {
 			fmt.Fprintln(stdout)
 			fmt.Fprintf(stdout, "You can always run `money providers configure <provider>` later.\n")
 			return nil
-		} else {
-			fmt.Fprintf(stdout, "  ! Invalid choice. Please enter a number between 1 and %d.\n", len(unconfigured)+1)
 		}
 	}
 }
@@ -506,6 +539,9 @@ func runInteractiveProviderConfigure(state *runtimeState, stdout io.Writer, prov
 			exitCode: 2,
 		}
 	}
+	if err := confirmProviderCredentialOverwrite(state, stdout, spec, &force); err != nil {
+		return err
+	}
 
 	result, err := config.ConfigureProvider(state.configPath, state.profile, spec, secrets, options, force)
 	if err != nil {
@@ -541,6 +577,53 @@ func runInteractiveProviderConfigure(state *runtimeState, stdout io.Writer, prov
 		fmt.Fprintf(stdout, "%s credentials already present (use --force to overwrite).\n", providerName)
 	}
 	printDiagnostics(stdout, providerDiags)
+	return nil
+}
+
+func confirmProviderCredentialOverwrite(state *runtimeState, output io.Writer, spec config.ProviderSpec, force *bool) error {
+	if *force {
+		return nil
+	}
+	conflicts, envPath, err := config.ProviderCredentialConflicts(state.configPath, state.profile, spec)
+	if err != nil {
+		return err
+	}
+	if len(conflicts) == 0 {
+		return nil
+	}
+	message := fmt.Sprintf("%s credentials already exist in %s; rerun with --force to overwrite %s.", spec.Name, envPath, strings.Join(conflicts, ", "))
+	if state.json || state.stdin == nil {
+		return cliError{
+			command:   "providers.configure",
+			code:      "CONFIRMATION_REQUIRED",
+			message:   message,
+			category:  contracts.CategorySafety,
+			retryable: false,
+			exitCode:  10,
+		}
+	}
+	selector := state.prompter
+	if selector == nil {
+		selector = prompt.HuhSelector{Input: state.stdin, Output: output}
+	}
+	choice, err := selector.Select("Overwrite existing "+spec.Name+" credentials?", []prompt.Choice{
+		{Label: "No, keep existing credentials", Value: "no"},
+		{Label: "Yes, overwrite credentials", Value: "yes"},
+	})
+	if err != nil {
+		return err
+	}
+	if choice != "yes" {
+		return cliError{
+			command:   "providers.configure",
+			code:      "CONFIRMATION_REQUIRED",
+			message:   message,
+			category:  contracts.CategorySafety,
+			retryable: false,
+			exitCode:  10,
+		}
+	}
+	*force = true
 	return nil
 }
 

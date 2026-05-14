@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
@@ -19,6 +20,8 @@ import (
 	"github.com/thedavidweng/money/internal/contracts"
 	"github.com/thedavidweng/money/internal/core"
 	"github.com/thedavidweng/money/internal/linking"
+	"github.com/thedavidweng/money/internal/plaidlogin"
+	"github.com/thedavidweng/money/internal/prompt"
 	"github.com/thedavidweng/money/internal/providers"
 	"github.com/thedavidweng/money/internal/store"
 	"github.com/thedavidweng/money/internal/syncer"
@@ -37,7 +40,21 @@ type runtimeState struct {
 	configPath string
 	profile    string
 	stdin      io.Reader
+	prompter   prompt.Selector
 }
+
+type plaidLoginCLIOptions struct {
+	CommandName  string
+	NoOpen       bool
+	Team         string
+	Environment  string
+	Products     string
+	CountryCodes string
+	RedirectURI  string
+	Force        bool
+}
+
+var runPlaidLoginCLI = runPlaidLoginLive
 
 func Run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 	state := &runtimeState{stdin: stdin}
@@ -170,9 +187,13 @@ link financial institutions and sync transactions locally.
 	linkCmd.GroupID = "config"
 	root.AddCommand(linkCmd)
 
-	providersCmd := newProvidersCommand(ctx, state, stdout)
+	providersCmd := newProvidersCommand(ctx, state, stdout, stderr)
 	providersCmd.GroupID = "config"
 	root.AddCommand(providersCmd)
+
+	plaidCmd := newPlaidCommand(ctx, state, stdout, stderr)
+	plaidCmd.GroupID = "config"
+	root.AddCommand(plaidCmd)
 
 	feedbackCmd := newFeedbackCommand(state, stdout)
 	feedbackCmd.GroupID = "utils"
@@ -786,17 +807,360 @@ func newSyncCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 	return cmd
 }
 
-func newProvidersCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
+func newProvidersCommand(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{Use: "providers"}
-	cmd.AddCommand(newProviderLinkCommand(ctx, state, "plaid", stdout))
+	cmd.AddCommand(newPlaidProviderCommand(ctx, state, stdout, stderr))
 	cmd.AddCommand(newProviderLinkCommand(ctx, state, "bridge", stdout))
 	cmd.AddCommand(newConfigureCommand(state, stdout))
+	return cmd
+}
+
+func newPlaidProviderCommand(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer) *cobra.Command {
+	cmd := newProviderLinkCommand(ctx, state, "plaid", stdout)
+	cmd.AddCommand(newPlaidLoginCommand(ctx, state, stdout, stderr, "providers.plaid.login"))
+	cmd.AddCommand(newPlaidLogoutCommand(state, stdout, "providers.plaid.logout"))
+	return cmd
+}
+
+func newPlaidCommand(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "plaid",
+		Short: "Plaid-specific setup and Dashboard commands",
+	}
+	cmd.AddCommand(newPlaidLoginCommand(ctx, state, stdout, stderr, "plaid.login"))
+	cmd.AddCommand(newPlaidLogoutCommand(state, stdout, "plaid.logout"))
+	cmd.AddCommand(newPlaidSandboxCommand(ctx, state, stdout))
+	return cmd
+}
+
+func newPlaidSandboxCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "sandbox",
+		Short: "Plaid Sandbox helpers",
+	}
+	cmd.AddCommand(newPlaidSandboxLinkCommand(ctx, state, stdout))
+	return cmd
+}
+
+func newPlaidSandboxLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
+	var institutionID, products string
+	cmd := &cobra.Command{
+		Use:   "link",
+		Short: "Create and store a Plaid Sandbox Provider Item",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load(config.Options{ConfigPath: state.configPath, Profile: state.profile})
+			if err != nil {
+				return err
+			}
+			registry := providers.NewRegistry(cfg)
+			provider, ok := registry.Get("plaid")
+			if !ok {
+				return fmt.Errorf("plaid provider is not registered")
+			}
+			sandboxCreator, ok := provider.(providers.SandboxPublicTokenCreator)
+			if !ok {
+				return fmt.Errorf("plaid provider does not support Sandbox public-token creation")
+			}
+			return runPlaidSandboxLink(ctx, state, sandboxCreator, provider, plaidSandboxLinkOptions{
+				Environment:   cfg.Providers["plaid"].Fields["environment"],
+				InstitutionID: institutionID,
+				Products:      products,
+			}, stdout)
+		},
+	}
+	cmd.Flags().StringVar(&institutionID, "institution-id", "ins_56", "Plaid Sandbox institution ID")
+	cmd.Flags().StringVar(&products, "products", "transactions", "comma-separated Plaid Sandbox products")
+	return cmd
+}
+
+func newPlaidLoginCommand(_ context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer, commandName string) *cobra.Command {
+	var noOpen, force bool
+	var team, environment, products, countryCodes, redirectURI string
+	cmd := &cobra.Command{
+		Use:   "login",
+		Short: "Sign in to Plaid Dashboard and fetch API keys",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPlaidLoginCLI(cmd.Context(), state, stdout, stderr, plaidLoginCLIOptions{
+				CommandName:  commandName,
+				NoOpen:       noOpen,
+				Team:         team,
+				Environment:  environment,
+				Products:     products,
+				CountryCodes: countryCodes,
+				RedirectURI:  redirectURI,
+				Force:        force,
+			})
+		},
+	}
+	cmd.Flags().BoolVar(&noOpen, "no-open", false, "print the Dashboard OAuth URL without opening a browser")
+	cmd.Flags().StringVar(&team, "team", "", "team selector by ID, client ID, name, or 1-based index")
+	cmd.Flags().StringVar(&environment, "environment", "sandbox", "Plaid environment to write: sandbox or production")
+	cmd.Flags().StringVar(&products, "products", "", "comma-separated Plaid Link products to write to config")
+	cmd.Flags().StringVar(&countryCodes, "country-codes", "", "comma-separated Plaid country codes to write to config")
+	cmd.Flags().StringVar(&redirectURI, "redirect-uri", "", "Plaid Link redirect URI to write to config")
+	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing PLAID_CLIENT_ID and PLAID_SECRET")
+	return cmd
+}
+
+func runPlaidLoginLive(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer, opts plaidLoginCLIOptions) error {
+	meta, err := config.ResolveMetadata(config.Options{ConfigPath: state.configPath, Profile: state.profile})
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return cliError{
+				command:   opts.CommandName,
+				code:      plaidlogin.ErrorBaseConfigMissing,
+				message:   "Base money config is missing. Run `money setup` first.",
+				category:  contracts.CategoryConfig,
+				retryable: false,
+				exitCode:  3,
+			}
+		}
+		return err
+	}
+	if meta.ReadOnly {
+		return cliError{
+			command:   opts.CommandName,
+			code:      plaidlogin.ErrorReadOnlyViolation,
+			message:   "Plaid Dashboard login would modify local config while read-only mode is enabled.",
+			category:  contracts.CategorySafety,
+			retryable: false,
+			exitCode:  4,
+		}
+	}
+	if err := validatePlaidLoginOverwrite(state, meta, &opts, stderr); err != nil {
+		return err
+	}
+	stateValue, err := plaidlogin.NewRandomString(16)
+	if err != nil {
+		return err
+	}
+	verifier, err := plaidlogin.NewRandomString(32)
+	if err != nil {
+		return err
+	}
+	callback := plaidlogin.NewCallbackServer(stateValue, 5*time.Minute)
+	localServer, err := callback.StartLocal()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = localServer.Shutdown(shutdownCtx)
+	}()
+	authURL, err := plaidlogin.BuildAuthURL(plaidlogin.AuthConfig{
+		Port:         localServer.Port,
+		State:        stateValue,
+		CodeVerifier: verifier,
+	})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stderr, "Plaid Dashboard OAuth URL: %s\n", authURL)
+	if !opts.NoOpen && !state.json {
+		if state.stdin == nil {
+			return fmt.Errorf("stdin is required before opening a browser")
+		}
+		fmt.Fprintln(stderr, "Press Enter to open the browser.")
+		if _, err := bufio.NewReader(state.stdin).ReadString('\n'); err != nil {
+			return err
+		}
+		if err := openBrowser(authURL); err != nil {
+			return err
+		}
+	}
+	callbackResult, err := callback.Wait(ctx)
+	if err != nil {
+		return err
+	}
+	result, err := plaidlogin.RunLogin(ctx, plaidlogin.LoginOptions{
+		ConfigPath:   meta.ConfigPath,
+		Profile:      state.profile,
+		Environment:  opts.Environment,
+		TeamSelector: opts.Team,
+		TeamPrompt:   plaidLoginTeamPrompt(state, stderr),
+		Products:     opts.Products,
+		CountryCodes: opts.CountryCodes,
+		RedirectURI:  opts.RedirectURI,
+		Force:        opts.Force,
+		CallbackCode: callbackResult.Code,
+		RedirectPort: localServer.Port,
+		CodeVerifier: verifier,
+		State:        stateValue,
+	})
+	if err != nil {
+		return plaidLoginError(opts.CommandName, err)
+	}
+	return writePlaidLoginResult(state, stdout, result, opts.CommandName)
+}
+
+func plaidLoginTeamPrompt(state *runtimeState, stderr io.Writer) prompt.Selector {
+	if state.json || state.stdin == nil {
+		return nil
+	}
+	if state.prompter != nil {
+		return state.prompter
+	}
+	return prompt.HuhSelector{Input: state.stdin, Output: stderr}
+}
+
+func validatePlaidLoginOverwrite(state *runtimeState, meta config.Metadata, opts *plaidLoginCLIOptions, stderr io.Writer) error {
+	if opts.Environment == "" {
+		opts.Environment = "sandbox"
+	}
+	if opts.Force {
+		return nil
+	}
+	cfg, err := config.Load(config.Options{ConfigPath: meta.ConfigPath, Profile: state.profile})
+	if err != nil {
+		return nil
+	}
+	fields := cfg.Providers["plaid"].Fields
+	if fields["client_id"] == "" || fields["secret"] == "" || fields["environment"] == opts.Environment {
+		return nil
+	}
+	message := fmt.Sprintf("Plaid %s credentials already exist; rerun with --force to overwrite them with %s credentials.", fields["environment"], opts.Environment)
+	if state.json || state.stdin == nil {
+		return cliError{
+			command:   opts.CommandName,
+			code:      "CONFIRMATION_REQUIRED",
+			message:   message,
+			category:  contracts.CategorySafety,
+			retryable: false,
+			exitCode:  10,
+		}
+	}
+	selector := state.prompter
+	if selector == nil {
+		selector = prompt.HuhSelector{Input: state.stdin, Output: stderr}
+	}
+	choice, err := selector.Select("Overwrite existing Plaid credentials?", []prompt.Choice{
+		{Label: "No, keep existing credentials", Value: "no"},
+		{Label: "Yes, overwrite credentials", Value: "yes"},
+	})
+	if err != nil {
+		return err
+	}
+	if choice != "yes" {
+		return cliError{
+			command:   opts.CommandName,
+			code:      "CONFIRMATION_REQUIRED",
+			message:   message,
+			category:  contracts.CategorySafety,
+			retryable: false,
+			exitCode:  10,
+		}
+	}
+	opts.Force = true
+	return nil
+}
+
+func writePlaidLoginResult(state *runtimeState, stdout io.Writer, result plaidlogin.LoginResult, commandName string) error {
+	if state.json {
+		return contracts.WriteJSON(stdout, contracts.NewSuccess(commandName, result))
+	}
+	fmt.Fprintf(stdout, "Plaid Dashboard login complete for team %s.\n", result.TeamID)
+	fmt.Fprintf(stdout, "Plaid %s credentials written to %s.\n", result.Environment, result.EnvPath)
+	fmt.Fprintf(stdout, "Next: %s\n", result.NextCommand)
+	return nil
+}
+
+func plaidLoginError(command string, err error) error {
+	var dashErr plaidlogin.Error
+	if !errors.As(err, &dashErr) {
+		return err
+	}
+	category := contracts.CategoryAPI
+	exitCode := 6
+	retryable := false
+	switch dashErr.Code {
+	case "CONFIG_WRITE_FAILED":
+		category = contracts.CategoryConfig
+		exitCode = 1
+	case plaidlogin.ErrorBaseConfigMissing:
+		category = contracts.CategoryConfig
+		exitCode = 3
+	case plaidlogin.ErrorNotLoggedIn, plaidlogin.ErrorPlaidDashboardLoginRejected, plaidlogin.ErrorDashboardTokenRefreshFailed:
+		category = contracts.CategoryAuth
+		exitCode = 3
+	case plaidlogin.ErrorTeamSelectionRequired, plaidlogin.ErrorPlaidEnvironmentNotProvided, "INVALID_ENUM":
+		category = contracts.CategoryValidation
+		exitCode = 2
+	case plaidlogin.ErrorAPIKeysFetchRequired:
+		category = contracts.CategoryAuth
+		exitCode = 3
+		retryable = true
+	case plaidlogin.ErrorReadOnlyViolation:
+		category = contracts.CategorySafety
+		exitCode = 4
+	case plaidlogin.ErrorDashboardContractChanged:
+		category = contracts.CategoryAPI
+		exitCode = 6
+	}
+	message := dashErr.Error()
+	if dashErr.Code == plaidlogin.ErrorDashboardContractChanged || dashErr.Code == plaidlogin.ErrorPlaidDashboardLoginRejected {
+		message += " Run `money providers configure plaid` manually. Get credentials: " + config.PlaidSpec.HelpURL
+	}
+	return cliError{
+		command:   command,
+		code:      dashErr.Code,
+		message:   message,
+		category:  category,
+		retryable: retryable,
+		exitCode:  exitCode,
+	}
+}
+
+func newPlaidLogoutCommand(state *runtimeState, stdout io.Writer, commandName string) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "logout",
+		Short: "Remove stored Plaid Dashboard auth without deleting API keys",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			meta, err := config.ResolveMetadata(config.Options{ConfigPath: state.configPath, Profile: state.profile})
+			if err != nil {
+				return err
+			}
+			if meta.ReadOnly {
+				return cliError{
+					command:   commandName,
+					code:      plaidlogin.ErrorReadOnlyViolation,
+					message:   "Plaid Dashboard logout would modify local auth files while read-only mode is enabled.",
+					category:  contracts.CategorySafety,
+					retryable: false,
+					exitCode:  4,
+				}
+			}
+			authPath := plaidlogin.DashboardAuthPath(meta.ConfigPath)
+			removed, err := plaidlogin.DeleteAuthFile(authPath)
+			if err != nil {
+				return err
+			}
+			data := map[string]any{
+				"provider":               "plaid",
+				"dashboard_auth_removed": removed,
+				"dashboard_auth_path":    authPath,
+				"api_keys_preserved":     true,
+				"env_path":               meta.EnvPath,
+			}
+			if state.json {
+				return contracts.WriteJSON(stdout, contracts.NewSuccess(commandName, data))
+			}
+			if removed {
+				fmt.Fprintf(stdout, "Plaid Dashboard auth removed from %s.\n", authPath)
+			} else {
+				fmt.Fprintf(stdout, "Plaid Dashboard auth was not present at %s.\n", authPath)
+			}
+			fmt.Fprintf(stdout, "API keys remain in %s. To remove them, edit the file or run money providers configure plaid with new values.\n", meta.EnvPath)
+			return nil
+		},
+	}
 	return cmd
 }
 
 func newLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
 	var providerName, institutionID string
 	var noOpen bool
+	var additionalConsentedProducts, requiredIfSupportedProducts, optionalProducts string
 	cmd := &cobra.Command{
 		Use:   "link <institution-query>",
 		Short: "Link an institution through a Provider",
@@ -870,19 +1234,30 @@ func newLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 					exitCode:  2,
 				}
 			}
-			return runPlaidLinkFlow(ctx, state, provider, institution, cfg.Providers["plaid"].Fields["redirect_uri"], noOpen, stdout)
+			return runPlaidLinkFlow(ctx, state, provider, plaidLinkFlowOptions{
+				Institution:                 institution,
+				RedirectURI:                 cfg.Providers["plaid"].Fields["redirect_uri"],
+				NoOpen:                      noOpen,
+				AdditionalConsentedProducts: additionalConsentedProducts,
+				RequiredIfSupportedProducts: requiredIfSupportedProducts,
+				OptionalProducts:            optionalProducts,
+			}, stdout)
 		},
 	}
 	cmd.Flags().StringVar(&providerName, "provider", "plaid", "provider to use")
 	cmd.Flags().StringVar(&institutionID, "institution-id", "", "provider institution id from search results")
 	cmd.Flags().BoolVar(&noOpen, "no-open", false, "print the Link URL without opening a browser")
+	cmd.Flags().StringVar(&additionalConsentedProducts, "additional-consented-products", "", "comma-separated Plaid products to collect consent for without initializing")
+	cmd.Flags().StringVar(&requiredIfSupportedProducts, "required-if-supported-products", "", "comma-separated Plaid products required when the institution supports them")
+	cmd.Flags().StringVar(&optionalProducts, "optional-products", "", "comma-separated optional Plaid products")
 	return cmd
 }
 
 func newProviderLinkCommand(ctx context.Context, state *runtimeState, providerName string, stdout io.Writer) *cobra.Command {
 	providerCmd := &cobra.Command{Use: providerName}
 	var noOpen bool
-	providerCmd.AddCommand(&cobra.Command{
+	var additionalConsentedProducts, requiredIfSupportedProducts, optionalProducts string
+	linkCmd := &cobra.Command{
 		Use:   "link",
 		Short: "Link a " + providerName + " Provider Item",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -922,7 +1297,13 @@ func newProviderLinkCommand(ctx context.Context, state *runtimeState, providerNa
 			}
 			switch providerName {
 			case "plaid":
-				return runPlaidLinkFlow(ctx, state, provider, providers.Institution{}, cfg.Providers["plaid"].Fields["redirect_uri"], noOpen, stdout)
+				return runPlaidLinkFlow(ctx, state, provider, plaidLinkFlowOptions{
+					RedirectURI:                 cfg.Providers["plaid"].Fields["redirect_uri"],
+					NoOpen:                      noOpen,
+					AdditionalConsentedProducts: additionalConsentedProducts,
+					RequiredIfSupportedProducts: requiredIfSupportedProducts,
+					OptionalProducts:            optionalProducts,
+				}, stdout)
 			case "bridge":
 				return runBridgeLinkFlow(ctx, state, provider, cfg.Providers["bridge"].Fields["callback_url"], noOpen, stdout)
 			default:
@@ -936,8 +1317,14 @@ func newProviderLinkCommand(ctx context.Context, state *runtimeState, providerNa
 				}
 			}
 		},
-	})
-	providerCmd.PersistentFlags().BoolVar(&noOpen, "no-open", false, "print the Link URL without opening a browser")
+	}
+	linkCmd.Flags().BoolVar(&noOpen, "no-open", false, "print the Link URL without opening a browser")
+	if providerName == "plaid" {
+		linkCmd.Flags().StringVar(&additionalConsentedProducts, "additional-consented-products", "", "comma-separated Plaid products to collect consent for without initializing")
+		linkCmd.Flags().StringVar(&requiredIfSupportedProducts, "required-if-supported-products", "", "comma-separated Plaid products required when the institution supports them")
+		linkCmd.Flags().StringVar(&optionalProducts, "optional-products", "", "comma-separated optional Plaid products")
+	}
+	providerCmd.AddCommand(linkCmd)
 	return providerCmd
 }
 
@@ -990,7 +1377,31 @@ var openBrowser = func(url string) error {
 	}
 }
 
-func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider providers.Provider, institution providers.Institution, redirectURI string, noOpen bool, stdout io.Writer) error {
+type plaidLinkFlowOptions struct {
+	Institution                 providers.Institution
+	RedirectURI                 string
+	NoOpen                      bool
+	AdditionalConsentedProducts string
+	RequiredIfSupportedProducts string
+	OptionalProducts            string
+}
+
+func commaList(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	values := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			values = append(values, trimmed)
+		}
+	}
+	return values
+}
+
+func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider providers.Provider, opts plaidLinkFlowOptions, stdout io.Writer) error {
 	activeStore, err := requireStore(state)
 	if err != nil {
 		return err
@@ -1004,9 +1415,12 @@ func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider provide
 		return err
 	}
 	session, err := provider.CreateLinkSession(ctx, providers.LinkRequest{
-		Institution: institution,
-		RedirectURI: redirectURI,
-		State:       linkState,
+		Institution:                 opts.Institution,
+		RedirectURI:                 opts.RedirectURI,
+		State:                       linkState,
+		AdditionalConsentedProducts: commaList(opts.AdditionalConsentedProducts),
+		RequiredIfSupportedProducts: commaList(opts.RequiredIfSupportedProducts),
+		OptionalProducts:            commaList(opts.OptionalProducts),
 	})
 	if err != nil {
 		return err
@@ -1025,7 +1439,7 @@ func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider provide
 	}()
 
 	fmt.Fprintf(stdout, "Plaid Link URL: %s\n", server.LinkURL())
-	if !noOpen {
+	if !opts.NoOpen {
 		if state.stdin == nil {
 			return fmt.Errorf("stdin is required before opening a browser")
 		}
@@ -1047,6 +1461,80 @@ func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider provide
 		return err
 	}
 	fmt.Fprintf(stdout, "Linked %s Provider Item %s.\n", result.Provider, result.ProviderItemID)
+	fmt.Fprintln(stdout, "No sync was run. Run `money sync` after linking.")
+	return nil
+}
+
+type plaidSandboxLinkOptions struct {
+	Environment   string
+	InstitutionID string
+	Products      string
+}
+
+func runPlaidSandboxLink(ctx context.Context, state *runtimeState, sandboxCreator providers.SandboxPublicTokenCreator, provider providers.Provider, opts plaidSandboxLinkOptions, stdout io.Writer) error {
+	environment := opts.Environment
+	if environment == "" {
+		environment = "sandbox"
+	}
+	if environment != "sandbox" {
+		return cliError{
+			command:   "plaid.sandbox.link",
+			code:      "INVALID_ENVIRONMENT",
+			message:   "money plaid sandbox link requires providers.plaid.environment to be sandbox.",
+			category:  contracts.CategoryValidation,
+			retryable: false,
+			exitCode:  2,
+		}
+	}
+	products := commaList(opts.Products)
+	for _, product := range products {
+		if product == "balance" {
+			return cliError{
+				command:   "plaid.sandbox.link",
+				code:      "INVALID_PRODUCT",
+				message:   "Plaid Sandbox product balance is not supported; choose explicit initial products such as transactions.",
+				category:  contracts.CategoryValidation,
+				retryable: false,
+				exitCode:  2,
+			}
+		}
+	}
+	activeStore, err := requireStore(state)
+	if err != nil {
+		return err
+	}
+	linkStore, ok := activeStore.(linking.Store)
+	if !ok {
+		return fmt.Errorf("active store cannot persist linked provider items")
+	}
+	linkState, err := linking.NewLinkState()
+	if err != nil {
+		return err
+	}
+	publicToken, err := sandboxCreator.CreateSandboxPublicToken(ctx, providers.SandboxPublicTokenRequest{
+		InstitutionID: opts.InstitutionID,
+		Products:      products,
+	})
+	if err != nil {
+		return err
+	}
+	session := providers.LinkSession{
+		Provider: "plaid",
+		State:    linkState,
+		Products: products,
+	}
+	result, err := linking.CompleteProviderLink(ctx, linkStore, provider, session, providers.LinkCallback{
+		PublicToken: publicToken,
+		State:       linkState,
+		Status:      "success",
+		Metadata: providers.LinkMetadata{
+			Institution: providers.LinkInstitutionMetadata{ID: opts.InstitutionID, Name: "Plaid Sandbox"},
+		},
+	})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "Linked %s Sandbox Provider Item %s.\n", result.Provider, result.ProviderItemID)
 	fmt.Fprintln(stdout, "No sync was run. Run `money sync` after linking.")
 	return nil
 }
