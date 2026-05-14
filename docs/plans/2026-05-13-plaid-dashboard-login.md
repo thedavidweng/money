@@ -498,7 +498,7 @@ go run ./cmd/money setup --help
 ```
 
 - [x] Run a fake Dashboard login smoke test if the implementation exposes a local fake server.
-- [ ] Only run live Plaid Dashboard login with explicit user approval.
+- [x] Live Plaid Dashboard login was not run because it requires explicit user approval.
 
 ## User Decisions Needed Before Implementation
 
