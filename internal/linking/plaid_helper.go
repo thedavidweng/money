@@ -172,7 +172,11 @@ func validCallbackOrigin(r *http.Request) bool {
 		return false
 	}
 	host := parsed.Hostname()
-	return host == "localhost" || net.ParseIP(host).IsLoopback()
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 var plaidLinkPage = template.Must(template.New("plaid-link").Parse(`<!doctype html>

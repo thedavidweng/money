@@ -166,6 +166,25 @@ func TestPlaidLinkHelperRejectsWrongOriginAndDuplicateCallback(t *testing.T) {
 		}
 	})
 
+	t.Run("bare hostname matching Host header does not panic", func(t *testing.T) {
+		helper := NewPlaidLinkHelper(PlaidLinkHelperConfig{LinkToken: "link-token", State: "state", Timeout: time.Second})
+		handler := helper.Handler()
+
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/callback", strings.NewReader(`{"status":"cancel","state":"state"}`))
+		req.Host = "myhost"
+		req.Header.Set("Origin", "http://myhost")
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("bare hostname status = %d", rec.Code)
+		}
+
+		callback, _ := helper.Wait(context.Background())
+		if callback.Status != "error" || callback.Error.Code != "ORIGIN_VALIDATION_FAILED" {
+			t.Fatalf("expected origin error callback, got status=%q code=%q", callback.Status, callback.Error.Code)
+		}
+	})
+
 	t.Run("duplicate callback", func(t *testing.T) {
 		helper := NewPlaidLinkHelper(PlaidLinkHelperConfig{LinkToken: "link-token", State: "state", Timeout: time.Second})
 		handler := helper.Handler()
