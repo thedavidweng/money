@@ -1757,6 +1757,28 @@ func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider provide
 	}
 	result, err := linking.CompleteProviderLink(ctx, linkStore, provider, session, callback)
 	if err != nil {
+		var canceled linking.LinkCanceledError
+		if errors.As(err, &canceled) {
+			return cliError{
+				command:   "plaid.link",
+				code:      "LINK_CANCELED",
+				message:   canceled.Error(),
+				category:  contracts.CategorySafety,
+				retryable: true,
+				exitCode:  10,
+			}
+		}
+		var flowErr linking.LinkFlowError
+		if errors.As(err, &flowErr) {
+			return cliError{
+				command:   "plaid.link",
+				code:      "LINK_ERROR",
+				message:   flowErr.Error(),
+				category:  contracts.CategoryAPI,
+				retryable: false,
+				exitCode:  6,
+			}
+		}
 		return err
 	}
 	fmt.Fprintf(stdout, "Linked %s Provider Item %s.\n", result.Provider, result.ProviderItemID)
@@ -1832,6 +1854,14 @@ func runPlaidSandboxLink(ctx context.Context, state *runtimeState, sandboxCreato
 	})
 	if err != nil {
 		return err
+	}
+	if state.json {
+		env := contracts.NewSuccess("plaid.sandbox.link", map[string]any{
+			"provider":         result.Provider,
+			"provider_item_id": result.ProviderItemID,
+			"institution_id":   result.InstitutionID,
+		})
+		return contracts.WriteJSON(stdout, env)
 	}
 	fmt.Fprintf(stdout, "Linked %s Sandbox Provider Item %s.\n", result.Provider, result.ProviderItemID)
 	fmt.Fprintln(stdout, "No sync was run. Run `money sync` after linking.")

@@ -334,6 +334,129 @@ func (s fakeLinkSessionServer) Shutdown(ctx context.Context) error {
 	return nil
 }
 
+func TestRunPlaidLinkFlowReturnsCLIErrorOnCancel(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenEncrypted(ctx, t.TempDir()+"/money.db", []byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatalf("open encrypted store: %v", err)
+	}
+	defer db.Close()
+
+	oldStart := startPlaidLinkSessionServer
+	t.Cleanup(func() { startPlaidLinkSessionServer = oldStart })
+	startPlaidLinkSessionServer = func(linkToken string, state string, timeout time.Duration) (linkSessionServer, error) {
+		return fakeLinkSessionServer{
+			url: "http://127.0.0.1:4000",
+			callback: providers.LinkCallback{
+				State:  state,
+				Status: "cancel",
+				Metadata: providers.LinkMetadata{LinkSessionID: "sess-cancel"},
+			},
+		}, nil
+	}
+
+	var stdout bytes.Buffer
+	state := &runtimeState{store: db}
+	err = runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, plaidLinkFlowOptions{NoOpen: true}, &stdout)
+	var cliErr cliError
+	if !errors.As(err, &cliErr) {
+		t.Fatalf("expected cliError, got %#v", err)
+	}
+	if cliErr.code != "LINK_CANCELED" {
+		t.Fatalf("code = %q, want LINK_CANCELED", cliErr.code)
+	}
+	if cliErr.category != "safety" {
+		t.Fatalf("category = %q, want safety", cliErr.category)
+	}
+	if !cliErr.retryable {
+		t.Fatal("expected retryable")
+	}
+	if cliErr.exitCode != 10 {
+		t.Fatalf("exitCode = %d, want 10", cliErr.exitCode)
+	}
+	if !strings.Contains(cliErr.message, "canceled") {
+		t.Fatalf("message = %q, want 'canceled'", cliErr.message)
+	}
+}
+
+func TestRunPlaidLinkFlowReturnsCLIErrorOnLinkError(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenEncrypted(ctx, t.TempDir()+"/money.db", []byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatalf("open encrypted store: %v", err)
+	}
+	defer db.Close()
+
+	oldStart := startPlaidLinkSessionServer
+	t.Cleanup(func() { startPlaidLinkSessionServer = oldStart })
+	startPlaidLinkSessionServer = func(linkToken string, state string, timeout time.Duration) (linkSessionServer, error) {
+		return fakeLinkSessionServer{
+			url: "http://127.0.0.1:4000",
+			callback: providers.LinkCallback{
+				State:  state,
+				Status: "error",
+				Error:  providers.LinkError{Type: "INSTITUTION_ERROR", Code: "INSUFFICIENT_CREDENTIALS", Message: "user entered invalid credentials"},
+				Metadata: providers.LinkMetadata{RequestID: "req-123", LinkSessionID: "sess-456"},
+			},
+		}, nil
+	}
+
+	var stdout bytes.Buffer
+	state := &runtimeState{store: db}
+	err = runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, plaidLinkFlowOptions{NoOpen: true}, &stdout)
+	var cliErr cliError
+	if !errors.As(err, &cliErr) {
+		t.Fatalf("expected cliError, got %#v", err)
+	}
+	if cliErr.code != "LINK_ERROR" {
+		t.Fatalf("code = %q, want LINK_ERROR", cliErr.code)
+	}
+	if cliErr.category != "api" {
+		t.Fatalf("category = %q, want api", cliErr.category)
+	}
+	if cliErr.retryable {
+		t.Fatal("expected not retryable")
+	}
+	if cliErr.exitCode != 6 {
+		t.Fatalf("exitCode = %d, want 6", cliErr.exitCode)
+	}
+	if !strings.Contains(cliErr.message, "INSUFFICIENT_CREDENTIALS") {
+		t.Fatalf("message = %q", cliErr.message)
+	}
+}
+
+func TestRunPlaidSandboxLinkWritesJSONWhenStateJSON(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenEncrypted(ctx, t.TempDir()+"/money.db", []byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatalf("open encrypted store: %v", err)
+	}
+	defer db.Close()
+
+	provider := &fakePlaidSandboxProvider{publicToken: "public-sandbox"}
+	var stdout bytes.Buffer
+	state := &runtimeState{store: db, json: true}
+	if err := runPlaidSandboxLink(ctx, state, provider, provider, plaidSandboxLinkOptions{
+		InstitutionID: "ins_56",
+		Products:      "transactions",
+	}, &stdout); err != nil {
+		t.Fatalf("run plaid sandbox link: %v", err)
+	}
+	out := stdout.String()
+	if !strings.Contains(out, `"ok": true`) {
+		t.Fatalf("expected success envelope, stdout = %q", out)
+	}
+	if !strings.Contains(out, `"provider_item_id": "pi_sandbox"`) {
+		t.Fatalf("expected provider_item_id in JSON, stdout = %q", out)
+	}
+	if !strings.Contains(out, `"institution_id": "plaid:ins_56"`) {
+		t.Fatalf("expected institution_id in JSON, stdout = %q", out)
+	}
+	if strings.Contains(out, "Linked plaid Sandbox") {
+		t.Fatal("unexpected plain text output in JSON mode")
+	}
+}
+
 type fakePlaidCLIProvider struct{}
 
 func (fakePlaidCLIProvider) Name() string { return "plaid" }
