@@ -43,24 +43,34 @@ func TestCallbackHandlerAcceptsValidCodeOnce(t *testing.T) {
 
 func TestCallbackHandlerRejectsOAuthErrorMissingCodeWrongStateAndWrongMethod(t *testing.T) {
 	tests := []struct {
-		name   string
-		method string
-		target string
-		status int
+		name       string
+		method     string
+		target     string
+		status     int
+		wantWaitErr bool // true if Wait should return immediately with an error
 	}{
-		{name: "oauth error", method: http.MethodGet, target: "/oauth/callback?error=access_denied&state=state-ok", status: http.StatusBadRequest},
-		{name: "missing code", method: http.MethodGet, target: "/oauth/callback?state=state-ok", status: http.StatusBadRequest},
-		{name: "wrong state", method: http.MethodGet, target: "/oauth/callback?code=auth-code&state=bad", status: http.StatusForbidden},
-		{name: "wrong method", method: http.MethodPost, target: "/oauth/callback?code=auth-code&state=state-ok", status: http.StatusMethodNotAllowed},
+		{name: "oauth error", method: http.MethodGet, target: "/oauth/callback?error=access_denied&state=state-ok", status: http.StatusBadRequest, wantWaitErr: true},
+		{name: "missing code", method: http.MethodGet, target: "/oauth/callback?state=state-ok", status: http.StatusBadRequest, wantWaitErr: true},
+		{name: "wrong state", method: http.MethodGet, target: "/oauth/callback?code=auth-code&state=bad", status: http.StatusForbidden, wantWaitErr: true},
+		{name: "wrong method", method: http.MethodPost, target: "/oauth/callback?code=auth-code&state=state-ok", status: http.StatusMethodNotAllowed, wantWaitErr: false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			server := NewCallbackServer("state-ok", 10*time.Millisecond)
+			server := NewCallbackServer("state-ok", time.Second)
 			req := httptest.NewRequest(tc.method, tc.target, strings.NewReader(""))
 			rec := httptest.NewRecorder()
 			server.Handler().ServeHTTP(rec, req)
 			if rec.Code != tc.status {
 				t.Fatalf("status = %d, want %d; body=%s", rec.Code, tc.status, rec.Body.String())
+			}
+			if tc.wantWaitErr {
+				// Wait should return immediately with an error, not hang.
+				waitCtx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+				defer cancel()
+				_, err := server.Wait(waitCtx)
+				if err == nil {
+					t.Fatal("Wait returned nil, want OAuth callback error")
+				}
 			}
 		})
 	}

@@ -11,6 +11,7 @@ import (
 
 type CallbackResult struct {
 	Code string
+	Err  error
 }
 
 type CallbackServer struct {
@@ -69,10 +70,27 @@ func (s *CallbackServer) Wait(ctx context.Context) (CallbackResult, error) {
 	defer cancel()
 	select {
 	case result := <-s.results:
+		if result.Err != nil {
+			return result, result.Err
+		}
 		return result, nil
 	case <-waitCtx.Done():
 		return CallbackResult{}, waitCtx.Err()
 	}
+}
+
+// sendOnce sends result to the channel if no result has been sent yet.
+// Returns true if this call sent the result, false if a result was already sent.
+func (s *CallbackServer) sendOnce(result CallbackResult) bool {
+	s.mu.Lock()
+	if s.seen {
+		s.mu.Unlock()
+		return false
+	}
+	s.seen = true
+	s.mu.Unlock()
+	s.results <- result
+	return true
 }
 
 func (s *CallbackServer) handleCallback(w http.ResponseWriter, r *http.Request) {
@@ -82,25 +100,23 @@ func (s *CallbackServer) handleCallback(w http.ResponseWriter, r *http.Request) 
 	}
 	if r.URL.Query().Get("state") != s.state {
 		http.Error(w, "invalid state", http.StatusForbidden)
+		s.sendOnce(CallbackResult{Err: Error{Code: ErrorPlaidDashboardLoginRejected, Message: "Plaid Dashboard callback has invalid state parameter"}})
 		return
 	}
 	if oauthError := r.URL.Query().Get("error"); oauthError != "" {
 		http.Error(w, oauthError, http.StatusBadRequest)
+		s.sendOnce(CallbackResult{Err: Error{Code: ErrorPlaidDashboardLoginRejected, Message: "Plaid Dashboard login rejected: " + oauthError}})
 		return
 	}
 	code := r.URL.Query().Get("code")
 	if code == "" {
 		http.Error(w, "missing authorization code", http.StatusBadRequest)
+		s.sendOnce(CallbackResult{Err: Error{Code: ErrorPlaidDashboardLoginRejected, Message: "Plaid Dashboard callback missing authorization code"}})
 		return
 	}
-	s.mu.Lock()
-	if s.seen {
-		s.mu.Unlock()
+	if !s.sendOnce(CallbackResult{Code: code}) {
 		http.Error(w, "callback already received", http.StatusConflict)
 		return
 	}
-	s.seen = true
-	s.mu.Unlock()
-	s.results <- CallbackResult{Code: code}
 	fmt.Fprint(w, "ok")
 }
