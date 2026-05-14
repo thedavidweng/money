@@ -248,6 +248,17 @@ func updateProviderConfig(configPath string, spec ProviderSpec, options map[stri
 			providerBlock[field] = val
 		}
 	}
+	// Preserve existing fields not managed by this update (e.g. consent
+	// product fields configured outside the login flow). Without this,
+	// updateProviderConfig silently drops them when building a fresh block.
+	if existing, ok := providers[spec.Name].(map[string]any); ok {
+		for k, v := range existing {
+			if _, exists := providerBlock[k]; !exists {
+				providerBlock[k] = v
+			}
+		}
+	}
+
 	providers[spec.Name] = providerBlock
 
 	out, err := yaml.Marshal(raw)
