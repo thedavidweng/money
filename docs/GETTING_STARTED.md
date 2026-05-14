@@ -2,13 +2,24 @@
 
 ## Install
 
-### macOS / Linux (Homebrew)
+### macOS / Linux (Homebrew Cask)
 
 ```bash
-brew install thedavidweng/tap/money
+brew install --cask thedavidweng/tap/money
 ```
 
-### All platforms (Go)
+If you installed the old Homebrew formula, migrate to the cask:
+
+```bash
+brew update
+brew uninstall --formula thedavidweng/tap/money
+brew install --cask thedavidweng/tap/money
+money version
+```
+
+This does not remove your local `~/.money` configuration, secrets, or encrypted database.
+
+### macOS / Linux / all platforms (Go)
 
 Requires Go 1.25 or later:
 

@@ -39,10 +39,10 @@ Existing personal finance tools either lock data behind a paid SaaS, embed opini
 ### Quick Start
 
 ```bash
-# Install via Homebrew (macOS/Linux)
-brew install thedavidweng/tap/money
+# Install via Homebrew Cask (macOS/Linux)
+brew install --cask thedavidweng/tap/money
 
-# Or install via Go (cross-platform)
+# Or install via Go (macOS/Linux/cross-platform)
 go install github.com/thedavidweng/money/cmd/money@latest
 
 # Initialize configuration and encrypted database (interactive)
@@ -56,6 +56,17 @@ money sync
 money accounts list --json
 money transactions search "Costco" --json
 ```
+
+If you installed an older Homebrew formula release, migrate to the cask:
+
+```bash
+brew update
+brew uninstall --formula thedavidweng/tap/money
+brew install --cask thedavidweng/tap/money
+money version
+```
+
+Your local `~/.money` config, secrets, and database are not removed by uninstalling the old formula.
 
 Try it without real credentials:
 
