@@ -1740,12 +1740,16 @@ func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider provide
 		_ = server.Shutdown(shutdownCtx)
 	}()
 
-	fmt.Fprintf(stdout, "Plaid Link URL: %s\n", server.LinkURL())
-	if !opts.NoOpen {
+	if !state.json && state.stderr != nil {
+		fmt.Fprintf(state.stderr, "Plaid Link URL: %s\n", server.LinkURL())
+	}
+	if !opts.NoOpen && !state.json {
 		if state.stdin == nil {
 			return fmt.Errorf("stdin is required before opening a browser")
 		}
-		fmt.Fprintln(stdout, "Press Enter to open the browser.")
+		if state.stderr != nil {
+			fmt.Fprintln(state.stderr, "Press Enter to open the browser.")
+		}
 		if _, err := bufio.NewReader(state.stdin).ReadString('\n'); err != nil {
 			return err
 		}
@@ -1783,6 +1787,14 @@ func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider provide
 			}
 		}
 		return err
+	}
+	if state.json {
+		env := contracts.NewSuccess(opts.CommandName, map[string]any{
+			"provider":         result.Provider,
+			"provider_item_id": result.ProviderItemID,
+			"institution_id":   result.InstitutionID,
+		})
+		return contracts.WriteJSON(stdout, env)
 	}
 	fmt.Fprintf(stdout, "Linked %s Provider Item %s.\n", result.Provider, result.ProviderItemID)
 	fmt.Fprintln(stdout, "No sync was run. Run `money sync` after linking.")

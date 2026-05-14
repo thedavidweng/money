@@ -47,16 +47,16 @@ func TestRunPlaidLinkFlowNoOpenStoresLinkedItem(t *testing.T) {
 		return nil
 	}
 
-	var stdout bytes.Buffer
-	state := &runtimeState{store: db}
+	var stdout, stderr bytes.Buffer
+	state := &runtimeState{store: db, stderr: &stderr}
 	if err := runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, plaidLinkFlowOptions{NoOpen: true}, &stdout); err != nil {
 		t.Fatalf("run plaid link flow: %v", err)
 	}
 	if opened {
 		t.Fatal("browser opened despite --no-open")
 	}
-	if !strings.Contains(stdout.String(), "Plaid Link URL: http://127.0.0.1:4000") {
-		t.Fatalf("stdout = %q", stdout.String())
+	if !strings.Contains(stderr.String(), "Plaid Link URL: http://127.0.0.1:4000") {
+		t.Fatalf("stderr = %q", stderr.String())
 	}
 
 	item, err := db.GetProviderItem(ctx, "pi_cli")
@@ -98,8 +98,8 @@ func TestRunPlaidLinkFlowWaitsForEnterBeforeOpeningBrowser(t *testing.T) {
 		return nil
 	}
 
-	var stdout bytes.Buffer
-	state := &runtimeState{store: db, stdin: strings.NewReader("\n")}
+	var stdout, stderr bytes.Buffer
+	state := &runtimeState{store: db, stdin: strings.NewReader("\n"), stderr: &stderr}
 	if err := runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, plaidLinkFlowOptions{}, &stdout); err != nil {
 		t.Fatalf("run plaid link flow: %v", err)
 	}
@@ -129,8 +129,8 @@ func TestRunPlaidLinkFlowPassesConsentProductOptions(t *testing.T) {
 	}
 
 	provider := &recordingPlaidCLIProvider{}
-	var stdout bytes.Buffer
-	state := &runtimeState{store: db}
+	var stdout, stderr bytes.Buffer
+	state := &runtimeState{store: db, stderr: &stderr}
 	err = runPlaidLinkFlow(ctx, state, provider, plaidLinkFlowOptions{
 		NoOpen:                      true,
 		AdditionalConsentedProducts: "investments",
@@ -428,6 +428,49 @@ func TestRunPlaidLinkFlowReturnsCLIErrorOnLinkError(t *testing.T) {
 	}
 	if !strings.Contains(cliErr.message, "INSUFFICIENT_CREDENTIALS") {
 		t.Fatalf("message = %q", cliErr.message)
+	}
+}
+
+func TestRunPlaidLinkFlowWritesJSONWhenStateJSON(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenEncrypted(ctx, t.TempDir()+"/money.db", []byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatalf("open encrypted store: %v", err)
+	}
+	defer db.Close()
+
+	oldStart := startPlaidLinkSessionServer
+	t.Cleanup(func() { startPlaidLinkSessionServer = oldStart })
+	startPlaidLinkSessionServer = func(linkToken string, state string, timeout time.Duration) (linkSessionServer, error) {
+		return fakeLinkSessionServer{
+			url: "http://127.0.0.1:4000",
+			callback: providers.LinkCallback{
+				PublicToken: "public-token",
+				State:       state,
+			},
+		}, nil
+	}
+
+	var stdout bytes.Buffer
+	state := &runtimeState{store: db, json: true}
+	if err := runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, plaidLinkFlowOptions{CommandName: "link", NoOpen: true}, &stdout); err != nil {
+		t.Fatalf("run plaid link flow: %v", err)
+	}
+	out := stdout.String()
+	if !strings.Contains(out, `"ok": true`) {
+		t.Fatalf("expected success envelope, stdout = %q", out)
+	}
+	if !strings.Contains(out, `"provider_item_id": "pi_cli"`) {
+		t.Fatalf("expected provider_item_id in JSON, stdout = %q", out)
+	}
+	if !strings.Contains(out, `"institution_id": "inst_cli"`) {
+		t.Fatalf("expected institution_id in JSON, stdout = %q", out)
+	}
+	if strings.Contains(out, "Plaid Link URL") {
+		t.Fatal("unexpected progress text in JSON mode")
+	}
+	if strings.Contains(out, "Linked plaid") {
+		t.Fatal("unexpected plain text output in JSON mode")
 	}
 }
 
