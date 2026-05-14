@@ -1072,7 +1072,12 @@ func writePlaidLoginResult(state *runtimeState, stdout io.Writer, result plaidlo
 		return contracts.WriteJSON(stdout, contracts.NewSuccess(commandName, result))
 	}
 	fmt.Fprintf(stdout, "Plaid Dashboard login complete for team %s.\n", result.TeamID)
-	fmt.Fprintf(stdout, "Plaid %s credentials written to %s.\n", result.Environment, result.EnvPath)
+	switch result.CredentialAction {
+	case "preserved_existing":
+		fmt.Fprintf(stdout, "Plaid %s credentials already exist; preserved (use --force to overwrite).\n", result.Environment)
+	default:
+		fmt.Fprintf(stdout, "Plaid %s credentials written to %s.\n", result.Environment, result.EnvPath)
+	}
 	fmt.Fprintf(stdout, "Next: %s\n", result.NextCommand)
 	return nil
 }
