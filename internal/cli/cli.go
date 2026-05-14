@@ -186,6 +186,14 @@ link financial institutions and sync transactions locally.
 	importCmd.GroupID = "data"
 	root.AddCommand(importCmd)
 
+	cashflowCmd := newCashflowCommand(ctx, state, stdout)
+	cashflowCmd.GroupID = "data"
+	root.AddCommand(cashflowCmd)
+
+	netWorthCmd := newNetWorthCommand(ctx, state, stdout)
+	netWorthCmd.GroupID = "data"
+	root.AddCommand(netWorthCmd)
+
 	syncCmd := newSyncCommand(ctx, state, stdout)
 	syncCmd.GroupID = "data"
 	root.AddCommand(syncCmd)
@@ -958,6 +966,70 @@ func newImportCommand(ctx context.Context, state *runtimeState, stdout io.Writer
 		sourceCmd.Flags().BoolVar(&dryRun, "dry-run", false, "show import plan without writing")
 		sourceCmd.Flags().BoolVar(&confirm, "confirm", false, "confirm import")
 		cmd.AddCommand(sourceCmd)
+	}
+	return cmd
+}
+
+func newCashflowCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
+	var fromDate, toDate, period, currency string
+	cmd := &cobra.Command{
+		Use:   "cashflow",
+		Short: "Show income and expenses over time",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if fromDate == "" || toDate == "" {
+				return fmt.Errorf("cashflow requires --from and --to dates")
+			}
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return err
+			}
+			periods, err := activeStore.CashflowSummary(ctx, fromDate, toDate, period, currency)
+			if err != nil {
+				return err
+			}
+			if !state.json {
+				table := tablewriter.NewWriter(stdout)
+				table.SetHeader([]string{"PERIOD", "INCOME", "EXPENSES", "NET"})
+				table.SetBorder(false)
+				for _, p := range periods {
+					table.Append([]string{p.Period, colorAmount(stdout, p.Income), colorAmount(stdout, p.Expenses), colorAmount(stdout, p.Net)})
+				}
+				table.Render()
+				return nil
+			}
+			env := contracts.NewSuccess("cashflow", map[string]any{"periods": periods})
+			env.Meta.Demo = state.demo
+			return contracts.WriteJSON(stdout, env)
+		},
+	}
+	cmd.Flags().StringVar(&fromDate, "from", "", "start date (YYYY-MM-DD)")
+	cmd.Flags().StringVar(&toDate, "to", "", "end date (YYYY-MM-DD)")
+	cmd.Flags().StringVar(&period, "period", "monthly", "grouping period: monthly or yearly")
+	cmd.Flags().StringVar(&currency, "currency", "USD", "currency to report")
+	return cmd
+}
+
+func newNetWorthCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "net-worth",
+		Short: "Show current net worth across all visible accounts",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return err
+			}
+			nw, err := activeStore.NetWorth(ctx)
+			if err != nil {
+				return err
+			}
+			if !state.json {
+				fmt.Fprintf(stdout, "Net worth: %s %s\n", colorAmount(stdout, nw.Total), nw.Currency)
+				return nil
+			}
+			env := contracts.NewSuccess("net_worth", map[string]any{"net_worth": nw})
+			env.Meta.Demo = state.demo
+			return contracts.WriteJSON(stdout, env)
+		},
 	}
 	return cmd
 }

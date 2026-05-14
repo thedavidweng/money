@@ -23,6 +23,8 @@ type Store interface {
 	ListLiabilities(ctx context.Context) ([]core.Liability, error)
 	UpsertImportedAccount(ctx context.Context, account core.Account) error
 	UpsertImportedTransaction(ctx context.Context, tx core.Transaction, sourceRowHash string) (bool, []string, error)
+	CashflowSummary(ctx context.Context, from, to, period, currency string) ([]core.CashflowPeriod, error)
+	NetWorth(ctx context.Context) (core.NetWorth, error)
 }
 
 type TransactionListQuery struct {

@@ -371,6 +371,71 @@ func (s *SQLiteStore) ListTags(ctx context.Context) ([]core.Tag, error) {
 	return tags, rows.Err()
 }
 
+func (s *SQLiteStore) CashflowSummary(ctx context.Context, from, to, period, currency string) ([]core.CashflowPeriod, error) {
+	groupFormat := "%Y-%m"
+	if period == "yearly" {
+		groupFormat = "%Y"
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT
+  strftime(?, date) AS period,
+  COALESCE(SUM(CASE WHEN amount_minor_units > 0 THEN amount_minor_units ELSE 0 END), 0) AS income,
+  COALESCE(SUM(CASE WHEN amount_minor_units < 0 THEN amount_minor_units ELSE 0 END), 0) AS expenses
+FROM transactions
+WHERE date >= ? AND date <= ? AND removed = 0 AND pending = 0 AND currency = ?
+GROUP BY period
+ORDER BY period ASC`, groupFormat, from, to, currency)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var periods []core.CashflowPeriod
+	for rows.Next() {
+		var p core.CashflowPeriod
+		if err := rows.Scan(&p.Period, &p.IncomeMinor, &p.ExpensesMinor); err != nil {
+			return nil, err
+		}
+		p.Currency = currency
+		p.Income = core.FormatMinorUnits(p.IncomeMinor, currency)
+		p.Expenses = core.FormatMinorUnits(p.ExpensesMinor, currency)
+		p.NetMinor = p.IncomeMinor + p.ExpensesMinor
+		p.Net = core.FormatMinorUnits(p.NetMinor, currency)
+		periods = append(periods, p)
+	}
+	return periods, rows.Err()
+}
+
+func (s *SQLiteStore) NetWorth(ctx context.Context) (core.NetWorth, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT
+  currency,
+  SUM(current_balance_minor_units) AS total,
+  COUNT(*) AS count
+FROM accounts
+WHERE hidden = 0
+GROUP BY currency`)
+	if err != nil {
+		return core.NetWorth{}, err
+	}
+	defer rows.Close()
+	var nw core.NetWorth
+	for rows.Next() {
+		var currency string
+		var total int64
+		var count int
+		if err := rows.Scan(&currency, &total, &count); err != nil {
+			return core.NetWorth{}, err
+		}
+		if nw.Currency == "" || currency == "USD" {
+			nw.Currency = currency
+			nw.TotalMinor = total
+			nw.Total = core.FormatMinorUnits(total, currency)
+			nw.AssetCount = count
+		}
+	}
+	return nw, rows.Err()
+}
+
 func (s *SQLiteStore) ListRecurring(ctx context.Context) ([]core.Recurring, error) {
 	rows, err := s.db.QueryContext(ctx, `
 SELECT r.id, r.account_id, r.merchant_name, r.average_amount_minor_units, r.currency, r.frequency, r.next_date,

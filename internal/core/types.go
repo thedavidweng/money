@@ -87,6 +87,26 @@ func onlyDigits(value string) bool {
 	return true
 }
 
+type CashflowPeriod struct {
+	Period        string `json:"period"`
+	Income        string `json:"income"`
+	IncomeMinor   int64  `json:"-"`
+	Expenses      string `json:"expenses"`
+	ExpensesMinor int64  `json:"-"`
+	Net           string `json:"net"`
+	NetMinor      int64  `json:"-"`
+	Currency      string `json:"currency"`
+}
+
+type NetWorth struct {
+	Total          string `json:"total"`
+	TotalMinor     int64  `json:"-"`
+	Currency       string `json:"currency"`
+	AssetCount     int    `json:"asset_count"`
+	LiabilityCount int    `json:"liability_count"`
+	UpdatedAt      string `json:"updated_at,omitempty"`
+}
+
 type Source struct {
 	Kind                   string  `json:"kind"`
 	Provider               *string `json:"provider"`
