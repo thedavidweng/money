@@ -198,6 +198,10 @@ link financial institutions and sync transactions locally.
 	budgetsCmd.GroupID = "data"
 	root.AddCommand(budgetsCmd)
 
+	rulesCmd := newRulesCommand(ctx, state, stdout)
+	rulesCmd.GroupID = "data"
+	root.AddCommand(rulesCmd)
+
 	syncCmd := newSyncCommand(ctx, state, stdout)
 	syncCmd.GroupID = "data"
 	root.AddCommand(syncCmd)
@@ -427,6 +431,10 @@ All data is stored in memory and discarded when the command exits.
 	budgetsCmd := newBudgetsCommand(ctx, state, stdout)
 	budgetsCmd.GroupID = "data"
 	cmd.AddCommand(budgetsCmd)
+
+	rulesCmd := newRulesCommand(ctx, state, stdout)
+	rulesCmd.GroupID = "data"
+	cmd.AddCommand(rulesCmd)
 
 	txAlias := newTransactionsCommand(ctx, state, stdout)
 	txAlias.Use = "tx"

@@ -262,3 +262,21 @@ type BudgetCategory struct {
 	CreatedAt       string  `json:"created_at,omitempty"`
 	UpdatedAt       string  `json:"updated_at,omitempty"`
 }
+
+type Rule struct {
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	ConditionField string `json:"condition_field"`
+	ConditionOp    string `json:"condition_op"`
+	ConditionValue string `json:"condition_value"`
+	ActionType     string `json:"action_type"`
+	ActionValue    string `json:"action_value"`
+	Priority       int    `json:"priority"`
+	Enabled        bool   `json:"enabled"`
+	CreatedAt      string `json:"created_at,omitempty"`
+	UpdatedAt      string `json:"updated_at,omitempty"`
+}
+
+type ApplyRulesResult struct {
+	TransactionsUpdated int `json:"transactions_updated"`
+}

@@ -78,6 +78,9 @@ func (s *SQLiteStore) Close() error {
 //go:embed migrations/0003_budgets.sql
 var budgetsMigration string
 
+//go:embed migrations/0004_rules.sql
+var rulesMigration string
+
 func (s *SQLiteStore) runMigrations(ctx context.Context) error {
 	var count int
 	if err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'institutions'`).Scan(&count); err != nil {
@@ -95,6 +98,9 @@ func (s *SQLiteStore) runMigrations(ctx context.Context) error {
 		return err
 	}
 	if err := s.migrateBudgets(ctx); err != nil {
+		return err
+	}
+	if err := s.migrateRules(ctx); err != nil {
 		return err
 	}
 	return nil
@@ -121,6 +127,19 @@ func (s *SQLiteStore) migrateBudgets(ctx context.Context) error {
 	if count == 0 {
 		if _, err := s.db.ExecContext(ctx, budgetsMigration); err != nil {
 			return fmt.Errorf("run budgets migration: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *SQLiteStore) migrateRules(ctx context.Context) error {
+	var count int
+	if err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'rules'`).Scan(&count); err != nil {
+		return fmt.Errorf("check rules migration state: %w", err)
+	}
+	if count == 0 {
+		if _, err := s.db.ExecContext(ctx, rulesMigration); err != nil {
+			return fmt.Errorf("run rules migration: %w", err)
 		}
 	}
 	return nil
@@ -718,6 +737,160 @@ VALUES (?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?)`,
 func (s *SQLiteStore) DeleteBudgetCategory(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM budget_categories WHERE id = ?`, id)
 	return err
+}
+
+func (s *SQLiteStore) ListRules(ctx context.Context) ([]core.Rule, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id, name, condition_field, condition_op, condition_value, action_type, action_value, priority, enabled, created_at, updated_at
+FROM rules
+WHERE enabled = 1
+ORDER BY priority DESC, created_at ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var rules []core.Rule
+	for rows.Next() {
+		var r core.Rule
+		var enabled int
+		if err := rows.Scan(&r.ID, &r.Name, &r.ConditionField, &r.ConditionOp, &r.ConditionValue, &r.ActionType, &r.ActionValue, &r.Priority, &enabled, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			return nil, err
+		}
+		r.Enabled = enabled == 1
+		rules = append(rules, r)
+	}
+	return rules, rows.Err()
+}
+
+func (s *SQLiteStore) CreateRule(ctx context.Context, rule core.Rule) (core.Rule, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	if rule.ID == "" {
+		id, err := core.NewLocalID("rule_")
+		if err != nil {
+			return core.Rule{}, err
+		}
+		rule.ID = id
+	}
+	if rule.CreatedAt == "" {
+		rule.CreatedAt = now
+	}
+	if rule.UpdatedAt == "" {
+		rule.UpdatedAt = now
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO rules (id, name, condition_field, condition_op, condition_value, action_type, action_value, priority, enabled, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		rule.ID, rule.Name, rule.ConditionField, rule.ConditionOp, rule.ConditionValue, rule.ActionType, rule.ActionValue, rule.Priority, boolInt(rule.Enabled), rule.CreatedAt, rule.UpdatedAt)
+	if err != nil {
+		return core.Rule{}, err
+	}
+	return rule, nil
+}
+
+func (s *SQLiteStore) UpdateRule(ctx context.Context, rule core.Rule) (core.Rule, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := s.db.ExecContext(ctx, `
+UPDATE rules SET name = ?, condition_field = ?, condition_op = ?, condition_value = ?, action_type = ?, action_value = ?, priority = ?, enabled = ?, updated_at = ?
+WHERE id = ?`,
+		rule.Name, rule.ConditionField, rule.ConditionOp, rule.ConditionValue, rule.ActionType, rule.ActionValue, rule.Priority, boolInt(rule.Enabled), now, rule.ID)
+	if err != nil {
+		return core.Rule{}, err
+	}
+	return rule, nil
+}
+
+func (s *SQLiteStore) DeleteRule(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM rules WHERE id = ?`, id)
+	return err
+}
+
+func (s *SQLiteStore) ApplyRules(ctx context.Context) (core.ApplyRulesResult, error) {
+	rules, err := s.ListRules(ctx)
+	if err != nil {
+		return core.ApplyRulesResult{}, err
+	}
+	if len(rules) == 0 {
+		return core.ApplyRulesResult{}, nil
+	}
+
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id, name, merchant_name, amount_minor_units, category_id
+FROM transactions
+WHERE removed = 0`)
+	if err != nil {
+		return core.ApplyRulesResult{}, err
+	}
+	defer rows.Close()
+	var transactions []txRow
+	for rows.Next() {
+		var t txRow
+		if err := rows.Scan(&t.id, &t.name, &t.merchantName, &t.amountMinor, &t.categoryID); err != nil {
+			return core.ApplyRulesResult{}, err
+		}
+		transactions = append(transactions, t)
+	}
+	if err := rows.Err(); err != nil {
+		return core.ApplyRulesResult{}, err
+	}
+
+	var updated int
+	for _, tx := range transactions {
+		for _, rule := range rules {
+			if !ruleMatches(tx, rule) {
+				continue
+			}
+			if err := s.applyRuleAction(ctx, tx.id, rule); err != nil {
+				return core.ApplyRulesResult{TransactionsUpdated: updated}, err
+			}
+			updated++
+			break // highest-priority match wins
+		}
+	}
+	return core.ApplyRulesResult{TransactionsUpdated: updated}, nil
+}
+
+type txRow struct {
+	id           string
+	name         string
+	merchantName string
+	amountMinor  int64
+	categoryID   sql.NullString
+}
+
+func ruleMatches(tx txRow, rule core.Rule) bool {
+	var fieldValue string
+	switch rule.ConditionField {
+	case "merchant_name":
+		fieldValue = tx.merchantName
+	case "name":
+		fieldValue = tx.name
+	default:
+		return false
+	}
+
+	switch rule.ConditionOp {
+	case "contains":
+		return strings.Contains(strings.ToLower(fieldValue), strings.ToLower(rule.ConditionValue))
+	case "equals":
+		return strings.EqualFold(fieldValue, rule.ConditionValue)
+	default:
+		return false
+	}
+}
+
+func (s *SQLiteStore) applyRuleAction(ctx context.Context, txID string, rule core.Rule) error {
+	switch rule.ActionType {
+	case "set_category":
+		var categoryName string
+		_ = s.db.QueryRowContext(ctx, `SELECT name FROM categories WHERE id = ?`, rule.ActionValue).Scan(&categoryName)
+		_, err := s.db.ExecContext(ctx, `UPDATE transactions SET category_id = ?, category_name = NULLIF(?, ''), category_source = 'local' WHERE id = ?`, rule.ActionValue, categoryName, txID)
+		return err
+	case "set_note":
+		_, err := s.db.ExecContext(ctx, `UPDATE transactions SET note = ? WHERE id = ?`, rule.ActionValue, txID)
+		return err
+	default:
+		return fmt.Errorf("unknown rule action type: %s", rule.ActionType)
+	}
 }
 
 func (s *SQLiteStore) hydrateTransactionTags(ctx context.Context, transactions []core.Transaction) error {

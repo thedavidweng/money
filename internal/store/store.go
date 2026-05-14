@@ -33,6 +33,11 @@ type Store interface {
 	ListBudgetCategories(ctx context.Context, budgetID string) ([]core.BudgetCategory, error)
 	CreateBudgetCategory(ctx context.Context, bc core.BudgetCategory) (core.BudgetCategory, error)
 	DeleteBudgetCategory(ctx context.Context, id string) error
+	ListRules(ctx context.Context) ([]core.Rule, error)
+	CreateRule(ctx context.Context, rule core.Rule) (core.Rule, error)
+	UpdateRule(ctx context.Context, rule core.Rule) (core.Rule, error)
+	DeleteRule(ctx context.Context, id string) error
+	ApplyRules(ctx context.Context) (core.ApplyRulesResult, error)
 }
 
 type TransactionListQuery struct {
