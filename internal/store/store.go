@@ -21,6 +21,8 @@ type Store interface {
 	ListHoldings(ctx context.Context) ([]core.InvestmentHolding, error)
 	ListSecurities(ctx context.Context) ([]core.InvestmentSecurity, error)
 	ListLiabilities(ctx context.Context) ([]core.Liability, error)
+	UpsertImportedAccount(ctx context.Context, account core.Account) error
+	UpsertImportedTransaction(ctx context.Context, tx core.Transaction, sourceRowHash string) (bool, []string, error)
 }
 
 type TransactionListQuery struct {

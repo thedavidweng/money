@@ -570,6 +570,93 @@ func displayName(account core.Account) string {
 	return account.OfficialName
 }
 
+func (s *SQLiteStore) UpsertImportedAccount(ctx context.Context, account core.Account) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	if account.UpdatedAt == "" {
+		account.UpdatedAt = now
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO accounts (
+  id, source_kind, import_source_id, import_batch_id, name, official_name, alias,
+  type, subtype, current_balance_minor_units, currency, hidden, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, NULLIF(?, ''), ?, ?, 0, ?, ?)`,
+		account.ID, account.Source.Kind,
+		nullString(account.Source.ImportSourceID), nullString(account.Source.ImportBatchID),
+		account.Name, account.OfficialName, account.Alias,
+		account.Type, account.Subtype,
+		account.CurrentBalanceMinorUnits, account.Currency,
+		now, account.UpdatedAt)
+	return err
+}
+
+func (s *SQLiteStore) UpsertImportedTransaction(ctx context.Context, tx core.Transaction, sourceRowHash string) (bool, []string, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	lastChanged := tx.LastChangedAt
+	if lastChanged == "" {
+		lastChanged = now
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO transactions (
+  id, account_id, source_kind, import_source_id, import_batch_id, source_row_hash,
+  date, amount_minor_units, currency, name, merchant_name,
+  category_id, category_name, category_source, provider_category, provider_subcategory,
+  pending, removed, needs_review, note, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, NULLIF(?, ''), NULLIF(?, ''), ?, 0, 0, NULLIF(?, ''), ?, ?)`,
+		tx.ID, tx.AccountID, tx.Source.Kind,
+		nullString(tx.Source.ImportSourceID), nullString(tx.Source.ImportBatchID), sourceRowHash,
+		tx.Date, tx.AmountMinorUnits, tx.Currency, tx.Name, nullString(&tx.MerchantName),
+		nullString(tx.CategoryID), nullString(tx.CategoryName), tx.CategorySource,
+		nullString(tx.ProviderCategory), nullString(tx.ProviderSubcategory),
+		boolInt(tx.Pending), nullString(tx.Note), now, lastChanged)
+	if err != nil {
+		if isUniqueConstraintError(err) {
+			return false, nil, nil // same-batch duplicate, skipped
+		}
+		return false, nil, err
+	}
+
+	possibleDups, err := s.findPossibleDuplicates(ctx, tx)
+	return true, possibleDups, err
+}
+
+func (s *SQLiteStore) findPossibleDuplicates(ctx context.Context, tx core.Transaction) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id FROM transactions
+WHERE account_id = ? AND date = ? AND amount_minor_units = ? AND id != ?
+  AND (import_source_id IS DISTINCT FROM ? OR import_batch_id IS DISTINCT FROM ?)
+LIMIT 5`,
+		tx.AccountID, tx.Date, tx.AmountMinorUnits, tx.ID,
+		nullString(tx.Source.ImportSourceID), nullString(tx.Source.ImportBatchID))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func isUniqueConstraintError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unique constraint failed") || strings.Contains(msg, "constraint violation")
+}
+
+func nullString(s *string) sql.NullString {
+	if s == nil || *s == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: *s, Valid: true}
+}
+
 func boolInt(value bool) int {
 	if value {
 		return 1
