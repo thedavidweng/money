@@ -2,6 +2,7 @@ package plaidlogin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -91,14 +92,30 @@ func RunLogin(ctx context.Context, opts LoginOptions) (LoginResult, error) {
 	keysWritten := 0
 	credentialAction := "written"
 	loaded, loadErr := config.Load(config.Options{ConfigPath: meta.ConfigPath, Profile: opts.Profile})
-	existingPlaid := loaded.Providers["plaid"].Fields
-	if loadErr == nil && existingPlaid["client_id"] != "" && existingPlaid["secret"] != "" && existingPlaid["environment"] == environment && !opts.Force {
+
+	// Determine effective force flag.
+	// When loadErr is a MissingEnvError for plaid fields, credentials are
+	// provably incomplete (e.g. PLAID_CLIENT_ID present but PLAID_SECRET
+	// missing, or vice versa). Force-write the keys we just fetched so the
+	// missing entries are added. The caller already handled user-facing
+	// confirmation at the CLI layer.
+	effectiveForce := opts.Force
+	if loadErr != nil {
+		var missing config.MissingEnvError
+		if errors.As(loadErr, &missing) && (missing.Path == "providers.plaid.client_id" || missing.Path == "providers.plaid.secret") {
+			effectiveForce = true
+		} else {
+			return LoginResult{}, loadErr
+		}
+	}
+
+	if loadErr == nil && loaded.Providers["plaid"].Fields["client_id"] != "" && loaded.Providers["plaid"].Fields["secret"] != "" && loaded.Providers["plaid"].Fields["environment"] == environment && !opts.Force {
 		credentialAction = "preserved_existing"
 	} else {
 		configResult, err := config.ConfigureProvider(meta.ConfigPath, opts.Profile, config.PlaidSpec, map[string]string{
 			"client_id": keys.ClientID,
 			"secret":    secret,
-		}, providerOptions(environment, opts), opts.Force)
+		}, providerOptions(environment, opts), effectiveForce)
 		if err != nil {
 			return LoginResult{}, Error{Code: "CONFIG_WRITE_FAILED", Message: "Plaid credentials could not be written", Err: err}
 		}
