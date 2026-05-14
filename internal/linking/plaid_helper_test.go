@@ -34,31 +34,47 @@ func TestNewLinkStateReturnsRandomBase64URLState(t *testing.T) {
 }
 
 func TestPlaidLinkHelperServesOnlyLinkPageAndCallback(t *testing.T) {
-	helper := NewPlaidLinkHelper(PlaidLinkHelperConfig{
-		LinkToken: "link-token",
-		State:     "state",
-		Timeout:   time.Second,
-	})
-
+	helper := NewPlaidLinkHelper(PlaidLinkHelperConfig{LinkToken: "link-token", State: "state", Timeout: time.Second})
 	handler := helper.Handler()
+
 	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, httptest.NewRequest(http.MethodGet, "/", nil))
-	if resp.Code != http.StatusOK {
-		t.Fatalf("link page status = %d", resp.Code)
+	handler.ServeHTTP(resp, httptest.NewRequest(http.MethodGet, "/other", nil))
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("other path status = %d", resp.Code)
+	}
+
+	pageResp := httptest.NewRecorder()
+	handler.ServeHTTP(pageResp, httptest.NewRequest(http.MethodGet, "/", nil))
+	if pageResp.Code != http.StatusOK {
+		t.Fatalf("page status = %d", pageResp.Code)
 	}
 	buf := new(bytes.Buffer)
-	if _, err := buf.ReadFrom(resp.Body); err != nil {
-		t.Fatal(err)
-	}
+	_, _ = buf.ReadFrom(pageResp.Body)
 	body := buf.String()
 	if !strings.Contains(body, "link-token") || !strings.Contains(body, "Plaid.create") {
 		t.Fatalf("link page does not contain Plaid Link bootstrap: %s", body)
 	}
+}
 
-	missing := httptest.NewRecorder()
-	handler.ServeHTTP(missing, httptest.NewRequest(http.MethodGet, "/accounts", nil))
-	if missing.Code != http.StatusNotFound {
-		t.Fatalf("unsupported path status = %d, want 404", missing.Code)
+func TestPlaidLinkHelperInvalidBodyPushesErrorCallback(t *testing.T) {
+	helper := NewPlaidLinkHelper(PlaidLinkHelperConfig{LinkToken: "link-token", State: "state", Timeout: time.Second})
+	handler := helper.Handler()
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/callback", strings.NewReader(`{"invalid`))
+	req.Host = "127.0.0.1"
+	req.Header.Set("Origin", "http://127.0.0.1")
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+
+	callback, err := helper.Wait(context.Background())
+	if err != nil {
+		t.Fatalf("wait callback: %v", err)
+	}
+	if callback.Status != "error" || callback.Error.Code != "INVALID_CALLBACK_PAYLOAD" {
+		t.Fatalf("expected body-decode error callback, got status=%q code=%q", callback.Status, callback.Error.Code)
 	}
 }
 
@@ -76,6 +92,33 @@ func TestPlaidLinkHelperValidatesStateBeforeReturningCallback(t *testing.T) {
 	if badResp.Code != http.StatusForbidden {
 		t.Fatalf("bad callback status = %d, want 403", badResp.Code)
 	}
+
+	callback, err := helper.Wait(context.Background())
+	if err != nil {
+		t.Fatalf("wait callback: %v", err)
+	}
+	if callback.Status != "error" || callback.Error.Code != "INVALID_STATE" {
+		t.Fatalf("expected state-mismatch error callback, got status=%q code=%q", callback.Status, callback.Error.Code)
+	}
+}
+
+func TestPlaidLinkHelperAcceptsValidCallbackAfterStateMismatchIsConsumed(t *testing.T) {
+	helper := NewPlaidLinkHelper(PlaidLinkHelperConfig{
+		LinkToken: "link-token",
+		State:     "state",
+		Timeout:   time.Second,
+	})
+	handler := helper.Handler()
+
+	badPayload := strings.NewReader(`{"public_token":"public","state":"wrong"}`)
+	badResp := httptest.NewRecorder()
+	handler.ServeHTTP(badResp, httptest.NewRequest(http.MethodPost, "/callback", badPayload))
+	if badResp.Code != http.StatusForbidden {
+		t.Fatalf("bad callback status = %d, want 403", badResp.Code)
+	}
+
+	// Consume the error callback pushed by the state-mismatch path.
+	_, _ = helper.Wait(context.Background())
 
 	goodPayload := strings.NewReader(`{"public_token":"public","state":"state","metadata":{"institution":{"institution_id":"ins_123","name":"Bank"},"accounts":[{"id":"acc_1","name":"Checking","mask":"0000","type":"depository","subtype":"checking"}]}}`)
 	goodResp := httptest.NewRecorder()

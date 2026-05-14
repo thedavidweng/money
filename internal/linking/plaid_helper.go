@@ -133,10 +133,24 @@ func (h *PlaidLinkHelper) handleCallback(w http.ResponseWriter, r *http.Request)
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "invalid callback", http.StatusBadRequest)
+		select {
+		case h.callback <- providers.LinkCallback{
+			Status: "error",
+			Error:  providers.LinkError{Type: "CALLBACK_ERROR", Code: "INVALID_CALLBACK_PAYLOAD", Message: "failed to decode callback body"},
+		}:
+		default:
+		}
 		return
 	}
 	if payload.State != h.state {
 		http.Error(w, "invalid state", http.StatusForbidden)
+		select {
+		case h.callback <- providers.LinkCallback{
+			Status: "error",
+			Error:  providers.LinkError{Type: "CALLBACK_ERROR", Code: "INVALID_STATE", Message: "callback state does not match link session state"},
+		}:
+		default:
+		}
 		return
 	}
 	status := payload.Status
