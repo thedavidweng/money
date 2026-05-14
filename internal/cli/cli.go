@@ -1534,6 +1534,7 @@ func newLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 				}
 			}
 			return runPlaidLinkFlow(ctx, state, provider, plaidLinkFlowOptions{
+				CommandName:                 "link",
 				Institution:                 institution,
 				RedirectURI:                 cfg.Providers["plaid"].Fields["redirect_uri"],
 				NoOpen:                      noOpen,
@@ -1597,6 +1598,7 @@ func newProviderLinkCommand(ctx context.Context, state *runtimeState, providerNa
 			switch providerName {
 			case "plaid":
 				return runPlaidLinkFlow(ctx, state, provider, plaidLinkFlowOptions{
+					CommandName:                 "providers.plaid.link",
 					RedirectURI:                 cfg.Providers["plaid"].Fields["redirect_uri"],
 					NoOpen:                      noOpen,
 					AdditionalConsentedProducts: additionalConsentedProducts,
@@ -1677,6 +1679,7 @@ var openBrowser = func(url string) error {
 }
 
 type plaidLinkFlowOptions struct {
+	CommandName                 string
 	Institution                 providers.Institution
 	RedirectURI                 string
 	NoOpen                      bool
@@ -1760,7 +1763,7 @@ func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider provide
 		var canceled linking.LinkCanceledError
 		if errors.As(err, &canceled) {
 			return cliError{
-				command:   "plaid.link",
+				command:   opts.CommandName,
 				code:      "LINK_CANCELED",
 				message:   canceled.Error(),
 				category:  contracts.CategorySafety,
@@ -1771,7 +1774,7 @@ func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider provide
 		var flowErr linking.LinkFlowError
 		if errors.As(err, &flowErr) {
 			return cliError{
-				command:   "plaid.link",
+				command:   opts.CommandName,
 				code:      "LINK_ERROR",
 				message:   flowErr.Error(),
 				category:  contracts.CategoryAPI,

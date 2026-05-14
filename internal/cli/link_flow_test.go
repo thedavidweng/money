@@ -357,10 +357,13 @@ func TestRunPlaidLinkFlowReturnsCLIErrorOnCancel(t *testing.T) {
 
 	var stdout bytes.Buffer
 	state := &runtimeState{store: db}
-	err = runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, plaidLinkFlowOptions{NoOpen: true}, &stdout)
+	err = runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, plaidLinkFlowOptions{CommandName: "providers.plaid.link", NoOpen: true}, &stdout)
 	var cliErr cliError
 	if !errors.As(err, &cliErr) {
 		t.Fatalf("expected cliError, got %#v", err)
+	}
+	if cliErr.command != "providers.plaid.link" {
+		t.Fatalf("command = %q, want providers.plaid.link", cliErr.command)
 	}
 	if cliErr.code != "LINK_CANCELED" {
 		t.Fatalf("code = %q, want LINK_CANCELED", cliErr.code)
@@ -403,10 +406,13 @@ func TestRunPlaidLinkFlowReturnsCLIErrorOnLinkError(t *testing.T) {
 
 	var stdout bytes.Buffer
 	state := &runtimeState{store: db}
-	err = runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, plaidLinkFlowOptions{NoOpen: true}, &stdout)
+	err = runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, plaidLinkFlowOptions{CommandName: "link", NoOpen: true}, &stdout)
 	var cliErr cliError
 	if !errors.As(err, &cliErr) {
 		t.Fatalf("expected cliError, got %#v", err)
+	}
+	if cliErr.command != "link" {
+		t.Fatalf("command = %q, want link", cliErr.command)
 	}
 	if cliErr.code != "LINK_ERROR" {
 		t.Fatalf("code = %q, want LINK_ERROR", cliErr.code)
