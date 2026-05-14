@@ -1254,7 +1254,7 @@ func runPlaidLoginLive(ctx context.Context, state *runtimeState, stdout io.Write
 	}
 	callbackResult, err := callback.Wait(ctx)
 	if err != nil {
-		return err
+		return plaidLoginError(opts.CommandName, err)
 	}
 	result, err := plaidlogin.RunLogin(ctx, plaidlogin.LoginOptions{
 		ConfigPath:   meta.ConfigPath,

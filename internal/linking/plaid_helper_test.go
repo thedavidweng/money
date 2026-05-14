@@ -128,44 +128,66 @@ func TestPlaidLinkHelperHandlesSuccessCancelAndLinkErrorPayloads(t *testing.T) {
 }
 
 func TestPlaidLinkHelperRejectsWrongOriginAndDuplicateCallback(t *testing.T) {
-	helper := NewPlaidLinkHelper(PlaidLinkHelperConfig{LinkToken: "link-token", State: "state", Timeout: time.Second})
-	handler := helper.Handler()
+	t.Run("bad origin pushes error callback", func(t *testing.T) {
+		helper := NewPlaidLinkHelper(PlaidLinkHelperConfig{LinkToken: "link-token", State: "state", Timeout: time.Second})
+		handler := helper.Handler()
 
-	badOrigin := httptest.NewRecorder()
-	badReq := httptest.NewRequest(http.MethodPost, "/callback", strings.NewReader(`{"status":"cancel","state":"state"}`))
-	badReq.Host = "127.0.0.1"
-	badReq.Header.Set("Origin", "http://evil.test")
-	handler.ServeHTTP(badOrigin, badReq)
-	if badOrigin.Code != http.StatusForbidden {
-		t.Fatalf("bad origin status = %d", badOrigin.Code)
-	}
+		badOrigin := httptest.NewRecorder()
+		badReq := httptest.NewRequest(http.MethodPost, "/callback", strings.NewReader(`{"status":"cancel","state":"state"}`))
+		badReq.Host = "127.0.0.1"
+		badReq.Header.Set("Origin", "http://evil.test")
+		handler.ServeHTTP(badOrigin, badReq)
+		if badOrigin.Code != http.StatusForbidden {
+			t.Fatalf("bad origin status = %d", badOrigin.Code)
+		}
 
-	nonLoopback := httptest.NewRecorder()
-	nonLoopbackReq := httptest.NewRequest(http.MethodPost, "/callback", strings.NewReader(`{"status":"cancel","state":"state"}`))
-	nonLoopbackReq.Host = "example.com"
-	nonLoopbackReq.Header.Set("Origin", "http://example.com")
-	handler.ServeHTTP(nonLoopback, nonLoopbackReq)
-	if nonLoopback.Code != http.StatusForbidden {
-		t.Fatalf("non-loopback origin status = %d", nonLoopback.Code)
-	}
+		callback, _ := helper.Wait(context.Background())
+		if callback.Status != "error" || callback.Error.Code != "ORIGIN_VALIDATION_FAILED" {
+			t.Fatalf("expected origin error callback, got status=%q code=%q", callback.Status, callback.Error.Code)
+		}
+	})
 
-	first := httptest.NewRecorder()
-	firstReq := httptest.NewRequest(http.MethodPost, "/callback", strings.NewReader(`{"status":"cancel","state":"state"}`))
-	firstReq.Host = "127.0.0.1"
-	firstReq.Header.Set("Origin", "http://127.0.0.1")
-	handler.ServeHTTP(first, firstReq)
-	if first.Code != http.StatusOK {
-		t.Fatalf("first status = %d", first.Code)
-	}
+	t.Run("non-loopback origin pushes error callback", func(t *testing.T) {
+		helper := NewPlaidLinkHelper(PlaidLinkHelperConfig{LinkToken: "link-token", State: "state", Timeout: time.Second})
+		handler := helper.Handler()
 
-	second := httptest.NewRecorder()
-	secondReq := httptest.NewRequest(http.MethodPost, "/callback", strings.NewReader(`{"status":"cancel","state":"state"}`))
-	secondReq.Host = "127.0.0.1"
-	secondReq.Header.Set("Origin", "http://127.0.0.1")
-	handler.ServeHTTP(second, secondReq)
-	if second.Code != http.StatusConflict {
-		t.Fatalf("second status = %d", second.Code)
-	}
+		nonLoopback := httptest.NewRecorder()
+		nonLoopbackReq := httptest.NewRequest(http.MethodPost, "/callback", strings.NewReader(`{"status":"cancel","state":"state"}`))
+		nonLoopbackReq.Host = "example.com"
+		nonLoopbackReq.Header.Set("Origin", "http://example.com")
+		handler.ServeHTTP(nonLoopback, nonLoopbackReq)
+		if nonLoopback.Code != http.StatusForbidden {
+			t.Fatalf("non-loopback origin status = %d", nonLoopback.Code)
+		}
+
+		callback, _ := helper.Wait(context.Background())
+		if callback.Status != "error" || callback.Error.Code != "ORIGIN_VALIDATION_FAILED" {
+			t.Fatalf("expected origin error callback, got status=%q code=%q", callback.Status, callback.Error.Code)
+		}
+	})
+
+	t.Run("duplicate callback", func(t *testing.T) {
+		helper := NewPlaidLinkHelper(PlaidLinkHelperConfig{LinkToken: "link-token", State: "state", Timeout: time.Second})
+		handler := helper.Handler()
+
+		first := httptest.NewRecorder()
+		firstReq := httptest.NewRequest(http.MethodPost, "/callback", strings.NewReader(`{"status":"cancel","state":"state"}`))
+		firstReq.Host = "127.0.0.1"
+		firstReq.Header.Set("Origin", "http://127.0.0.1")
+		handler.ServeHTTP(first, firstReq)
+		if first.Code != http.StatusOK {
+			t.Fatalf("first status = %d", first.Code)
+		}
+
+		second := httptest.NewRecorder()
+		secondReq := httptest.NewRequest(http.MethodPost, "/callback", strings.NewReader(`{"status":"cancel","state":"state"}`))
+		secondReq.Host = "127.0.0.1"
+		secondReq.Header.Set("Origin", "http://127.0.0.1")
+		handler.ServeHTTP(second, secondReq)
+		if second.Code != http.StatusConflict {
+			t.Fatalf("second status = %d", second.Code)
+		}
+	})
 }
 
 func TestPlaidLinkHelperWaitTimesOut(t *testing.T) {

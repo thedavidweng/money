@@ -115,6 +115,13 @@ func (h *PlaidLinkHelper) handleCallback(w http.ResponseWriter, r *http.Request)
 	}
 	if !validCallbackOrigin(r) {
 		http.Error(w, "invalid origin", http.StatusForbidden)
+		select {
+		case h.callback <- providers.LinkCallback{
+			Status: "error",
+			Error:  providers.LinkError{Type: "ORIGIN_ERROR", Code: "ORIGIN_VALIDATION_FAILED", Message: "callback request failed origin validation"},
+		}:
+		default:
+		}
 		return
 	}
 	var payload struct {
