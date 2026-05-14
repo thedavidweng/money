@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +14,19 @@ function assertBuiltAsset(pathname) {
 		existsSync(new URL(relativePath, distRoot)),
 		`${pathname} is referenced by built HTML but missing from dist/`,
 	);
+}
+
+function mediaFilesUnder(directory) {
+	if (!existsSync(directory)) {
+		return [];
+	}
+	const media = [];
+	for (const entry of readdirSync(directory, { recursive: true, withFileTypes: true })) {
+		if (entry.isFile() && /\.(avif|ico|png|svg|webp)$/i.test(entry.name)) {
+			media.push(join(entry.parentPath, entry.name));
+		}
+	}
+	return media.sort();
 }
 
 test('built pages only reference public assets that exist in dist', () => {
@@ -34,7 +47,20 @@ test('website uses the root public directory as its single media source', () => 
 	}
 
 	if (existsSync(websitePublicDir)) {
-		const duplicateMedia = readdirSync(websitePublicDir).filter((name) => /\.(avif|ico|png|svg|webp)$/i.test(name));
+		const duplicateMedia = mediaFilesUnder(websitePublicDir);
 		assert.deepEqual(duplicateMedia, [], 'website/public must not keep duplicate media assets');
+	}
+});
+
+test('mediaFilesUnder finds nested media files', () => {
+	const dir = new URL('../.tmp-public-assets-test/', import.meta.url);
+	rmSync(dir, { recursive: true, force: true });
+	mkdirSync(new URL('images/icons/', dir), { recursive: true });
+	writeFileSync(new URL('images/icons/logo.svg', dir), '<svg />');
+	writeFileSync(new URL('images/readme.txt', dir), 'not media');
+	try {
+		assert.deepEqual(mediaFilesUnder(dir), [fileURLToPath(new URL('images/icons/logo.svg', dir))]);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
 	}
 });

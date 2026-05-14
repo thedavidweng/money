@@ -104,8 +104,8 @@ func TestPlaidLinkHelperHandlesSuccessCancelAndLinkErrorPayloads(t *testing.T) {
 			helper := NewPlaidLinkHelper(PlaidLinkHelperConfig{LinkToken: "link-token", State: "state", Timeout: time.Second})
 			resp := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodPost, "/callback", strings.NewReader(payload))
-			req.Header.Set("Origin", "http://example.com")
-			req.Host = "example.com"
+			req.Header.Set("Origin", "http://127.0.0.1")
+			req.Host = "127.0.0.1"
 			helper.Handler().ServeHTTP(resp, req)
 			if resp.Code != http.StatusOK {
 				t.Fatalf("callback status = %d", resp.Code)
@@ -138,6 +138,15 @@ func TestPlaidLinkHelperRejectsWrongOriginAndDuplicateCallback(t *testing.T) {
 	handler.ServeHTTP(badOrigin, badReq)
 	if badOrigin.Code != http.StatusForbidden {
 		t.Fatalf("bad origin status = %d", badOrigin.Code)
+	}
+
+	nonLoopback := httptest.NewRecorder()
+	nonLoopbackReq := httptest.NewRequest(http.MethodPost, "/callback", strings.NewReader(`{"status":"cancel","state":"state"}`))
+	nonLoopbackReq.Host = "example.com"
+	nonLoopbackReq.Header.Set("Origin", "http://example.com")
+	handler.ServeHTTP(nonLoopback, nonLoopbackReq)
+	if nonLoopback.Code != http.StatusForbidden {
+		t.Fatalf("non-loopback origin status = %d", nonLoopback.Code)
 	}
 
 	first := httptest.NewRecorder()

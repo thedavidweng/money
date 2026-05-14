@@ -48,11 +48,11 @@ func SecretForEnvironment(keys Keys, environment string) (string, error) {
 	switch environment {
 	case "sandbox", "production":
 	default:
-		return "", Error{Code: "INVALID_ENUM", Message: "--environment must be sandbox or production"}
+		return "", Error{Code: ErrorInvalidEnum, Message: "--environment must be sandbox or production"}
 	}
 	secret := keys.Secrets[environment]
 	if secret == "" {
-		return "", Error{Code: ErrorPlaidEnvironmentNotProvided, Message: fmt.Sprintf("Plaid Dashboard did not return a %s secret", environment)}
+		return "", Error{Code: ErrorPlaidEnvironmentNotProvisioned, Message: fmt.Sprintf("Plaid Dashboard did not return a %s secret", environment)}
 	}
 	return secret, nil
 }

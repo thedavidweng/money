@@ -3,15 +3,16 @@ package plaidlogin
 import "fmt"
 
 const (
-	ErrorBaseConfigMissing           = "BASE_CONFIG_MISSING"
-	ErrorNotLoggedIn                 = "NOT_LOGGED_IN"
-	ErrorTeamSelectionRequired       = "TEAM_SELECTION_REQUIRED"
-	ErrorAPIKeysFetchRequired        = "API_KEYS_FETCH_REQUIRED"
-	ErrorDashboardTokenRefreshFailed = "DASHBOARD_TOKEN_REFRESH_FAILED"
-	ErrorDashboardContractChanged    = "DASHBOARD_CONTRACT_CHANGED"
-	ErrorPlaidDashboardLoginRejected = "PLAID_DASHBOARD_LOGIN_REJECTED"
-	ErrorPlaidEnvironmentNotProvided = "PLAID_ENVIRONMENT_NOT_PROVISIONED"
-	ErrorReadOnlyViolation           = "READ_ONLY_VIOLATION"
+	ErrorBaseConfigMissing              = "BASE_CONFIG_MISSING"
+	ErrorNotLoggedIn                    = "NOT_LOGGED_IN"
+	ErrorTeamSelectionRequired          = "TEAM_SELECTION_REQUIRED"
+	ErrorAPIKeysFetchRequired           = "API_KEYS_FETCH_REQUIRED"
+	ErrorDashboardTokenRefreshFailed    = "DASHBOARD_TOKEN_REFRESH_FAILED"
+	ErrorDashboardContractChanged       = "DASHBOARD_CONTRACT_CHANGED"
+	ErrorPlaidDashboardLoginRejected    = "PLAID_DASHBOARD_LOGIN_REJECTED"
+	ErrorPlaidEnvironmentNotProvisioned = "PLAID_ENVIRONMENT_NOT_PROVISIONED"
+	ErrorReadOnlyViolation              = "READ_ONLY_VIOLATION"
+	ErrorInvalidEnum                    = "INVALID_ENUM"
 )
 
 type Error struct {

@@ -40,6 +40,7 @@ type runtimeState struct {
 	configPath string
 	profile    string
 	stdin      io.Reader
+	stderr     io.Writer
 	prompter   prompt.Selector
 }
 
@@ -57,7 +58,7 @@ type plaidLoginCLIOptions struct {
 var runPlaidLoginCLI = runPlaidLoginLive
 
 func Run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
-	state := &runtimeState{stdin: stdin}
+	state := &runtimeState{stdin: stdin, stderr: stderr}
 	root := newRootCommand(ctx, state, stdout, stderr)
 	root.SetArgs(args)
 	root.SetIn(stdin)
@@ -1013,7 +1014,10 @@ func validatePlaidLoginOverwrite(state *runtimeState, meta config.Metadata, opts
 	}
 	cfg, err := config.Load(config.Options{ConfigPath: meta.ConfigPath, Profile: state.profile})
 	if err != nil {
-		return nil
+		if isMissingPlaidCredentialConfigError(err) {
+			return nil
+		}
+		return err
 	}
 	fields := cfg.Providers["plaid"].Fields
 	if fields["client_id"] == "" || fields["secret"] == "" || fields["environment"] == opts.Environment {
@@ -1055,6 +1059,14 @@ func validatePlaidLoginOverwrite(state *runtimeState, meta config.Metadata, opts
 	return nil
 }
 
+func isMissingPlaidCredentialConfigError(err error) bool {
+	var missing config.MissingEnvError
+	if !errors.As(err, &missing) {
+		return false
+	}
+	return missing.Path == "providers.plaid.client_id" || missing.Path == "providers.plaid.secret"
+}
+
 func writePlaidLoginResult(state *runtimeState, stdout io.Writer, result plaidlogin.LoginResult, commandName string) error {
 	if state.json {
 		return contracts.WriteJSON(stdout, contracts.NewSuccess(commandName, result))
@@ -1083,7 +1095,7 @@ func plaidLoginError(command string, err error) error {
 	case plaidlogin.ErrorNotLoggedIn, plaidlogin.ErrorPlaidDashboardLoginRejected, plaidlogin.ErrorDashboardTokenRefreshFailed:
 		category = contracts.CategoryAuth
 		exitCode = 3
-	case plaidlogin.ErrorTeamSelectionRequired, plaidlogin.ErrorPlaidEnvironmentNotProvided, "INVALID_ENUM":
+	case plaidlogin.ErrorTeamSelectionRequired, plaidlogin.ErrorPlaidEnvironmentNotProvisioned, plaidlogin.ErrorInvalidEnum:
 		category = contracts.CategoryValidation
 		exitCode = 2
 	case plaidlogin.ErrorAPIKeysFetchRequired:

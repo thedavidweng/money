@@ -83,6 +83,15 @@ type envReference struct {
 	Name string
 }
 
+type MissingEnvError struct {
+	Path string
+	Name string
+}
+
+func (e MissingEnvError) Error() string {
+	return fmt.Sprintf("%s references missing environment variable %s", e.Path, e.Name)
+}
+
 func validateProfile(profile string) error {
 	if profile == "" || profile == "default" {
 		return nil
@@ -117,33 +126,16 @@ func Load(options Options) (Config, error) {
 		return Config{}, err
 	}
 	configPath := meta.ConfigPath
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		return Config{}, fmt.Errorf("read config %s: %w", configPath, err)
-	}
-	if err := yaml.Unmarshal(content, &raw); err != nil {
-		return Config{}, err
-	}
 
-	mergedEnv := map[string]string{}
-	fileEnv, err := readDotEnv(meta.EnvPath)
+	mergedEnv, err := mergedEnvironment(options, meta.EnvPath)
 	if err != nil {
 		return Config{}, err
-	}
-	for key, value := range fileEnv {
-		mergedEnv[key] = value
-	}
-	if options.Env == nil {
-		options.Env = processEnv()
-	}
-	for key, value := range options.Env {
-		mergedEnv[key] = value
 	}
 
 	cfg := Config{
 		ConfigPath: configPath,
 		EnvPath:    meta.EnvPath,
-		ReadOnly:   meta.ReadOnly,
+		ReadOnly:   raw.ReadOnly || mergedEnv["MONEY_READ_ONLY"] == "1",
 		Providers:  map[string]ProviderConfig{},
 	}
 	if raw.Database.Path == "" {
@@ -222,11 +214,15 @@ func resolveMetadataAndRaw(options Options) (Metadata, rawConfig, error) {
 	meta := Metadata{
 		ConfigPath: absConfigPath,
 		EnvPath:    filepath.Clean(envPath),
-		ReadOnly:   raw.ReadOnly || options.Env["MONEY_READ_ONLY"] == "1",
 	}
 	if raw.Database.Path != "" {
 		meta.DatabasePath = resolvePath(raw.Database.Path, filepath.Dir(absConfigPath))
 	}
+	mergedEnv, err := mergedEnvironment(options, meta.EnvPath)
+	if err != nil {
+		return Metadata{}, rawConfig{}, err
+	}
+	meta.ReadOnly = raw.ReadOnly || mergedEnv["MONEY_READ_ONLY"] == "1"
 	return meta, raw, nil
 }
 
@@ -246,7 +242,7 @@ func resolveValue(path string, node yamlNode, env map[string]string, secret bool
 	case envReference:
 		resolved, ok := env[value.Name]
 		if !ok || resolved == "" {
-			return "", nil, fmt.Errorf("%s references missing environment variable %s", path, value.Name)
+			return "", nil, MissingEnvError{Path: path, Name: value.Name}
 		}
 		return resolved, nil, nil
 	case string:
@@ -291,6 +287,24 @@ func readDotEnv(path string) (map[string]string, error) {
 		values[strings.TrimSpace(key)] = strings.Trim(strings.TrimSpace(value), `"`)
 	}
 	return values, scanner.Err()
+}
+
+func mergedEnvironment(options Options, envPath string) (map[string]string, error) {
+	merged := map[string]string{}
+	fileEnv, err := readDotEnv(envPath)
+	if err != nil {
+		return nil, err
+	}
+	for key, value := range fileEnv {
+		merged[key] = value
+	}
+	if options.Env == nil {
+		options.Env = processEnv()
+	}
+	for key, value := range options.Env {
+		merged[key] = value
+	}
+	return merged, nil
 }
 
 func processEnv() map[string]string {

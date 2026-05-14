@@ -56,6 +56,41 @@ providers:
 	}
 }
 
+func TestResolveMetadataAndLoadHonorDotenvReadOnly(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	envPath := filepath.Join(dir, ".env")
+	key := base64.RawURLEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+
+	if err := os.WriteFile(configPath, []byte(`
+database:
+  path: ./money.db
+  encryption_key:
+    env: MONEY_DB_ENCRYPTION_KEY
+providers: {}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(envPath, []byte("MONEY_DB_ENCRYPTION_KEY="+key+"\nMONEY_READ_ONLY=1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	meta, err := ResolveMetadata(Options{ConfigPath: configPath, Env: map[string]string{}})
+	if err != nil {
+		t.Fatalf("ResolveMetadata: %v", err)
+	}
+	if !meta.ReadOnly {
+		t.Fatal("metadata ReadOnly = false, want true")
+	}
+	cfg, err := Load(Options{ConfigPath: configPath, Env: map[string]string{}})
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !cfg.ReadOnly {
+		t.Fatal("config ReadOnly = false, want true")
+	}
+}
+
 func TestConfigureProviderWritesResolvedEnvFileAndRefusesSilentSkip(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")

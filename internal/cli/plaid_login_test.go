@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/thedavidweng/money/internal/config"
 	"github.com/thedavidweng/money/internal/plaidlogin"
 )
 
@@ -164,6 +165,81 @@ func TestPlaidLoginJSONRequiresForceBeforeOAuthForEnvironmentSwitch(t *testing.T
 	}
 	if strings.Contains(stderr.String(), "OAuth URL") {
 		t.Fatalf("OAuth started before overwrite validation: %s", stderr.String())
+	}
+}
+
+func TestPlaidLoginOverwriteValidationFailsClosedOnConfigLoadError(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte(`
+database:
+  path: ./money.db
+  encryption_key:
+    env: MONEY_DB_ENCRYPTION_KEY
+providers:
+  plaid:
+    client_id:
+      env: PLAID_CLIENT_ID
+    secret:
+      env: PLAID_SECRET
+    environment: sandbox
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("PLAID_CLIENT_ID=client\nPLAID_SECRET=secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	err := runPlaidLoginLive(ctx, &runtimeState{
+		configPath: configPath,
+		profile:    "default",
+		json:       true,
+	}, &stdout, &stderr, plaidLoginCLIOptions{
+		CommandName: "plaid.login",
+		NoOpen:      true,
+		Environment: "production",
+	})
+	if err == nil {
+		t.Fatal("expected config load error")
+	}
+	if strings.Contains(stderr.String(), "OAuth URL") {
+		t.Fatalf("OAuth started after config load error: %s", stderr.String())
+	}
+}
+
+func TestPlaidLoginOverwriteValidationAllowsMissingPlaidCredentials(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	key := base64.RawURLEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+	if err := os.WriteFile(configPath, []byte(`
+database:
+  path: ./money.db
+  encryption_key:
+    env: MONEY_DB_ENCRYPTION_KEY
+providers:
+  plaid:
+    client_id:
+      env: PLAID_CLIENT_ID
+    secret:
+      env: PLAID_SECRET
+    environment: sandbox
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("MONEY_DB_ENCRYPTION_KEY="+key+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	meta, err := config.ResolveMetadata(config.Options{ConfigPath: configPath, Env: map[string]string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	opts := plaidLoginCLIOptions{CommandName: "plaid.login", Environment: "production"}
+	if err := validatePlaidLoginOverwrite(&runtimeState{configPath: configPath, profile: "default", json: true}, meta, &opts, &stderr); err != nil {
+		t.Fatalf("validatePlaidLoginOverwrite: %v", err)
 	}
 }
 

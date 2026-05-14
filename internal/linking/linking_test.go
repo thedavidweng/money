@@ -3,6 +3,7 @@ package linking
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/thedavidweng/money/internal/providers"
@@ -89,11 +90,21 @@ func TestCompleteProviderLinkDoesNotExchangeTokenForCancelOrError(t *testing.T) 
 	_, err = CompleteProviderLink(ctx, db, exchangeCountingProvider{}, providers.LinkSession{Provider: "plaid", State: "state"}, providers.LinkCallback{
 		Status: "error",
 		State:  "state",
-		Error:  providers.LinkError{Code: "INVALID_CREDENTIALS"},
+		Error:  providers.LinkError{Type: "ITEM_ERROR", Code: "INVALID_CREDENTIALS", Message: "bad credentials"},
+		Metadata: providers.LinkMetadata{
+			RequestID:     "req_123",
+			LinkSessionID: "link-session",
+		},
 	})
 	var linkErr LinkFlowError
 	if !errors.As(err, &linkErr) || linkErr.Code != "INVALID_CREDENTIALS" {
 		t.Fatalf("link err = %#v", err)
+	}
+	message := err.Error()
+	for _, want := range []string{"bad credentials", "ITEM_ERROR", "INVALID_CREDENTIALS", "req_123", "link-session"} {
+		if !strings.Contains(message, want) {
+			t.Fatalf("link error message %q missing %q", message, want)
+		}
 	}
 }
 

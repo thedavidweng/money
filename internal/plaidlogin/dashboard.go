@@ -80,9 +80,7 @@ func (c DashboardClient) ListTeams(ctx context.Context) ([]Team, error) {
 			Company  string `json:"company"`
 		} `json:"teams"`
 	}
-	decoder := json.NewDecoder(resp.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&body); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		return nil, Error{Code: ErrorDashboardContractChanged, Message: "Dashboard teams response shape changed", Err: err}
 	}
 	if body.Teams == nil {
@@ -126,9 +124,7 @@ func (c DashboardClient) FetchKeys(ctx context.Context, teamID string) (Keys, er
 		ClientID string              `json:"client_id"`
 		Secrets  map[string][]string `json:"secrets"`
 	}
-	decoder := json.NewDecoder(resp.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&body); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		return Keys{}, Error{Code: ErrorDashboardContractChanged, Message: "Dashboard keys response shape changed", Err: err}
 	}
 	if body.ClientID == "" || body.Secrets == nil {

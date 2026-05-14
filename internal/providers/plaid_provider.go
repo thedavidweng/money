@@ -121,7 +121,7 @@ func (p plaidProvider) CreateSandboxPublicToken(ctx context.Context, request San
 		return "", err
 	}
 	if len(products) == 0 {
-		return "", fmt.Errorf("Plaid Sandbox products are required")
+		return "", fmt.Errorf("at least one Plaid Sandbox product is required")
 	}
 	return client.CreateSandboxPublicToken(ctx, request.InstitutionID, products)
 }

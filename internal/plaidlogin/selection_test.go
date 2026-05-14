@@ -54,11 +54,11 @@ func TestSecretForEnvironmentValidatesSupportedEnvironmentAndProvisioning(t *tes
 		t.Fatalf("secret = %q", secret)
 	}
 	_, err = SecretForEnvironment(keys, "development")
-	if !isPlaidLoginCode(err, "INVALID_ENUM") {
+	if !isPlaidLoginCode(err, ErrorInvalidEnum) {
 		t.Fatalf("development err = %#v", err)
 	}
 	_, err = SecretForEnvironment(keys, "production")
-	if !isPlaidLoginCode(err, ErrorPlaidEnvironmentNotProvided) {
+	if !isPlaidLoginCode(err, ErrorPlaidEnvironmentNotProvisioned) {
 		t.Fatalf("production err = %#v", err)
 	}
 }

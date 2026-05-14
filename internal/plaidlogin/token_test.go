@@ -29,6 +29,7 @@ func TestExchangeCodeUsesPKCEFormBody(t *testing.T) {
 			"refresh_token": "refresh-token",
 			"expires_in":    3600,
 			"token_type":    "Bearer",
+			"scope":         "openid",
 		})
 	}))
 	defer server.Close()

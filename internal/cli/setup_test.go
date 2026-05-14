@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
@@ -272,6 +273,9 @@ func TestRunSetupWizardSelectPlaidDashboardLogin(t *testing.T) {
 		if opts.CommandName != "plaid.login" || opts.Environment != "sandbox" {
 			t.Fatalf("opts = %#v", opts)
 		}
+		if _, err := fmt.Fprintln(stderr, "oauth progress"); err != nil {
+			return err
+		}
 		return writePlaidLoginResult(state, stdout, plaidlogin.LoginResult{
 			Provider:          "plaid",
 			TeamID:            "team_1",
@@ -289,10 +293,12 @@ func TestRunSetupWizardSelectPlaidDashboardLogin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var stderr bytes.Buffer
 	state := &runtimeState{
 		configPath: result.ConfigPath,
 		profile:    "default",
 		stdin:      strings.NewReader(""),
+		stderr:     &stderr,
 		prompter:   prompt.NewFake("plaid", "dashboard"),
 	}
 	diags := []Diagnostic{
@@ -307,6 +313,12 @@ func TestRunSetupWizardSelectPlaidDashboardLogin(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "Plaid Dashboard login complete") {
 		t.Fatalf("stdout = %s", stdout.String())
+	}
+	if strings.Contains(stdout.String(), "oauth progress") {
+		t.Fatalf("OAuth progress should not be written to setup stdout: %s", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "oauth progress") {
+		t.Fatalf("OAuth progress missing from setup stderr: %s", stderr.String())
 	}
 }
 

@@ -354,7 +354,11 @@ func runSetupWizard(ctx context.Context, state *runtimeState, stdout io.Writer, 
 					fmt.Fprintf(stdout, "You can always run `money providers configure plaid` later.\n")
 					return nil
 				case "dashboard":
-					return runPlaidLoginCLI(ctx, state, stdout, stdout, plaidLoginCLIOptions{
+					stderr := state.stderr
+					if stderr == nil {
+						stderr = io.Discard
+					}
+					return runPlaidLoginCLI(ctx, state, stdout, stderr, plaidLoginCLIOptions{
 						CommandName: "plaid.login",
 						Environment: "sandbox",
 					})

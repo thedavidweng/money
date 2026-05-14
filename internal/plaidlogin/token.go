@@ -75,9 +75,7 @@ func tokenRequest(ctx context.Context, cfg TokenClientConfig, values url.Values)
 		ExpiresIn    int64  `json:"expires_in"`
 		TokenType    string `json:"token_type"`
 	}
-	decoder := json.NewDecoder(resp.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&body); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		return Auth{}, Error{Code: ErrorDashboardContractChanged, Message: "Dashboard OAuth token response shape changed", Err: err}
 	}
 	if body.AccessToken == "" || body.RefreshToken == "" || body.ExpiresIn <= 0 {

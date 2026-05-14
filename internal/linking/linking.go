@@ -3,6 +3,7 @@ package linking
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/thedavidweng/money/internal/providers"
 	"github.com/thedavidweng/money/internal/store"
@@ -90,8 +91,21 @@ func (e LinkFlowError) Error() string {
 	if message == "" {
 		message = "Plaid Link returned an error"
 	}
+	var details []string
+	if e.Type != "" {
+		details = append(details, "type="+e.Type)
+	}
 	if e.Code != "" {
-		message += " (" + e.Code + ")"
+		details = append(details, "code="+e.Code)
+	}
+	if e.RequestID != "" {
+		details = append(details, "request_id="+e.RequestID)
+	}
+	if e.LinkSessionID != "" {
+		details = append(details, "link_session_id="+e.LinkSessionID)
+	}
+	if len(details) > 0 {
+		message += " (" + strings.Join(details, ", ") + ")"
 	}
 	return message
 }
