@@ -15,6 +15,7 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/thedavidweng/money/internal/config"
 	"github.com/thedavidweng/money/internal/contracts"
@@ -249,7 +250,7 @@ func newInvestmentsCommand(ctx context.Context, state *runtimeState, stdout io.W
 				table.SetHeader([]string{"ACCOUNT", "SECURITY", "QUANTITY", "PRICE", "VALUE", "CURRENCY"})
 				table.SetBorder(false)
 				for _, h := range holdings {
-					table.Append([]string{h.AccountID, h.SecurityID, fmt.Sprintf("%.4f", h.Quantity), fmt.Sprintf("%.2f", h.InstitutionPrice), fmt.Sprintf("%.2f", h.InstitutionValue), h.Currency})
+					table.Append([]string{h.AccountID, h.SecurityID, fmt.Sprintf("%.4f", h.Quantity), colorAmountFloat(stdout, h.InstitutionPrice), colorAmountFloat(stdout, h.InstitutionValue), h.Currency})
 				}
 				table.Render()
 				return nil
@@ -280,7 +281,7 @@ func newInvestmentsCommand(ctx context.Context, state *runtimeState, stdout io.W
 					if sec.TickerSymbol != nil {
 						ticker = *sec.TickerSymbol
 					}
-					table.Append([]string{sec.SecurityID, sec.Name, ticker, sec.Type, fmt.Sprintf("%.2f", sec.ClosePrice), sec.Currency})
+					table.Append([]string{sec.SecurityID, sec.Name, ticker, sec.Type, colorAmountFloat(stdout, sec.ClosePrice), sec.Currency})
 				}
 				table.Render()
 				return nil
@@ -312,7 +313,7 @@ func newLiabilitiesCommand(ctx context.Context, state *runtimeState, stdout io.W
 				table.SetHeader([]string{"ACCOUNT", "TYPE", "NAME", "BALANCE", "CURRENCY"})
 				table.SetBorder(false)
 				for _, l := range liabilities {
-					table.Append([]string{l.AccountID, l.Type, l.Name, fmt.Sprintf("%.2f", l.CurrentBalance), l.Currency})
+					table.Append([]string{l.AccountID, l.Type, l.Name, colorAmountFloat(stdout, l.CurrentBalance), l.Currency})
 				}
 				table.Render()
 				return nil
@@ -415,8 +416,9 @@ All data is stored in memory and discarded when the command exits.
 }
 
 func newAccountsCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
+	var verbose bool
 	cmd := &cobra.Command{Use: "accounts"}
-	cmd.AddCommand(&cobra.Command{
+	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List accounts",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -430,11 +432,35 @@ func newAccountsCommand(ctx context.Context, state *runtimeState, stdout io.Writ
 			}
 			if !state.json {
 				table := tablewriter.NewWriter(stdout)
-				table.SetHeader([]string{"NAME", "TYPE", "BALANCE", "CURRENCY", "SOURCE"})
+				if verbose {
+					table.SetHeader([]string{"ID", "NAME", "TYPE", "BALANCE", "AVAILABLE", "AVAILABLE CREDIT", "CURRENCY", "SOURCE", "PROVIDER", "PROVIDER ACCOUNT ID", "UPDATED"})
+				} else {
+					table.SetHeader([]string{"NAME", "TYPE", "BALANCE", "CURRENCY", "SOURCE"})
+				}
 				table.SetBorder(false)
 				table.SetAutoWrapText(false)
 				for _, a := range accounts {
-					table.Append([]string{a.DisplayName, a.Type, a.CurrentBalance, a.Currency, a.Source.Kind})
+					if verbose {
+						avail := "-"
+						if a.AvailableBalance != nil {
+							avail = *a.AvailableBalance
+						}
+						availCredit := "-"
+						if a.AvailableCredit != nil {
+							availCredit = *a.AvailableCredit
+						}
+						provider := "-"
+						if a.Source.Provider != nil {
+							provider = *a.Source.Provider
+						}
+						providerAccountID := "-"
+						if a.Source.ProviderAccountID != nil {
+							providerAccountID = *a.Source.ProviderAccountID
+						}
+						table.Append([]string{a.ID, a.DisplayName, a.Type, colorAmount(stdout, a.CurrentBalance), colorAmount(stdout, avail), colorAmount(stdout, availCredit), a.Currency, a.Source.Kind, provider, providerAccountID, a.UpdatedAt})
+					} else {
+						table.Append([]string{a.DisplayName, a.Type, colorAmount(stdout, a.CurrentBalance), a.Currency, a.Source.Kind})
+					}
 				}
 				table.Render()
 				return nil
@@ -443,7 +469,9 @@ func newAccountsCommand(ctx context.Context, state *runtimeState, stdout io.Writ
 			env.Meta.Demo = state.demo
 			return contracts.WriteJSON(stdout, env)
 		},
-	})
+	}
+	listCmd.Flags().BoolVar(&verbose, "verbose", false, "show local IDs, provider provenance, and available balances")
+	cmd.AddCommand(listCmd)
 	cmd.AddCommand(newCreateManualCommand(ctx, state, stdout))
 	return cmd
 }
@@ -502,7 +530,7 @@ func newCreateManualCommand(ctx context.Context, state *runtimeState, stdout io.
 				env.Meta.Demo = state.demo
 				return contracts.WriteJSON(stdout, env)
 			}
-			fmt.Fprintf(stdout, "Created %s with balance %s %s\n", account.DisplayName, account.CurrentBalance, account.Currency)
+			fmt.Fprintf(stdout, "Created %s with balance %s %s\n", account.DisplayName, colorAmount(stdout, account.CurrentBalance), account.Currency)
 			return nil
 		},
 	}
@@ -524,6 +552,7 @@ func newTransactionsCommand(ctx context.Context, state *runtimeState, stdout io.
 	}
 	cmd.AddCommand(newTransactionsListCommand(ctx, state, stdout))
 	var searchLimit int
+	var searchVerbose bool
 	searchCmd := &cobra.Command{
 		Use:   "search <query>",
 		Short: "Search transactions",
@@ -537,10 +566,11 @@ func newTransactionsCommand(ctx context.Context, state *runtimeState, stdout io.
 			if err != nil {
 				return err
 			}
-			return writeTransactionsPage(stdout, state, "transactions.search", transactions, searchLimit, 0)
+			return writeTransactionsPage(stdout, state, "transactions.search", transactions, searchLimit, 0, searchVerbose)
 		},
 	}
 	searchCmd.Flags().IntVar(&searchLimit, "limit", 50, "maximum transactions to return")
+	searchCmd.Flags().BoolVar(&searchVerbose, "verbose", false, "show local IDs, source provenance, notes, tags, and provider categories")
 	cmd.AddCommand(searchCmd)
 	return cmd
 }
@@ -550,6 +580,7 @@ func newTransactionsListCommand(ctx context.Context, state *runtimeState, stdout
 	var accountID, categoryID, merchant, tagID, dateFrom, dateTo string
 	var needsReview, pending, recurring string
 	var limit, offset int
+	var verbose bool
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List transactions",
@@ -587,7 +618,7 @@ func newTransactionsListCommand(ctx context.Context, state *runtimeState, stdout
 			if err != nil {
 				return err
 			}
-			return writeTransactionsPage(stdout, state, "transactions.list", transactions, limit, offset)
+			return writeTransactionsPage(stdout, state, "transactions.list", transactions, limit, offset, verbose)
 		},
 	}
 	cmd.Flags().StringVar(&removedMode, "removed", string(store.RemovedExclude), "removed transaction mode: exclude, include, or only")
@@ -602,12 +633,14 @@ func newTransactionsListCommand(ctx context.Context, state *runtimeState, stdout
 	cmd.Flags().StringVar(&recurring, "recurring", "", "filter by recurring state: true or false")
 	cmd.Flags().IntVar(&limit, "limit", 50, "maximum transactions to return")
 	cmd.Flags().IntVar(&offset, "offset", 0, "transactions to skip")
+	cmd.Flags().BoolVar(&verbose, "verbose", false, "show local IDs, source provenance, notes, tags, and provider categories")
 	return cmd
 }
 
 func newCategoriesCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
+	var verbose bool
 	cmd := &cobra.Command{Use: "categories"}
-	cmd.AddCommand(&cobra.Command{
+	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List categories",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -619,17 +652,46 @@ func newCategoriesCommand(ctx context.Context, state *runtimeState, stdout io.Wr
 			if err != nil {
 				return err
 			}
+			if !state.json {
+				table := tablewriter.NewWriter(stdout)
+				if verbose {
+					table.SetHeader([]string{"ID", "NAME", "GROUP", "HIDDEN"})
+				} else {
+					table.SetHeader([]string{"NAME", "GROUP", "HIDDEN"})
+				}
+				table.SetBorder(false)
+				for _, c := range categories {
+					group := "-"
+					if c.GroupName != nil {
+						group = *c.GroupName
+					}
+					hidden := ""
+					if c.Hidden {
+						hidden = "yes"
+					}
+					if verbose {
+						table.Append([]string{c.ID, c.Name, group, hidden})
+					} else {
+						table.Append([]string{c.Name, group, hidden})
+					}
+				}
+				table.Render()
+				return nil
+			}
 			env := contracts.NewSuccess("categories.list", map[string]any{"categories": categories})
 			env.Meta.Demo = state.demo
 			return contracts.WriteJSON(stdout, env)
 		},
-	})
+	}
+	listCmd.Flags().BoolVar(&verbose, "verbose", false, "show local IDs")
+	cmd.AddCommand(listCmd)
 	return cmd
 }
 
 func newTagsCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
+	var verbose bool
 	cmd := &cobra.Command{Use: "tags"}
-	cmd.AddCommand(&cobra.Command{
+	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List tags",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -641,11 +703,31 @@ func newTagsCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 			if err != nil {
 				return err
 			}
+			if !state.json {
+				table := tablewriter.NewWriter(stdout)
+				if verbose {
+					table.SetHeader([]string{"ID", "NAME"})
+				} else {
+					table.SetHeader([]string{"NAME"})
+				}
+				table.SetBorder(false)
+				for _, t := range tags {
+					if verbose {
+						table.Append([]string{t.ID, t.Name})
+					} else {
+						table.Append([]string{t.Name})
+					}
+				}
+				table.Render()
+				return nil
+			}
 			env := contracts.NewSuccess("tags.list", map[string]any{"tags": tags})
 			env.Meta.Demo = state.demo
 			return contracts.WriteJSON(stdout, env)
 		},
-	})
+	}
+	listCmd.Flags().BoolVar(&verbose, "verbose", false, "show local IDs")
+	cmd.AddCommand(listCmd)
 	return cmd
 }
 
@@ -747,8 +829,9 @@ func newItemsCommand(ctx context.Context, state *runtimeState, stdout io.Writer)
 }
 
 func newRecurringCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
+	var verbose bool
 	cmd := &cobra.Command{Use: "recurring"}
-	cmd.AddCommand(&cobra.Command{
+	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List recurring transactions",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -760,11 +843,35 @@ func newRecurringCommand(ctx context.Context, state *runtimeState, stdout io.Wri
 			if err != nil {
 				return err
 			}
+			if !state.json {
+				table := tablewriter.NewWriter(stdout)
+				if verbose {
+					table.SetHeader([]string{"ID", "ACCOUNT", "MERCHANT", "AMOUNT", "FREQUENCY", "NEXT DATE"})
+				} else {
+					table.SetHeader([]string{"MERCHANT", "AMOUNT", "FREQUENCY", "NEXT DATE"})
+				}
+				table.SetBorder(false)
+				for _, r := range recurringItems {
+					nextDate := "-"
+					if r.NextDate != nil {
+						nextDate = *r.NextDate
+					}
+					if verbose {
+						table.Append([]string{r.ID, r.AccountID, r.MerchantName, colorAmount(stdout, r.AverageAmount), r.Frequency, nextDate})
+					} else {
+						table.Append([]string{r.MerchantName, colorAmount(stdout, r.AverageAmount), r.Frequency, nextDate})
+					}
+				}
+				table.Render()
+				return nil
+			}
 			env := contracts.NewSuccess("recurring.list", map[string]any{"recurring": recurringItems})
 			env.Meta.Demo = state.demo
 			return contracts.WriteJSON(stdout, env)
 		},
-	})
+	}
+	listCmd.Flags().BoolVar(&verbose, "verbose", false, "show local IDs and account IDs")
+	cmd.AddCommand(listCmd)
 	return cmd
 }
 
@@ -1662,11 +1769,11 @@ func writeManualPlan(stdout io.Writer, state *runtimeState, plan manualAccountPl
 		env.Meta.Demo = state.demo
 		return contracts.WriteJSON(stdout, env)
 	}
-	fmt.Fprintf(stdout, "Would create %s with balance %s %s\n", plan.AccountName, plan.SignedBalance, plan.Currency)
+	fmt.Fprintf(stdout, "Would create %s with balance %s %s\n", plan.AccountName, colorAmount(stdout, plan.SignedBalance), plan.Currency)
 	return nil
 }
 
-func writeTransactionsPage(stdout io.Writer, state *runtimeState, command string, transactions []core.Transaction, limit int, offset int) error {
+func writeTransactionsPage(stdout io.Writer, state *runtimeState, command string, transactions []core.Transaction, limit int, offset int, verbose bool) error {
 	if !state.json {
 		table := tablewriter.NewWriter(stdout)
 		table.SetHeader([]string{"DATE", "ACCOUNT", "MERCHANT", "AMOUNT", "CATEGORY", "STATUS"})
@@ -1699,9 +1806,48 @@ func writeTransactionsPage(stdout io.Writer, state *runtimeState, command string
 			if accountName == "" {
 				accountName = "-"
 			}
-			table.Append([]string{tx.Date, accountName, merchant, tx.Amount, cat, status})
+			table.Append([]string{tx.Date, accountName, merchant, colorAmount(stdout, tx.Amount), cat, status})
 		}
 		table.Render()
+		if verbose {
+			for _, tx := range transactions {
+				fmt.Fprintln(stdout)
+				fmt.Fprintf(stdout, "  ID: %s\n", tx.ID)
+				fmt.Fprintf(stdout, "  Account ID: %s\n", tx.AccountID)
+				if tx.AuthorizedDate != nil {
+					fmt.Fprintf(stdout, "  Authorized Date: %s\n", *tx.AuthorizedDate)
+				}
+				if tx.ProviderCategory != nil {
+					fmt.Fprintf(stdout, "  Provider Category: %s\n", *tx.ProviderCategory)
+				}
+				if tx.ProviderSubcategory != nil {
+					fmt.Fprintf(stdout, "  Provider Subcategory: %s\n", *tx.ProviderSubcategory)
+				}
+				if tx.Note != nil {
+					fmt.Fprintf(stdout, "  Note: %s\n", *tx.Note)
+				}
+				if len(tx.Tags) > 0 {
+					tagNames := make([]string, 0, len(tx.Tags))
+					for _, tag := range tx.Tags {
+						tagNames = append(tagNames, tag.Name)
+					}
+					fmt.Fprintf(stdout, "  Tags: %s\n", strings.Join(tagNames, ", "))
+				}
+				if tx.Source.Provider != nil {
+					fmt.Fprintf(stdout, "  Source Provider: %s\n", *tx.Source.Provider)
+				}
+				if tx.Source.ProviderItemID != nil {
+					fmt.Fprintf(stdout, "  Source Provider Item ID: %s\n", *tx.Source.ProviderItemID)
+				}
+				if tx.Source.ProviderAccountID != nil {
+					fmt.Fprintf(stdout, "  Source Provider Account ID: %s\n", *tx.Source.ProviderAccountID)
+				}
+				if tx.Source.ProviderTransactionID != nil {
+					fmt.Fprintf(stdout, "  Source Provider Transaction ID: %s\n", *tx.Source.ProviderTransactionID)
+				}
+				fmt.Fprintf(stdout, "  Last Changed: %s\n", tx.LastChangedAt)
+			}
+		}
 		return nil
 	}
 	env := contracts.NewSuccess(command, map[string]any{"transactions": transactions})
@@ -1786,4 +1932,33 @@ func commandName(cmd *cobra.Command) string {
 		return "unknown"
 	}
 	return strings.ReplaceAll(cmd.CommandPath(), "money ", ".")
+}
+
+var noColorForced = os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb"
+
+func supportsColor(w io.Writer) bool {
+	if noColorForced {
+		return false
+	}
+	if f, ok := w.(*os.File); ok {
+		return term.IsTerminal(int(f.Fd()))
+	}
+	return false
+}
+
+func colorAmount(w io.Writer, amount string) string {
+	if !supportsColor(w) {
+		return amount
+	}
+	if amount == "" || amount == "-" || amount == "0" || amount == "0.00" || amount == "-0.00" {
+		return amount
+	}
+	if strings.HasPrefix(amount, "-") {
+		return "\033[31m" + amount + "\033[0m"
+	}
+	return "\033[32m" + amount + "\033[0m"
+}
+
+func colorAmountFloat(w io.Writer, amount float64) string {
+	return colorAmount(w, fmt.Sprintf("%.2f", amount))
 }
