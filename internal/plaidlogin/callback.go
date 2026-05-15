@@ -96,6 +96,7 @@ func (s *CallbackServer) sendOnce(result CallbackResult) bool {
 func (s *CallbackServer) handleCallback(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		s.sendOnce(CallbackResult{Err: Error{Code: ErrorPlaidDashboardLoginRejected, Message: "Plaid Dashboard callback received invalid HTTP method"}})
 		return
 	}
 	if r.URL.Query().Get("state") != s.state {

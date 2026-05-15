@@ -1239,7 +1239,9 @@ func runPlaidLoginLive(ctx context.Context, state *runtimeState, stdout io.Write
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stderr, "Plaid Dashboard OAuth URL: %s\n", authURL)
+	if !state.json {
+		fmt.Fprintf(stderr, "Plaid Dashboard OAuth URL: %s\n", authURL)
+	}
 	if !opts.NoOpen && !state.json {
 		if state.stdin == nil {
 			return fmt.Errorf("stdin is required before opening a browser")
@@ -1373,6 +1375,16 @@ func plaidLoginError(command string, err error) error {
 			category:  contracts.CategoryAuth,
 			retryable: true,
 			exitCode:  3,
+		}
+	}
+	if errors.Is(err, context.Canceled) {
+		return cliError{
+			command:   command,
+			code:      "LOGIN_CANCELED",
+			message:   "Plaid Dashboard login was canceled.",
+			category:  contracts.CategorySafety,
+			retryable: true,
+			exitCode:  10,
 		}
 	}
 	var dashErr plaidlogin.Error
@@ -1517,7 +1529,7 @@ func newLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 				return cliError{
 					command:   "link",
 					code:      "INTERACTIVE_LINK_REQUIRES_HUMAN_MODE",
-					message:   "Plaid Link requires a local browser callback; omit --json for the live link flow.",
+					message:   providerName + " Link requires a local browser callback; omit --json for the live link flow.",
 					category:  contracts.CategoryValidation,
 					retryable: false,
 					exitCode:  2,
@@ -1599,7 +1611,7 @@ func newProviderLinkCommand(ctx context.Context, state *runtimeState, providerNa
 				return cliError{
 					command:   "providers." + providerName + ".link",
 					code:      "INTERACTIVE_LINK_REQUIRES_HUMAN_MODE",
-					message:   providerName + " Link requires a browser flow; omit --json for the live link flow.",
+					message:   providerName + " Link requires a local browser callback; omit --json for the live link flow.",
 					category:  contracts.CategoryValidation,
 					retryable: false,
 					exitCode:  2,

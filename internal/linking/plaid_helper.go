@@ -111,6 +111,13 @@ func (h *PlaidLinkHelper) handleIndex(w http.ResponseWriter, r *http.Request) {
 func (h *PlaidLinkHelper) handleCallback(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		select {
+		case h.callback <- providers.LinkCallback{
+			Status: "error",
+			Error:  providers.LinkError{Type: "CALLBACK_ERROR", Code: "METHOD_NOT_ALLOWED", Message: "callback received invalid HTTP method"},
+		}:
+		default:
+		}
 		return
 	}
 	if !validCallbackOrigin(r) {

@@ -125,7 +125,7 @@ providers:
 	if err := os.WriteFile(envPath, []byte("MONEY_DB_ENCRYPTION_KEY="+key+"\nPLAID_CLIENT_ID=existing-client\nPLAID_SECRET=existing-secret\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	server := loginFakeDashboard(t, "fetched-client", "fetched-secret")
+	server := loginFakeDashboard(t, "existing-client", "existing-secret")
 	defer server.Close()
 	result, err := RunLogin(context.Background(), LoginOptions{
 		ConfigPath:   configPath,
@@ -147,6 +147,45 @@ providers:
 	envContent, _ := os.ReadFile(envPath)
 	if !strings.Contains(string(envContent), "PLAID_CLIENT_ID=existing-client") || !strings.Contains(string(envContent), "PLAID_SECRET=existing-secret") {
 		t.Fatalf("env changed:\n%s", string(envContent))
+	}
+}
+
+func TestRunLoginRejectsMismatchedTeamCredentialsWithoutForce(t *testing.T) {
+	configPath, envPath := writeLoginConfig(t, `
+providers:
+  plaid:
+    client_id:
+      env: PLAID_CLIENT_ID
+    secret:
+      env: PLAID_SECRET
+    environment: sandbox
+`)
+	key := base64.RawURLEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+	if err := os.WriteFile(envPath, []byte("MONEY_DB_ENCRYPTION_KEY="+key+"\nPLAID_CLIENT_ID=team-a-client\nPLAID_SECRET=team-a-secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	server := loginFakeDashboard(t, "team-b-client", "team-b-secret")
+	defer server.Close()
+	_, err := RunLogin(context.Background(), LoginOptions{
+		ConfigPath:   configPath,
+		Environment:  "sandbox",
+		CallbackCode: "auth-code",
+		RedirectPort: 49152,
+		CodeVerifier: "verifier",
+		State:        "state",
+		HTTPClient:   server.Client(),
+		TokenURL:     server.URL + "/oauth/token",
+		DashboardURL: server.URL,
+	})
+	if err == nil {
+		t.Fatal("expected error for mismatched team credentials without --force")
+	}
+	if !strings.Contains(err.Error(), "Plaid credentials could not be written") {
+		t.Fatalf("expected credential write error, got %v", err)
+	}
+	envContent, _ := os.ReadFile(envPath)
+	if !strings.Contains(string(envContent), "PLAID_CLIENT_ID=team-a-client") {
+		t.Fatalf("env should not be overwritten without force:\n%s", string(envContent))
 	}
 }
 

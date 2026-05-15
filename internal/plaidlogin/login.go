@@ -109,7 +109,7 @@ func RunLogin(ctx context.Context, opts LoginOptions) (LoginResult, error) {
 		}
 	}
 
-	if loadErr == nil && loaded.Providers["plaid"].Fields["client_id"] != "" && loaded.Providers["plaid"].Fields["secret"] != "" && loaded.Providers["plaid"].Fields["environment"] == environment && !opts.Force {
+	if loadErr == nil && loaded.Providers["plaid"].Fields["client_id"] != "" && loaded.Providers["plaid"].Fields["client_id"] == keys.ClientID && loaded.Providers["plaid"].Fields["secret"] != "" && loaded.Providers["plaid"].Fields["environment"] == environment && !opts.Force {
 		credentialAction = "preserved_existing"
 	} else {
 		configResult, err := config.ConfigureProvider(meta.ConfigPath, opts.Profile, config.PlaidSpec, map[string]string{

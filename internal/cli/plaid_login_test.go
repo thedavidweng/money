@@ -229,6 +229,9 @@ func TestPlaidLoginJSONTimeoutReturnsStableError(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected cliError, got %#v", err)
 	}
+	if cliErr.command != "plaid.login" {
+		t.Fatalf("command = %q, want plaid.login", cliErr.command)
+	}
 	if cliErr.code != "PLAID_DASHBOARD_LOGIN_TIMEOUT" {
 		t.Fatalf("code = %q, want PLAID_DASHBOARD_LOGIN_TIMEOUT", cliErr.code)
 	}
