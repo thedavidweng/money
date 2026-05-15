@@ -72,7 +72,14 @@ func newBudgetsCreateCommand(ctx context.Context, state *runtimeState, stdout io
 		Short: "Create a budget",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if state.json && !dryRun && !confirm {
-				return fmt.Errorf("JSON budget writes require --dry-run or --confirm")
+				return cliError{
+					command:   "budgets.create",
+					code:      "CONFIRMATION_REQUIRED",
+					message:   "JSON budget writes require --dry-run or --confirm",
+					category:  contracts.CategoryValidation,
+					retryable: false,
+					exitCode:  2,
+				}
 			}
 			if name == "" || startDate == "" || endDate == "" {
 				return fmt.Errorf("budget requires --name, --start-date, and --end-date")
@@ -205,7 +212,14 @@ func newBudgetCategoriesCreateCommand(ctx context.Context, state *runtimeState, 
 		Short: "Create a budget category",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if state.json && !dryRun && !confirm {
-				return fmt.Errorf("JSON budget category writes require --dry-run or --confirm")
+				return cliError{
+					command:   "budgets.categories.create",
+					code:      "CONFIRMATION_REQUIRED",
+					message:   "JSON budget category writes require --dry-run or --confirm",
+					category:  contracts.CategoryValidation,
+					retryable: false,
+					exitCode:  2,
+				}
 			}
 			if budgetID == "" || name == "" || limitMinor <= 0 {
 				return fmt.Errorf("budget category requires --budget-id, --name, and --limit")

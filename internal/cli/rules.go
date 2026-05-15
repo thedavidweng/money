@@ -62,7 +62,14 @@ func newRulesCreateCommand(ctx context.Context, state *runtimeState, stdout io.W
 		Short: "Create a rule",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if state.json && !dryRun && !confirm {
-				return fmt.Errorf("JSON rule writes require --dry-run or --confirm")
+				return cliError{
+					command:   "rules.create",
+					code:      "CONFIRMATION_REQUIRED",
+					message:   "JSON rule writes require --dry-run or --confirm",
+					category:  contracts.CategoryValidation,
+					retryable: false,
+					exitCode:  2,
+				}
 			}
 			if name == "" || conditionField == "" || conditionOp == "" || conditionValue == "" || actionType == "" || actionValue == "" {
 				return fmt.Errorf("rule requires --name, --condition-field, --condition-op, --condition-value, --action-type, and --action-value")

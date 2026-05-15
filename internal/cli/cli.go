@@ -513,7 +513,14 @@ func newCreateManualCommand(ctx context.Context, state *runtimeState, stdout io.
 		Short: "Create a local manual account",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if state.json && !dryRun && !confirm {
-				return fmt.Errorf("JSON manual account writes require --dry-run or --confirm")
+				return cliError{
+					command:   "accounts.create_manual",
+					code:      "CONFIRMATION_REQUIRED",
+					message:   "JSON manual account writes require --dry-run or --confirm",
+					category:  contracts.CategoryValidation,
+					retryable: false,
+					exitCode:  2,
+				}
 			}
 			if strings.TrimSpace(name) == "" || strings.TrimSpace(accountType) == "" || strings.TrimSpace(balance) == "" || strings.TrimSpace(currency) == "" {
 				return fmt.Errorf("manual account requires --name, --type, --balance, and --currency")
@@ -916,9 +923,16 @@ func newImportCommand(ctx context.Context, state *runtimeState, stdout io.Writer
 			Short: "Import accounts and transactions from " + sourceName,
 			Args:  cobra.ExactArgs(1),
 			RunE: func(cmd *cobra.Command, args []string) error {
-				if state.json && !dryRun && !confirm {
-					return fmt.Errorf("JSON import writes require --dry-run or --confirm")
+			if state.json && !dryRun && !confirm {
+				return cliError{
+					command:   "import." + sourceName,
+					code:      "CONFIRMATION_REQUIRED",
+					message:   "JSON import writes require --dry-run or --confirm",
+					category:  contracts.CategoryValidation,
+					retryable: false,
+					exitCode:  2,
 				}
+			}
 				if batchID == "" {
 					batchID = time.Now().UTC().Format("20060102T150405Z")
 				}
