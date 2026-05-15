@@ -151,6 +151,44 @@ providers: {}
 	}
 }
 
+func TestLoadProviderConfigIgnoresUnrelatedProviderEnvErrors(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	key := base64.RawURLEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+
+	if err := os.WriteFile(configPath, []byte(`
+database:
+  path: ./money.db
+  encryption_key:
+    env: MONEY_DB_ENCRYPTION_KEY
+providers:
+  plaid:
+    client_id:
+      env: PLAID_CLIENT_ID
+    secret:
+      env: PLAID_SECRET
+    environment: sandbox
+  bridge:
+    client_id:
+      env: BRIDGE_CLIENT_ID
+    client_secret:
+      env: BRIDGE_CLIENT_SECRET
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("MONEY_DB_ENCRYPTION_KEY="+key+"\nPLAID_CLIENT_ID=client\nPLAID_SECRET=secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	provider, err := LoadProviderConfig(Options{ConfigPath: configPath, Env: map[string]string{}}, "plaid")
+	if err != nil {
+		t.Fatalf("LoadProviderConfig: %v", err)
+	}
+	if provider.Fields["client_id"] != "client" || provider.Fields["secret"] != "secret" || provider.Fields["environment"] != "sandbox" {
+		t.Fatalf("provider fields = %#v", provider.Fields)
+	}
+}
+
 func containsAll(value string, needles ...string) bool {
 	for _, needle := range needles {
 		if !strings.Contains(value, needle) {

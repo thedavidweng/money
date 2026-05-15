@@ -1405,6 +1405,9 @@ func plaidLoginError(command string, err error) error {
 	case plaidlogin.ErrorTeamSelectionRequired, plaidlogin.ErrorPlaidEnvironmentNotProvisioned, plaidlogin.ErrorInvalidEnum:
 		category = contracts.CategoryValidation
 		exitCode = 2
+	case plaidlogin.ErrorPlaidCredentialsOverwriteRequired:
+		category = contracts.CategorySafety
+		exitCode = 10
 	case plaidlogin.ErrorAPIKeysFetchRequired:
 		category = contracts.CategoryAuth
 		exitCode = 3

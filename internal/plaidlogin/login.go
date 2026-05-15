@@ -91,7 +91,7 @@ func RunLogin(ctx context.Context, opts LoginOptions) (LoginResult, error) {
 
 	keysWritten := 0
 	credentialAction := "written"
-	loaded, loadErr := config.Load(config.Options{ConfigPath: meta.ConfigPath, Profile: opts.Profile})
+	currentPlaid, loadErr := config.LoadProviderConfig(config.Options{ConfigPath: meta.ConfigPath, Profile: opts.Profile}, "plaid")
 
 	// Determine effective force flag.
 	// When loadErr is a MissingEnvError for plaid fields, credentials are
@@ -109,9 +109,21 @@ func RunLogin(ctx context.Context, opts LoginOptions) (LoginResult, error) {
 		}
 	}
 
-	if loadErr == nil && loaded.Providers["plaid"].Fields["client_id"] != "" && loaded.Providers["plaid"].Fields["client_id"] == keys.ClientID && loaded.Providers["plaid"].Fields["secret"] != "" && loaded.Providers["plaid"].Fields["environment"] == environment && !opts.Force {
+	currentClientID := currentPlaid.Fields["client_id"]
+	currentSecret := currentPlaid.Fields["secret"]
+	currentEnvironment := currentPlaid.Fields["environment"]
+	if !opts.Force && currentClientID != "" && currentSecret != "" && currentClientID != keys.ClientID {
+		return LoginResult{}, Error{
+			Code:    ErrorPlaidCredentialsOverwriteRequired,
+			Message: "Plaid credentials already exist for a different team; rerun with --force to overwrite them",
+		}
+	}
+	if currentClientID != "" && currentSecret != "" && currentClientID == keys.ClientID && currentSecret == secret && currentEnvironment == environment && !opts.Force {
 		credentialAction = "preserved_existing"
 	} else {
+		if currentClientID != "" || currentSecret != "" {
+			effectiveForce = true
+		}
 		configResult, err := config.ConfigureProvider(meta.ConfigPath, opts.Profile, config.PlaidSpec, map[string]string{
 			"client_id": keys.ClientID,
 			"secret":    secret,

@@ -170,6 +170,32 @@ func Load(options Options) (Config, error) {
 	return cfg, nil
 }
 
+// LoadProviderConfig resolves only one provider block without requiring the
+// rest of the config to resolve successfully.
+func LoadProviderConfig(options Options, provider string) (ProviderConfig, error) {
+	meta, raw, err := resolveMetadataAndRaw(options)
+	if err != nil {
+		return ProviderConfig{}, err
+	}
+	mergedEnv, err := mergedEnvironment(options, meta.EnvPath)
+	if err != nil {
+		return ProviderConfig{}, err
+	}
+	fields, ok := raw.Providers[provider]
+	if !ok {
+		return ProviderConfig{Fields: map[string]string{}}, nil
+	}
+	resolved := ProviderConfig{Fields: map[string]string{}}
+	for name, node := range fields {
+		value, _, err := resolveValue("providers."+provider+"."+name, node, mergedEnv, isSecretField(name))
+		if err != nil {
+			return ProviderConfig{}, err
+		}
+		resolved.Fields[name] = value
+	}
+	return resolved, nil
+}
+
 func ResolveMetadata(options Options) (Metadata, error) {
 	meta, _, err := resolveMetadataAndRaw(options)
 	return meta, err

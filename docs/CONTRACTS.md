@@ -163,6 +163,7 @@ Shared command error codes include:
 | `DASHBOARD_TOKEN_REFRESH_FAILED` | `auth` | false | 3 | Stored Dashboard refresh token cannot refresh; rerun `money plaid login`. |
 | `DASHBOARD_CONTRACT_CHANGED` | `api` | false | 6 | Plaid Dashboard private response shape no longer matches the known CLI-compatible contract. |
 | `PLAID_DASHBOARD_LOGIN_REJECTED` | `auth` | false | 3 | Plaid rejected the CLI-compatible Dashboard OAuth path. |
+| `PLAID_CREDENTIALS_OVERWRITE_REQUIRED` | `safety` | false | 10 | Existing Plaid API credentials would be replaced and `--force` is required. |
 | `PLAID_ENVIRONMENT_NOT_PROVISIONED` | `validation` | false | 2 | Dashboard returned no secret for the selected Plaid environment. |
 | `READ_ONLY_VIOLATION` | `safety` | false | 4 | The command would mutate local config, env, store, or auth files while read-only mode is enabled. |
 
