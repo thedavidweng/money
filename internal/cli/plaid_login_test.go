@@ -210,6 +210,39 @@ providers:
 	}
 }
 
+func TestPlaidLoginJSONTimeoutReturnsStableError(t *testing.T) {
+	configPath, _ := writePlaidLoginTestConfig(t)
+	var stdout, stderr bytes.Buffer
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	err := runPlaidLoginLive(ctx, &runtimeState{
+		configPath: configPath,
+		profile:    "default",
+		json:       true,
+	}, &stdout, &stderr, plaidLoginCLIOptions{
+		CommandName: "plaid.login",
+		NoOpen:      true,
+		Environment: "sandbox",
+		Force:       true,
+	})
+	cliErr, ok := err.(cliError)
+	if !ok {
+		t.Fatalf("expected cliError, got %#v", err)
+	}
+	if cliErr.code != "PLAID_DASHBOARD_LOGIN_TIMEOUT" {
+		t.Fatalf("code = %q, want PLAID_DASHBOARD_LOGIN_TIMEOUT", cliErr.code)
+	}
+	if cliErr.category != "auth" {
+		t.Fatalf("category = %q, want auth", cliErr.category)
+	}
+	if !cliErr.retryable {
+		t.Fatal("expected retryable")
+	}
+	if cliErr.exitCode != 3 {
+		t.Fatalf("exitCode = %d, want 3", cliErr.exitCode)
+	}
+}
+
 func TestPlaidLoginOverwriteValidationAllowsMissingPlaidCredentials(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")

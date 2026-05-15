@@ -1365,6 +1365,16 @@ func writePlaidLoginResult(state *runtimeState, stdout io.Writer, result plaidlo
 }
 
 func plaidLoginError(command string, err error) error {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return cliError{
+			command:   command,
+			code:      "PLAID_DASHBOARD_LOGIN_TIMEOUT",
+			message:   "Plaid Dashboard login timed out. Run the command again to retry.",
+			category:  contracts.CategoryAuth,
+			retryable: true,
+			exitCode:  3,
+		}
+	}
 	var dashErr plaidlogin.Error
 	if !errors.As(err, &dashErr) {
 		return err
