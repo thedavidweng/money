@@ -56,7 +56,7 @@ func TestRunLoginWritesFetchedKeysAndDashboardAuth(t *testing.T) {
 	if result.KeysWritten != 2 || result.CredentialAction != "written" || result.TeamID != "team_1" {
 		t.Fatalf("result = %#v", result)
 	}
-	if callbackURL != "http://localhost:49152/oauth/callback" {
+	if callbackURL != "http://127.0.0.1:49152/oauth/callback" {
 		t.Fatalf("redirect_uri = %q", callbackURL)
 	}
 	envContent, err := os.ReadFile(envPath)

@@ -13,7 +13,7 @@ const (
 	TokenURL     = "https://api.dashboard.plaid.com/oauth/token"
 	ClientID     = "plaid-cli"
 	BindHost     = "127.0.0.1"
-	RedirectHost = "localhost"
+	RedirectHost = "127.0.0.1"
 
 	// Plaid Dashboard APIs are private; this contract was last verified against this Plaid CLI build.
 	PlaidCLICompatibilityVersion = "20260507-4d1b0ca0"

@@ -21,7 +21,7 @@ func TestExchangeCodeUsesPKCEFormBody(t *testing.T) {
 		}
 		assertForm(t, r.PostForm, "grant_type", "authorization_code")
 		assertForm(t, r.PostForm, "code", "auth-code")
-		assertForm(t, r.PostForm, "redirect_uri", "http://localhost:49152/oauth/callback")
+		assertForm(t, r.PostForm, "redirect_uri", "http://127.0.0.1:49152/oauth/callback")
 		assertForm(t, r.PostForm, "client_id", ClientID)
 		assertForm(t, r.PostForm, "code_verifier", "verifier")
 		json.NewEncoder(w).Encode(map[string]any{

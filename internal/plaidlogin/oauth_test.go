@@ -23,7 +23,7 @@ func TestBuildAuthURLUsesPlaidCLICompatiblePKCE(t *testing.T) {
 	}
 	values := parsed.Query()
 	assertQuery(t, values, "client_id", "plaid-cli")
-	assertQuery(t, values, "redirect_uri", "http://localhost:49152/oauth/callback")
+	assertQuery(t, values, "redirect_uri", "http://127.0.0.1:49152/oauth/callback")
 	assertQuery(t, values, "response_type", "code")
 	assertQuery(t, values, "state", "state-123")
 	assertQuery(t, values, "code_challenge_method", "S256")
@@ -32,11 +32,11 @@ func TestBuildAuthURLUsesPlaidCLICompatiblePKCE(t *testing.T) {
 	}
 }
 
-func TestBindAndRedirectHostsAreIntentionallyDifferent(t *testing.T) {
+func TestBindAndRedirectHostsMatch(t *testing.T) {
 	if BindHost != "127.0.0.1" {
 		t.Fatalf("BindHost = %q", BindHost)
 	}
-	if RedirectHost != "localhost" {
+	if RedirectHost != "127.0.0.1" {
 		t.Fatalf("RedirectHost = %q", RedirectHost)
 	}
 }
