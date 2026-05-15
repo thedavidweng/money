@@ -21,6 +21,23 @@ type Store interface {
 	ListHoldings(ctx context.Context) ([]core.InvestmentHolding, error)
 	ListSecurities(ctx context.Context) ([]core.InvestmentSecurity, error)
 	ListLiabilities(ctx context.Context) ([]core.Liability, error)
+	UpsertImportedAccount(ctx context.Context, account core.Account) error
+	UpsertImportedTransaction(ctx context.Context, tx core.Transaction, sourceRowHash string) (bool, []string, error)
+	CashflowSummary(ctx context.Context, from, to, period, currency string) ([]core.CashflowPeriod, error)
+	NetWorth(ctx context.Context) (core.NetWorth, error)
+	ListBudgets(ctx context.Context) ([]core.Budget, error)
+	CreateBudget(ctx context.Context, budget core.Budget) (core.Budget, error)
+	UpdateBudget(ctx context.Context, budget core.Budget) (core.Budget, error)
+	DeleteBudget(ctx context.Context, id string) error
+	GetBudget(ctx context.Context, id string) (core.Budget, error)
+	ListBudgetCategories(ctx context.Context, budgetID string) ([]core.BudgetCategory, error)
+	CreateBudgetCategory(ctx context.Context, bc core.BudgetCategory) (core.BudgetCategory, error)
+	DeleteBudgetCategory(ctx context.Context, id string) error
+	ListRules(ctx context.Context) ([]core.Rule, error)
+	CreateRule(ctx context.Context, rule core.Rule) (core.Rule, error)
+	UpdateRule(ctx context.Context, rule core.Rule) (core.Rule, error)
+	DeleteRule(ctx context.Context, id string) error
+	ApplyRules(ctx context.Context) (core.ApplyRulesResult, error)
 }
 
 type TransactionListQuery struct {

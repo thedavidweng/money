@@ -39,10 +39,10 @@ Existing personal finance tools either lock data behind a paid SaaS, embed opini
 ### Quick Start
 
 ```bash
-# Install via Homebrew (macOS/Linux)
-brew install thedavidweng/tap/money
+# Install via Homebrew Cask (macOS/Linux)
+brew install --cask thedavidweng/tap/money
 
-# Or install via Go (cross-platform)
+# Or install via Go (macOS/Linux/cross-platform)
 go install github.com/thedavidweng/money/cmd/money@latest
 
 # Initialize configuration and encrypted database (interactive)
@@ -56,6 +56,17 @@ money sync
 money accounts list --json
 money transactions search "Costco" --json
 ```
+
+If you installed an older Homebrew formula release, migrate to the cask:
+
+```bash
+brew update
+brew uninstall --formula thedavidweng/tap/money
+brew install --cask thedavidweng/tap/money
+money version
+```
+
+Your local `~/.money` config, secrets, and database are not removed by uninstalling the old formula.
 
 Try it without real credentials:
 
@@ -91,6 +102,9 @@ money items remove <id>             Remove a linked provider item with cascade d
 # Provider Management
 money link                          Link a financial institution
 money providers configure <provider> Configure provider credentials
+money plaid login                    Sign in to Plaid Dashboard and fetch API keys
+money plaid logout                   Remove Plaid Dashboard auth; keep API keys
+money plaid sandbox link             Create and store a Plaid Sandbox Provider Item
 money providers plaid link          Link a Plaid Provider Item
 money providers bridge link         Link a Bridge Provider Item
 money sync                          Sync linked provider data (supports --start-date/--end-date)

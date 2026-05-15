@@ -30,6 +30,13 @@ type Config struct {
 	Warnings                   []contracts.Warning
 }
 
+type Metadata struct {
+	ConfigPath   string
+	EnvPath      string
+	DatabasePath string
+	ReadOnly     bool
+}
+
 type ProviderConfig struct {
 	Fields map[string]string
 }
@@ -76,6 +83,15 @@ type envReference struct {
 	Name string
 }
 
+type MissingEnvError struct {
+	Path string
+	Name string
+}
+
+func (e MissingEnvError) Error() string {
+	return fmt.Sprintf("%s references missing environment variable %s", e.Path, e.Name)
+}
+
 func validateProfile(profile string) error {
 	if profile == "" || profile == "default" {
 		return nil
@@ -105,56 +121,20 @@ func DefaultConfigPath(profile string) string {
 }
 
 func Load(options Options) (Config, error) {
-	if err := validateProfile(options.Profile); err != nil {
-		return Config{}, err
-	}
-	configPath := options.ConfigPath
-	if configPath == "" {
-		configPath = options.Env["MONEY_CONFIG"]
-	}
-	if configPath == "" {
-		configPath = DefaultConfigPath(options.Profile)
-	}
-	configPath = expandHome(configPath)
-	configPath, err := filepath.Abs(configPath)
+	meta, raw, err := resolveMetadataAndRaw(options)
 	if err != nil {
 		return Config{}, err
 	}
+	configPath := meta.ConfigPath
 
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		return Config{}, fmt.Errorf("read config %s: %w", configPath, err)
-	}
-	var raw rawConfig
-	if err := yaml.Unmarshal(content, &raw); err != nil {
-		return Config{}, err
-	}
-
-	envPath := raw.EnvFile
-	if envPath == "" {
-		envPath = filepath.Join(filepath.Dir(configPath), ".env")
-	} else if !filepath.IsAbs(envPath) {
-		envPath = filepath.Join(filepath.Dir(configPath), envPath)
-	}
-
-	mergedEnv := map[string]string{}
-	fileEnv, err := readDotEnv(envPath)
+	mergedEnv, err := mergedEnvironment(options, meta.EnvPath)
 	if err != nil {
 		return Config{}, err
-	}
-	for key, value := range fileEnv {
-		mergedEnv[key] = value
-	}
-	if options.Env == nil {
-		options.Env = processEnv()
-	}
-	for key, value := range options.Env {
-		mergedEnv[key] = value
 	}
 
 	cfg := Config{
 		ConfigPath: configPath,
-		EnvPath:    envPath,
+		EnvPath:    meta.EnvPath,
 		ReadOnly:   raw.ReadOnly || mergedEnv["MONEY_READ_ONLY"] == "1",
 		Providers:  map[string]ProviderConfig{},
 	}
@@ -190,6 +170,88 @@ func Load(options Options) (Config, error) {
 	return cfg, nil
 }
 
+// LoadProviderConfig resolves only one provider block without requiring the
+// rest of the config to resolve successfully.
+func LoadProviderConfig(options Options, provider string) (ProviderConfig, error) {
+	meta, raw, err := resolveMetadataAndRaw(options)
+	if err != nil {
+		return ProviderConfig{}, err
+	}
+	mergedEnv, err := mergedEnvironment(options, meta.EnvPath)
+	if err != nil {
+		return ProviderConfig{}, err
+	}
+	fields, ok := raw.Providers[provider]
+	if !ok {
+		return ProviderConfig{Fields: map[string]string{}}, nil
+	}
+	resolved := ProviderConfig{Fields: map[string]string{}}
+	for name, node := range fields {
+		value, _, err := resolveValue("providers."+provider+"."+name, node, mergedEnv, isSecretField(name))
+		if err != nil {
+			return ProviderConfig{}, err
+		}
+		resolved.Fields[name] = value
+	}
+	return resolved, nil
+}
+
+func ResolveMetadata(options Options) (Metadata, error) {
+	meta, _, err := resolveMetadataAndRaw(options)
+	return meta, err
+}
+
+func resolveMetadataAndRaw(options Options) (Metadata, rawConfig, error) {
+	if err := validateProfile(options.Profile); err != nil {
+		return Metadata{}, rawConfig{}, err
+	}
+	if options.Env == nil {
+		options.Env = processEnv()
+	}
+	configPath := options.ConfigPath
+	if configPath == "" {
+		configPath = options.Env["MONEY_CONFIG"]
+	}
+	if configPath == "" {
+		configPath = DefaultConfigPath(options.Profile)
+	}
+	configPath = expandHome(configPath)
+	absConfigPath, err := filepath.Abs(configPath)
+	if err != nil {
+		return Metadata{}, rawConfig{}, err
+	}
+	content, err := os.ReadFile(absConfigPath)
+	if err != nil {
+		return Metadata{}, rawConfig{}, fmt.Errorf("read config %s: %w", absConfigPath, err)
+	}
+	var raw rawConfig
+	if err := yaml.Unmarshal(content, &raw); err != nil {
+		return Metadata{}, rawConfig{}, err
+	}
+	envPath := raw.EnvFile
+	if envPath == "" {
+		envPath = filepath.Join(filepath.Dir(absConfigPath), ".env")
+	} else {
+		envPath = expandHome(envPath)
+		if !filepath.IsAbs(envPath) {
+			envPath = filepath.Join(filepath.Dir(absConfigPath), envPath)
+		}
+	}
+	meta := Metadata{
+		ConfigPath: absConfigPath,
+		EnvPath:    filepath.Clean(envPath),
+	}
+	if raw.Database.Path != "" {
+		meta.DatabasePath = resolvePath(raw.Database.Path, filepath.Dir(absConfigPath))
+	}
+	mergedEnv, err := mergedEnvironment(options, meta.EnvPath)
+	if err != nil {
+		return Metadata{}, rawConfig{}, err
+	}
+	meta.ReadOnly = raw.ReadOnly || mergedEnv["MONEY_READ_ONLY"] == "1"
+	return meta, raw, nil
+}
+
 func decodeDatabaseKey(value string) ([]byte, error) {
 	key, err := base64.RawURLEncoding.DecodeString(value)
 	if err != nil {
@@ -206,7 +268,7 @@ func resolveValue(path string, node yamlNode, env map[string]string, secret bool
 	case envReference:
 		resolved, ok := env[value.Name]
 		if !ok || resolved == "" {
-			return "", nil, fmt.Errorf("%s references missing environment variable %s", path, value.Name)
+			return "", nil, MissingEnvError{Path: path, Name: value.Name}
 		}
 		return resolved, nil, nil
 	case string:
@@ -251,6 +313,24 @@ func readDotEnv(path string) (map[string]string, error) {
 		values[strings.TrimSpace(key)] = strings.Trim(strings.TrimSpace(value), `"`)
 	}
 	return values, scanner.Err()
+}
+
+func mergedEnvironment(options Options, envPath string) (map[string]string, error) {
+	merged := map[string]string{}
+	fileEnv, err := readDotEnv(envPath)
+	if err != nil {
+		return nil, err
+	}
+	for key, value := range fileEnv {
+		merged[key] = value
+	}
+	if options.Env == nil {
+		options.Env = processEnv()
+	}
+	for key, value := range options.Env {
+		merged[key] = value
+	}
+	return merged, nil
 }
 
 func processEnv() map[string]string {

@@ -22,21 +22,22 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: website/package-lock.json
+          node-version: '22.12.0'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3'
       - name: Install and build
         run: |
-          npm ci
-          npm audit --audit-level=high
-          npm run build
+          bun install --frozen-lockfile
+          bun run test
+          bun run build
         working-directory: website
       - name: Upload Pages artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: website/dist
 
@@ -52,4 +53,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

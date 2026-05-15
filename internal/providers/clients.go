@@ -65,6 +65,23 @@ func (c PlaidClient) CreateLinkToken(ctx context.Context, request plaid.LinkToke
 	return response.GetLinkToken(), nil
 }
 
+func (c PlaidClient) CreateSandboxPublicToken(ctx context.Context, institutionID string, products []plaid.Products) (string, error) {
+	request := plaid.NewSandboxPublicTokenCreateRequest(institutionID, products)
+	response, httpResponse, err := c.APIClient.PlaidApi.SandboxPublicTokenCreate(ctx).SandboxPublicTokenCreateRequest(*request).Execute()
+	if err != nil {
+		if httpResponse != nil {
+			return "", ProviderAPIError{
+				Provider:   "plaid",
+				StatusCode: httpResponse.StatusCode,
+				Code:       httpResponse.Status,
+				Message:    err.Error(),
+			}
+		}
+		return "", err
+	}
+	return response.GetPublicToken(), nil
+}
+
 func (c PlaidClient) ExchangePublicToken(ctx context.Context, publicToken string) (PlaidPublicTokenExchangeResult, error) {
 	request := plaid.NewItemPublicTokenExchangeRequest(publicToken)
 	response, httpResponse, err := c.APIClient.PlaidApi.ItemPublicTokenExchange(ctx).ItemPublicTokenExchangeRequest(*request).Execute()

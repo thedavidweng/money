@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"time"
 
 	"github.com/thedavidweng/money/internal/providers"
@@ -110,22 +111,66 @@ func (h *PlaidLinkHelper) handleIndex(w http.ResponseWriter, r *http.Request) {
 func (h *PlaidLinkHelper) handleCallback(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		select {
+		case h.callback <- providers.LinkCallback{
+			Status: "error",
+			Error:  providers.LinkError{Type: "CALLBACK_ERROR", Code: "METHOD_NOT_ALLOWED", Message: "callback received invalid HTTP method"},
+		}:
+		default:
+		}
+		return
+	}
+	if !validCallbackOrigin(r) {
+		http.Error(w, "invalid origin", http.StatusForbidden)
+		select {
+		case h.callback <- providers.LinkCallback{
+			Status: "error",
+			Error:  providers.LinkError{Type: "ORIGIN_ERROR", Code: "ORIGIN_VALIDATION_FAILED", Message: "callback request failed origin validation"},
+		}:
+		default:
+		}
 		return
 	}
 	var payload struct {
 		PublicToken string                 `json:"public_token"`
 		State       string                 `json:"state"`
+		Status      string                 `json:"status"`
 		Metadata    providers.LinkMetadata `json:"metadata"`
+		Error       providers.LinkError    `json:"error"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "invalid callback", http.StatusBadRequest)
+		select {
+		case h.callback <- providers.LinkCallback{
+			Status: "error",
+			Error:  providers.LinkError{Type: "CALLBACK_ERROR", Code: "INVALID_CALLBACK_PAYLOAD", Message: "failed to decode callback body"},
+		}:
+		default:
+		}
 		return
 	}
 	if payload.State != h.state {
 		http.Error(w, "invalid state", http.StatusForbidden)
+		select {
+		case h.callback <- providers.LinkCallback{
+			Status: "error",
+			Error:  providers.LinkError{Type: "CALLBACK_ERROR", Code: "INVALID_STATE", Message: "callback state does not match link session state"},
+		}:
+		default:
+		}
 		return
 	}
-	callback := providers.LinkCallback{PublicToken: payload.PublicToken, State: payload.State, Metadata: payload.Metadata}
+	status := payload.Status
+	if status == "" {
+		status = "success"
+	}
+	callback := providers.LinkCallback{
+		PublicToken: payload.PublicToken,
+		State:       payload.State,
+		Status:      status,
+		Metadata:    payload.Metadata,
+		Error:       payload.Error,
+	}
 	select {
 	case h.callback <- callback:
 	default:
@@ -133,6 +178,26 @@ func (h *PlaidLinkHelper) handleCallback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	fmt.Fprint(w, "ok")
+}
+
+func validCallbackOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Scheme != "http" || parsed.Host == "" {
+		return false
+	}
+	if parsed.Host != r.Host {
+		return false
+	}
+	host := parsed.Hostname()
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 var plaidLinkPage = template.Must(template.New("plaid-link").Parse(`<!doctype html>
@@ -147,7 +212,14 @@ const handler = Plaid.create({
     fetch("/callback", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({public_token: public_token, state: {{printf "%q" .State}}, metadata: metadata})
+      body: JSON.stringify({status: "success", public_token: public_token, state: {{printf "%q" .State}}, metadata: metadata})
+    });
+  },
+  onExit: function(err, metadata) {
+    fetch("/callback", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({status: err ? "error" : "cancel", state: {{printf "%q" .State}}, error: err, metadata: metadata})
     });
   }
 });

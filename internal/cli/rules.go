@@ -1,0 +1,172 @@
+package cli
+
+import (
+	"context"
+	"fmt"
+	"io"
+
+	"github.com/olekukonko/tablewriter"
+	"github.com/spf13/cobra"
+
+	"github.com/thedavidweng/money/internal/contracts"
+	"github.com/thedavidweng/money/internal/core"
+)
+
+func newRulesCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
+	cmd := &cobra.Command{Use: "rules"}
+	cmd.AddCommand(newRulesListCommand(ctx, state, stdout))
+	cmd.AddCommand(newRulesCreateCommand(ctx, state, stdout))
+	cmd.AddCommand(newRulesDeleteCommand(ctx, state, stdout))
+	cmd.AddCommand(newRulesApplyCommand(ctx, state, stdout))
+	return cmd
+}
+
+func newRulesListCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
+		Short: "List active rules",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return err
+			}
+			rules, err := activeStore.ListRules(ctx)
+			if err != nil {
+				return err
+			}
+			if !state.json {
+				table := tablewriter.NewWriter(stdout)
+				table.SetHeader([]string{"NAME", "IF", "THEN", "PRIORITY"})
+				table.SetBorder(false)
+				for _, r := range rules {
+					condition := fmt.Sprintf("%s %s %q", r.ConditionField, r.ConditionOp, r.ConditionValue)
+					action := fmt.Sprintf("%s %q", r.ActionType, r.ActionValue)
+					table.Append([]string{r.Name, condition, action, fmt.Sprintf("%d", r.Priority)})
+				}
+				table.Render()
+				return nil
+			}
+			env := contracts.NewSuccess("rules.list", map[string]any{"rules": rules})
+			env.Meta.Demo = state.demo
+			return contracts.WriteJSON(stdout, env)
+		},
+	}
+}
+
+func newRulesCreateCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
+	var name, conditionField, conditionOp, conditionValue, actionType, actionValue string
+	var priority int
+	var dryRun, confirm bool
+	cmd := &cobra.Command{
+		Use:   "create",
+		Short: "Create a rule",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if state.json && !dryRun && !confirm {
+				return cliError{
+					command:   "rules.create",
+					code:      "CONFIRMATION_REQUIRED",
+					message:   "JSON rule writes require --dry-run or --confirm",
+					category:  contracts.CategoryValidation,
+					retryable: false,
+					exitCode:  2,
+				}
+			}
+			if name == "" || conditionField == "" || conditionOp == "" || conditionValue == "" || actionType == "" || actionValue == "" {
+				return fmt.Errorf("rule requires --name, --condition-field, --condition-op, --condition-value, --action-type, and --action-value")
+			}
+			rule := core.Rule{
+				Name:           name,
+				ConditionField: conditionField,
+				ConditionOp:    conditionOp,
+				ConditionValue: conditionValue,
+				ActionType:     actionType,
+				ActionValue:    actionValue,
+				Priority:       priority,
+				Enabled:        true,
+			}
+			if dryRun {
+				if state.json {
+					env := contracts.NewSuccess("rules.create", map[string]any{"dry_run": true, "rule": rule})
+					env.Meta.Demo = state.demo
+					return contracts.WriteJSON(stdout, env)
+				}
+				fmt.Fprintf(stdout, "Would create rule %q: if %s %s %q then %s %q (priority %d)\n",
+					rule.Name, rule.ConditionField, rule.ConditionOp, rule.ConditionValue, rule.ActionType, rule.ActionValue, rule.Priority)
+				return nil
+			}
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return err
+			}
+			created, err := activeStore.CreateRule(ctx, rule)
+			if err != nil {
+				return err
+			}
+			if state.json {
+				env := contracts.NewSuccess("rules.create", map[string]any{"rule": created})
+				env.Meta.Demo = state.demo
+				return contracts.WriteJSON(stdout, env)
+			}
+			fmt.Fprintf(stdout, "Created rule %s (%s)\n", created.Name, created.ID)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&name, "name", "", "rule name")
+	cmd.Flags().StringVar(&conditionField, "condition-field", "", "field to match: merchant_name or name")
+	cmd.Flags().StringVar(&conditionOp, "condition-op", "", "operator: contains or equals")
+	cmd.Flags().StringVar(&conditionValue, "condition-value", "", "value to match")
+	cmd.Flags().StringVar(&actionType, "action-type", "", "action: set_category or set_note")
+	cmd.Flags().StringVar(&actionValue, "action-value", "", "action value")
+	cmd.Flags().IntVar(&priority, "priority", 0, "rule priority (higher first)")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show write plan without saving")
+	cmd.Flags().BoolVar(&confirm, "confirm", false, "save the rule")
+	return cmd
+}
+
+func newRulesDeleteCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
+	return &cobra.Command{
+		Use:   "delete <id>",
+		Short: "Delete a rule",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return err
+			}
+			if err := activeStore.DeleteRule(ctx, args[0]); err != nil {
+				return err
+			}
+			if state.json {
+				env := contracts.NewSuccess("rules.delete", map[string]string{"id": args[0]})
+				env.Meta.Demo = state.demo
+				return contracts.WriteJSON(stdout, env)
+			}
+			fmt.Fprintf(stdout, "Deleted rule %s\n", args[0])
+			return nil
+		},
+	}
+}
+
+func newRulesApplyCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
+	return &cobra.Command{
+		Use:   "apply",
+		Short: "Apply all enabled rules to transactions",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return err
+			}
+			result, err := activeStore.ApplyRules(ctx)
+			if err != nil {
+				return err
+			}
+			if !state.json {
+				fmt.Fprintf(stdout, "Updated %d transactions\n", result.TransactionsUpdated)
+				return nil
+			}
+			env := contracts.NewSuccess("rules.apply", map[string]any{"result": result})
+			env.Meta.Demo = state.demo
+			return contracts.WriteJSON(stdout, env)
+		},
+	}
+}

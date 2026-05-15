@@ -4,11 +4,15 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"fmt"
+	"io"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/thedavidweng/money/internal/config"
+	"github.com/thedavidweng/money/internal/plaidlogin"
+	"github.com/thedavidweng/money/internal/prompt"
 )
 
 // promptForProviderCredentials tests
@@ -143,11 +147,12 @@ func TestRunSetupWizardSkip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stdin := strings.NewReader("3\n")
+	stdin := strings.NewReader("")
 	state := &runtimeState{
 		configPath: result.ConfigPath,
 		profile:    "default",
 		stdin:      stdin,
+		prompter:   prompt.NewFake("skip"),
 	}
 	diags := []Diagnostic{
 		{Section: "Providers", Code: "PROVIDER_NOT_CONFIGURED", Status: "warn", Message: "plaid is not configured"},
@@ -158,38 +163,31 @@ func TestRunSetupWizardSkip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(stdout.String(), "Skip for now") {
-		t.Fatal("should show skip option")
-	}
 	if !strings.Contains(stdout.String(), "You can always run") {
 		t.Fatal("should show skip confirmation")
 	}
 }
 
-func TestRunSetupWizardInvalidChoice(t *testing.T) {
+func TestRunSetupWizardPromptFailure(t *testing.T) {
 	dir := t.TempDir()
 	result, err := config.Setup(filepath.Join(dir, "config.yaml"), "default", false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// With only 1 unconfigured provider, skip is option 2.
-	stdin := strings.NewReader("abc\n2\n")
 	state := &runtimeState{
 		configPath: result.ConfigPath,
 		profile:    "default",
-		stdin:      stdin,
+		stdin:      strings.NewReader(""),
+		prompter:   prompt.NewFake("missing"),
 	}
 	diags := []Diagnostic{
 		{Section: "Providers", Code: "PROVIDER_NOT_CONFIGURED", Status: "warn", Message: "plaid is not configured"},
 	}
 	var stdout bytes.Buffer
 	err = runSetupWizard(context.Background(), state, &stdout, diags)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(stdout.String(), "Invalid choice") {
-		t.Fatal("should show invalid choice message")
+	if err == nil {
+		t.Fatal("expected prompt failure")
 	}
 }
 
@@ -204,12 +202,13 @@ func TestRunSetupWizardSelectPlaidAndConfigure(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Select 1 (plaid), press Enter at browser prompt, enter client-id, enter secret, enter n (don't continue)
-	stdin := strings.NewReader("1\n\nmy-client-id\nmy-secret\nn\n")
+	// Select plaid, press Enter at browser prompt, enter client-id, enter secret, enter n (don't continue)
+	stdin := strings.NewReader("\nmy-client-id\nmy-secret\nn\n")
 	state := &runtimeState{
 		configPath: result.ConfigPath,
 		profile:    "default",
 		stdin:      stdin,
+		prompter:   prompt.NewFake("plaid", "manual"),
 	}
 	diags := []Diagnostic{
 		{Section: "Providers", Code: "PROVIDER_NOT_CONFIGURED", Status: "warn", Message: "plaid is not configured"},
@@ -237,6 +236,139 @@ func TestRunSetupWizardSelectPlaidAndConfigure(t *testing.T) {
 	}
 }
 
+func TestRunSetupWizardSelectPlaidAndSkipMethodWritesNothing(t *testing.T) {
+	dir := t.TempDir()
+	result, err := config.Setup(filepath.Join(dir, "config.yaml"), "default", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := &runtimeState{
+		configPath: result.ConfigPath,
+		profile:    "default",
+		stdin:      strings.NewReader(""),
+		prompter:   prompt.NewFake("plaid", "skip"),
+	}
+	diags := []Diagnostic{
+		{Section: "Providers", Code: "PROVIDER_NOT_CONFIGURED", Status: "warn", Message: "plaid is not configured"},
+	}
+	var stdout bytes.Buffer
+	if err := runSetupWizard(context.Background(), state, &stdout, diags); err != nil {
+		t.Fatalf("runSetupWizard: %v", err)
+	}
+	cfg, err := config.Load(config.Options{ConfigPath: result.ConfigPath, Profile: "default"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := cfg.Providers["plaid"]; ok {
+		t.Fatal("plaid provider was written after skip")
+	}
+}
+
+func TestRunSetupWizardSelectPlaidDashboardLogin(t *testing.T) {
+	oldRunPlaidLogin := runPlaidLoginCLI
+	t.Cleanup(func() { runPlaidLoginCLI = oldRunPlaidLogin })
+	var called bool
+	runPlaidLoginCLI = func(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer, opts plaidLoginCLIOptions) error {
+		called = true
+		if opts.CommandName != "plaid.login" || opts.Environment != "sandbox" {
+			t.Fatalf("opts = %#v", opts)
+		}
+		if _, err := fmt.Fprintln(stderr, "oauth progress"); err != nil {
+			return err
+		}
+		return writePlaidLoginResult(state, stdout, plaidlogin.LoginResult{
+			Provider:          "plaid",
+			TeamID:            "team_1",
+			Environment:       "sandbox",
+			KeysWritten:       2,
+			CredentialAction:  "written",
+			DashboardAuthPath: filepath.Join(filepath.Dir(state.configPath), "plaid-dashboard-auth.json"),
+			NextCommand:       "money link <institution-query>",
+			ConfigPath:        state.configPath,
+			EnvPath:           filepath.Join(filepath.Dir(state.configPath), ".env"),
+		}, opts.CommandName)
+	}
+	dir := t.TempDir()
+	result, err := config.Setup(filepath.Join(dir, "config.yaml"), "default", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	state := &runtimeState{
+		configPath: result.ConfigPath,
+		profile:    "default",
+		stdin:      strings.NewReader(""),
+		stderr:     &stderr,
+		prompter:   prompt.NewFake("plaid", "dashboard"),
+	}
+	diags := []Diagnostic{
+		{Section: "Providers", Code: "PROVIDER_NOT_CONFIGURED", Status: "warn", Message: "plaid is not configured"},
+	}
+	var stdout bytes.Buffer
+	if err := runSetupWizard(context.Background(), state, &stdout, diags); err != nil {
+		t.Fatalf("runSetupWizard: %v", err)
+	}
+	if !called {
+		t.Fatal("dashboard login was not called")
+	}
+	if !strings.Contains(stdout.String(), "Plaid Dashboard login complete") {
+		t.Fatalf("stdout = %s", stdout.String())
+	}
+	if strings.Contains(stdout.String(), "oauth progress") {
+		t.Fatalf("OAuth progress should not be written to setup stdout: %s", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "oauth progress") {
+		t.Fatalf("OAuth progress missing from setup stderr: %s", stderr.String())
+	}
+}
+
+func TestRunInteractiveProviderConfigureRequiresForceOrHumanConfirmationForExistingCredentials(t *testing.T) {
+	dir := t.TempDir()
+	result, err := config.Setup(filepath.Join(dir, "config.yaml"), "default", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := config.ConfigureProvider(result.ConfigPath, "default", config.PlaidSpec, map[string]string{
+		"client_id": "existing-client",
+		"secret":    "existing-secret",
+	}, map[string]string{"environment": "sandbox"}, false); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := newConfigureCommand(&runtimeState{}, io.Discard)
+	cmd.SetArgs([]string{"plaid", "--client-id", "new-client", "--secret", "new-secret"})
+	if err := cmd.ParseFlags([]string{"plaid", "--client-id", "new-client", "--secret", "new-secret"}); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	err = runInteractiveProviderConfigure(&runtimeState{
+		configPath: result.ConfigPath,
+		profile:    "default",
+		json:       true,
+	}, &stdout, "plaid", cmd, nil)
+	cliErr, ok := err.(cliError)
+	if !ok || cliErr.code != "CONFIRMATION_REQUIRED" || cliErr.exitCode != 10 {
+		t.Fatalf("err = %#v", err)
+	}
+
+	state := &runtimeState{
+		configPath: result.ConfigPath,
+		profile:    "default",
+		stdin:      strings.NewReader(""),
+		prompter:   prompt.NewFake("yes"),
+	}
+	if err := runInteractiveProviderConfigure(state, &stdout, "plaid", cmd, nil); err != nil {
+		t.Fatalf("human confirmed configure: %v", err)
+	}
+	cfg, err := config.Load(config.Options{ConfigPath: result.ConfigPath, Profile: "default"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Providers["plaid"].Fields["client_id"] != "new-client" || cfg.Providers["plaid"].Fields["secret"] != "new-secret" {
+		t.Fatalf("fields = %#v", cfg.Providers["plaid"].Fields)
+	}
+}
+
 func TestRunSetupWizardConfigureAllProviders(t *testing.T) {
 	origOpenBrowser := openBrowser
 	openBrowser = func(url string) error { return nil }
@@ -248,12 +380,13 @@ func TestRunSetupWizardConfigureAllProviders(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Select 1 (plaid), enter credentials, y (continue), 1 (bridge), enter credentials, n
-	stdin := strings.NewReader("1\n\nplaid-id\nplaid-secret\ny\n1\n\nbridge-id\nbridge-secret\nn\n")
+	// Select plaid, enter credentials, continue, select bridge, enter credentials.
+	stdin := strings.NewReader("\nplaid-id\nplaid-secret\ny\n\nbridge-id\nbridge-secret\nn\n")
 	state := &runtimeState{
 		configPath: result.ConfigPath,
 		profile:    "default",
 		stdin:      stdin,
+		prompter:   prompt.NewFake("plaid", "manual", "bridge"),
 	}
 	diags := []Diagnostic{
 		{Section: "Providers", Code: "PROVIDER_NOT_CONFIGURED", Status: "warn", Message: "plaid is not configured"},

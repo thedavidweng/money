@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	plaid "github.com/plaid/plaid-go/v40/plaid"
@@ -13,13 +14,16 @@ func TestPlaidProviderCreateLinkSessionCreatesPlaidLinkToken(t *testing.T) {
 	client := &fakePlaidLinkTokenClient{linkToken: "link-sandbox-token"}
 	provider := plaidProvider{
 		cfg: config.ProviderConfig{Fields: map[string]string{
-			"client_id":      "client-id",
-			"secret":         "secret",
-			"environment":    "sandbox",
-			"products":       "transactions,liabilities",
-			"country_codes":  "US,CA",
-			"redirect_uri":   "http://127.0.0.1:4000/callback",
-			"institution_id": "ignored",
+			"client_id":                      "client-id",
+			"secret":                         "secret",
+			"environment":                    "sandbox",
+			"products":                       "transactions,liabilities",
+			"country_codes":                  "US,CA",
+			"redirect_uri":                   "http://127.0.0.1:4000/callback",
+			"institution_id":                 "ignored",
+			"additional_consented_products":  "investments",
+			"required_if_supported_products": "liabilities",
+			"optional_products":              "auth",
 		}},
 		client: client,
 	}
@@ -51,6 +55,15 @@ func TestPlaidProviderCreateLinkSessionCreatesPlaidLinkToken(t *testing.T) {
 	}
 	if request.InstitutionId == nil || *request.InstitutionId != "ins_123" {
 		t.Fatalf("institution id = %#v", request.InstitutionId)
+	}
+	if len(request.AdditionalConsentedProducts) != 1 || request.AdditionalConsentedProducts[0] != plaid.PRODUCTS_INVESTMENTS {
+		t.Fatalf("additional consented products = %#v", request.AdditionalConsentedProducts)
+	}
+	if len(request.RequiredIfSupportedProducts) != 1 || request.RequiredIfSupportedProducts[0] != plaid.PRODUCTS_LIABILITIES {
+		t.Fatalf("required if supported products = %#v", request.RequiredIfSupportedProducts)
+	}
+	if len(request.OptionalProducts) != 1 || request.OptionalProducts[0] != plaid.PRODUCTS_AUTH {
+		t.Fatalf("optional products = %#v", request.OptionalProducts)
 	}
 }
 
@@ -159,6 +172,47 @@ func TestPlaidProviderExchangeLinkTokenExchangesPublicTokenAndMapsLinkedItem(t *
 	}
 }
 
+func TestPlaidProviderCreateSandboxPublicToken(t *testing.T) {
+	client := &fakePlaidLinkTokenClient{sandboxPublicToken: "public-sandbox"}
+	provider := plaidProvider{
+		cfg: config.ProviderConfig{Fields: map[string]string{
+			"client_id": "client-id",
+			"secret":    "secret",
+		}},
+		client: client,
+	}
+	publicToken, err := provider.CreateSandboxPublicToken(context.Background(), SandboxPublicTokenRequest{
+		InstitutionID: "ins_56",
+		Products:      []string{"transactions", "liabilities"},
+	})
+	if err != nil {
+		t.Fatalf("CreateSandboxPublicToken: %v", err)
+	}
+	if publicToken != "public-sandbox" {
+		t.Fatalf("publicToken = %q", publicToken)
+	}
+	if client.sandboxInstitutionID != "ins_56" {
+		t.Fatalf("institution = %q", client.sandboxInstitutionID)
+	}
+	if len(client.sandboxProducts) != 2 || client.sandboxProducts[0] != plaid.PRODUCTS_TRANSACTIONS || client.sandboxProducts[1] != plaid.PRODUCTS_LIABILITIES {
+		t.Fatalf("products = %#v", client.sandboxProducts)
+	}
+}
+
+func TestPlaidProviderCreateSandboxPublicTokenRejectsBalance(t *testing.T) {
+	provider := plaidProvider{
+		cfg:    config.ProviderConfig{Fields: map[string]string{"client_id": "client-id", "secret": "secret"}},
+		client: &fakePlaidLinkTokenClient{},
+	}
+	_, err := provider.CreateSandboxPublicToken(context.Background(), SandboxPublicTokenRequest{
+		InstitutionID: "ins_56",
+		Products:      []string{"balance"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "unsupported Plaid Link product") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestPlaidProviderExchangeLinkTokenRejectsStateMismatch(t *testing.T) {
 	provider := plaidProvider{
 		cfg:    config.ProviderConfig{Fields: map[string]string{"client_id": "client-id", "secret": "secret"}},
@@ -254,21 +308,30 @@ func TestPlaidProviderSyncAccountsThenTransactionsWithCursor(t *testing.T) {
 }
 
 type fakePlaidLinkTokenClient struct {
-	request             plaid.LinkTokenCreateRequest
-	searchRequest       plaid.InstitutionsSearchRequest
-	linkToken           string
-	publicToken         string
-	exchangeResult      PlaidPublicTokenExchangeResult
-	institutions        []plaid.Institution
-	accountsAccessToken string
-	accounts            []plaid.AccountBase
-	transactionRequests []plaidTransactionRequest
-	transactionPages    []plaid.TransactionsSyncResponse
+	request              plaid.LinkTokenCreateRequest
+	searchRequest        plaid.InstitutionsSearchRequest
+	linkToken            string
+	publicToken          string
+	exchangeResult       PlaidPublicTokenExchangeResult
+	institutions         []plaid.Institution
+	accountsAccessToken  string
+	accounts             []plaid.AccountBase
+	transactionRequests  []plaidTransactionRequest
+	transactionPages     []plaid.TransactionsSyncResponse
+	sandboxInstitutionID string
+	sandboxProducts      []plaid.Products
+	sandboxPublicToken   string
 }
 
 func (c *fakePlaidLinkTokenClient) CreateLinkToken(ctx context.Context, request plaid.LinkTokenCreateRequest) (string, error) {
 	c.request = request
 	return c.linkToken, nil
+}
+
+func (c *fakePlaidLinkTokenClient) CreateSandboxPublicToken(ctx context.Context, institutionID string, products []plaid.Products) (string, error) {
+	c.sandboxInstitutionID = institutionID
+	c.sandboxProducts = products
+	return c.sandboxPublicToken, nil
 }
 
 func (c *fakePlaidLinkTokenClient) ExchangePublicToken(ctx context.Context, publicToken string) (PlaidPublicTokenExchangeResult, error) {
@@ -342,11 +405,21 @@ func (s *recordingSyncSink) MarkTransactionRemoved(ctx context.Context, provider
 	return nil
 }
 func (s *recordingSyncSink) RecordSyncRun(ctx context.Context, run SyncRun) error { return nil }
-func (s *recordingSyncSink) UpsertSecurity(ctx context.Context, security InvestmentSecurity) error { return nil }
-func (s *recordingSyncSink) UpsertHolding(ctx context.Context, providerItemID string, holding InvestmentHolding) error { return nil }
-func (s *recordingSyncSink) ClearHoldings(ctx context.Context, providerItemID string) error { return nil }
-func (s *recordingSyncSink) UpsertLiability(ctx context.Context, providerItemID string, liability Liability) error { return nil }
-func (s *recordingSyncSink) ClearLiabilities(ctx context.Context, providerItemID string) error { return nil }
+func (s *recordingSyncSink) UpsertSecurity(ctx context.Context, security InvestmentSecurity) error {
+	return nil
+}
+func (s *recordingSyncSink) UpsertHolding(ctx context.Context, providerItemID string, holding InvestmentHolding) error {
+	return nil
+}
+func (s *recordingSyncSink) ClearHoldings(ctx context.Context, providerItemID string) error {
+	return nil
+}
+func (s *recordingSyncSink) UpsertLiability(ctx context.Context, providerItemID string, liability Liability) error {
+	return nil
+}
+func (s *recordingSyncSink) ClearLiabilities(ctx context.Context, providerItemID string) error {
+	return nil
+}
 
 func nullablePlaidString(value string) plaid.NullableString {
 	var nullable plaid.NullableString

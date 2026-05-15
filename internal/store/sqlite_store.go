@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -74,6 +75,12 @@ func (s *SQLiteStore) Close() error {
 	return s.db.Close()
 }
 
+//go:embed migrations/0003_budgets.sql
+var budgetsMigration string
+
+//go:embed migrations/0004_rules.sql
+var rulesMigration string
+
 func (s *SQLiteStore) runMigrations(ctx context.Context) error {
 	var count int
 	if err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'institutions'`).Scan(&count); err != nil {
@@ -90,6 +97,12 @@ func (s *SQLiteStore) runMigrations(ctx context.Context) error {
 	if err := s.migrateInvestmentsLiabilities(ctx); err != nil {
 		return err
 	}
+	if err := s.migrateBudgets(ctx); err != nil {
+		return err
+	}
+	if err := s.migrateRules(ctx); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -101,6 +114,32 @@ func (s *SQLiteStore) migrateInvestmentsLiabilities(ctx context.Context) error {
 	if count == 0 {
 		if _, err := s.db.ExecContext(ctx, investmentsLiabilitiesMigration); err != nil {
 			return fmt.Errorf("run investments_liabilities migration: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *SQLiteStore) migrateBudgets(ctx context.Context) error {
+	var count int
+	if err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'budgets'`).Scan(&count); err != nil {
+		return fmt.Errorf("check budgets migration state: %w", err)
+	}
+	if count == 0 {
+		if _, err := s.db.ExecContext(ctx, budgetsMigration); err != nil {
+			return fmt.Errorf("run budgets migration: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *SQLiteStore) migrateRules(ctx context.Context) error {
+	var count int
+	if err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'rules'`).Scan(&count); err != nil {
+		return fmt.Errorf("check rules migration state: %w", err)
+	}
+	if count == 0 {
+		if _, err := s.db.ExecContext(ctx, rulesMigration); err != nil {
+			return fmt.Errorf("run rules migration: %w", err)
 		}
 	}
 	return nil
@@ -371,6 +410,71 @@ func (s *SQLiteStore) ListTags(ctx context.Context) ([]core.Tag, error) {
 	return tags, rows.Err()
 }
 
+func (s *SQLiteStore) CashflowSummary(ctx context.Context, from, to, period, currency string) ([]core.CashflowPeriod, error) {
+	groupFormat := "%Y-%m"
+	if period == "yearly" {
+		groupFormat = "%Y"
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT
+  strftime(?, date) AS period,
+  COALESCE(SUM(CASE WHEN amount_minor_units > 0 THEN amount_minor_units ELSE 0 END), 0) AS income,
+  COALESCE(SUM(CASE WHEN amount_minor_units < 0 THEN amount_minor_units ELSE 0 END), 0) AS expenses
+FROM transactions
+WHERE date >= ? AND date <= ? AND removed = 0 AND pending = 0 AND currency = ?
+GROUP BY period
+ORDER BY period ASC`, groupFormat, from, to, currency)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var periods []core.CashflowPeriod
+	for rows.Next() {
+		var p core.CashflowPeriod
+		if err := rows.Scan(&p.Period, &p.IncomeMinor, &p.ExpensesMinor); err != nil {
+			return nil, err
+		}
+		p.Currency = currency
+		p.Income = core.FormatMinorUnits(p.IncomeMinor, currency)
+		p.Expenses = core.FormatMinorUnits(p.ExpensesMinor, currency)
+		p.NetMinor = p.IncomeMinor + p.ExpensesMinor
+		p.Net = core.FormatMinorUnits(p.NetMinor, currency)
+		periods = append(periods, p)
+	}
+	return periods, rows.Err()
+}
+
+func (s *SQLiteStore) NetWorth(ctx context.Context) (core.NetWorth, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT
+  currency,
+  SUM(current_balance_minor_units) AS total,
+  COUNT(*) AS count
+FROM accounts
+WHERE hidden = 0
+GROUP BY currency`)
+	if err != nil {
+		return core.NetWorth{}, err
+	}
+	defer rows.Close()
+	var nw core.NetWorth
+	for rows.Next() {
+		var currency string
+		var total int64
+		var count int
+		if err := rows.Scan(&currency, &total, &count); err != nil {
+			return core.NetWorth{}, err
+		}
+		if nw.Currency == "" || currency == "USD" {
+			nw.Currency = currency
+			nw.TotalMinor = total
+			nw.Total = core.FormatMinorUnits(total, currency)
+			nw.AssetCount = count
+		}
+	}
+	return nw, rows.Err()
+}
+
 func (s *SQLiteStore) ListRecurring(ctx context.Context) ([]core.Recurring, error) {
 	rows, err := s.db.QueryContext(ctx, `
 SELECT r.id, r.account_id, r.merchant_name, r.average_amount_minor_units, r.currency, r.frequency, r.next_date,
@@ -490,6 +594,305 @@ ORDER BY current_balance DESC, name ASC, id ASC`)
 	return items, rows.Err()
 }
 
+func (s *SQLiteStore) ListBudgets(ctx context.Context) ([]core.Budget, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id, name, currency, period, start_date, end_date, created_at, updated_at
+FROM budgets
+ORDER BY start_date DESC, name ASC, id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	budgets := []core.Budget{}
+	for rows.Next() {
+		var b core.Budget
+		if err := rows.Scan(&b.ID, &b.Name, &b.Currency, &b.Period, &b.StartDate, &b.EndDate, &b.CreatedAt, &b.UpdatedAt); err != nil {
+			return nil, err
+		}
+		budgets = append(budgets, b)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for i := range budgets {
+		cats, err := s.ListBudgetCategories(ctx, budgets[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		budgets[i].Categories = cats
+	}
+	return budgets, nil
+}
+
+func (s *SQLiteStore) GetBudget(ctx context.Context, id string) (core.Budget, error) {
+	var b core.Budget
+	if err := s.db.QueryRowContext(ctx, `
+SELECT id, name, currency, period, start_date, end_date, created_at, updated_at
+FROM budgets WHERE id = ?`, id).Scan(&b.ID, &b.Name, &b.Currency, &b.Period, &b.StartDate, &b.EndDate, &b.CreatedAt, &b.UpdatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return core.Budget{}, fmt.Errorf("budget %s not found", id)
+		}
+		return core.Budget{}, err
+	}
+	cats, err := s.ListBudgetCategories(ctx, b.ID)
+	if err != nil {
+		return core.Budget{}, err
+	}
+	b.Categories = cats
+	return b, nil
+}
+
+func (s *SQLiteStore) CreateBudget(ctx context.Context, budget core.Budget) (core.Budget, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	if budget.ID == "" {
+		id, err := core.NewLocalID("bdg_")
+		if err != nil {
+			return core.Budget{}, err
+		}
+		budget.ID = id
+	}
+	if budget.CreatedAt == "" {
+		budget.CreatedAt = now
+	}
+	if budget.UpdatedAt == "" {
+		budget.UpdatedAt = now
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO budgets (id, name, currency, period, start_date, end_date, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		budget.ID, budget.Name, budget.Currency, budget.Period, budget.StartDate, budget.EndDate, budget.CreatedAt, budget.UpdatedAt)
+	if err != nil {
+		return core.Budget{}, err
+	}
+	return budget, nil
+}
+
+func (s *SQLiteStore) UpdateBudget(ctx context.Context, budget core.Budget) (core.Budget, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := s.db.ExecContext(ctx, `
+UPDATE budgets SET name = ?, currency = ?, period = ?, start_date = ?, end_date = ?, updated_at = ?
+WHERE id = ?`,
+		budget.Name, budget.Currency, budget.Period, budget.StartDate, budget.EndDate, now, budget.ID)
+	if err != nil {
+		return core.Budget{}, err
+	}
+	return s.GetBudget(ctx, budget.ID)
+}
+
+func (s *SQLiteStore) DeleteBudget(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM budgets WHERE id = ?`, id)
+	return err
+}
+
+func (s *SQLiteStore) ListBudgetCategories(ctx context.Context, budgetID string) ([]core.BudgetCategory, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id, budget_id, category_id, name, limit_minor_units, currency, created_at, updated_at
+FROM budget_categories
+WHERE budget_id = ?
+ORDER BY name ASC, id ASC`, budgetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []core.BudgetCategory{}
+	for rows.Next() {
+		var bc core.BudgetCategory
+		var categoryID sql.NullString
+		if err := rows.Scan(&bc.ID, &bc.BudgetID, &categoryID, &bc.Name, &bc.LimitMinorUnits, &bc.Currency, &bc.CreatedAt, &bc.UpdatedAt); err != nil {
+			return nil, err
+		}
+		bc.CategoryID = stringPtr(categoryID)
+		bc.Limit = core.FormatMinorUnits(bc.LimitMinorUnits, bc.Currency)
+		items = append(items, bc)
+	}
+	return items, rows.Err()
+}
+
+func (s *SQLiteStore) CreateBudgetCategory(ctx context.Context, bc core.BudgetCategory) (core.BudgetCategory, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	if bc.ID == "" {
+		id, err := core.NewLocalID("bc_")
+		if err != nil {
+			return core.BudgetCategory{}, err
+		}
+		bc.ID = id
+	}
+	if bc.CreatedAt == "" {
+		bc.CreatedAt = now
+	}
+	if bc.UpdatedAt == "" {
+		bc.UpdatedAt = now
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO budget_categories (id, budget_id, category_id, name, limit_minor_units, currency, created_at, updated_at)
+VALUES (?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?)`,
+		bc.ID, bc.BudgetID, nullString(bc.CategoryID), bc.Name, bc.LimitMinorUnits, bc.Currency, bc.CreatedAt, bc.UpdatedAt)
+	if err != nil {
+		return core.BudgetCategory{}, err
+	}
+	bc.Limit = core.FormatMinorUnits(bc.LimitMinorUnits, bc.Currency)
+	return bc, nil
+}
+
+func (s *SQLiteStore) DeleteBudgetCategory(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM budget_categories WHERE id = ?`, id)
+	return err
+}
+
+func (s *SQLiteStore) ListRules(ctx context.Context) ([]core.Rule, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id, name, condition_field, condition_op, condition_value, action_type, action_value, priority, enabled, created_at, updated_at
+FROM rules
+WHERE enabled = 1
+ORDER BY priority DESC, created_at ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var rules []core.Rule
+	for rows.Next() {
+		var r core.Rule
+		var enabled int
+		if err := rows.Scan(&r.ID, &r.Name, &r.ConditionField, &r.ConditionOp, &r.ConditionValue, &r.ActionType, &r.ActionValue, &r.Priority, &enabled, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			return nil, err
+		}
+		r.Enabled = enabled == 1
+		rules = append(rules, r)
+	}
+	return rules, rows.Err()
+}
+
+func (s *SQLiteStore) CreateRule(ctx context.Context, rule core.Rule) (core.Rule, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	if rule.ID == "" {
+		id, err := core.NewLocalID("rule_")
+		if err != nil {
+			return core.Rule{}, err
+		}
+		rule.ID = id
+	}
+	if rule.CreatedAt == "" {
+		rule.CreatedAt = now
+	}
+	if rule.UpdatedAt == "" {
+		rule.UpdatedAt = now
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO rules (id, name, condition_field, condition_op, condition_value, action_type, action_value, priority, enabled, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		rule.ID, rule.Name, rule.ConditionField, rule.ConditionOp, rule.ConditionValue, rule.ActionType, rule.ActionValue, rule.Priority, boolInt(rule.Enabled), rule.CreatedAt, rule.UpdatedAt)
+	if err != nil {
+		return core.Rule{}, err
+	}
+	return rule, nil
+}
+
+func (s *SQLiteStore) UpdateRule(ctx context.Context, rule core.Rule) (core.Rule, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := s.db.ExecContext(ctx, `
+UPDATE rules SET name = ?, condition_field = ?, condition_op = ?, condition_value = ?, action_type = ?, action_value = ?, priority = ?, enabled = ?, updated_at = ?
+WHERE id = ?`,
+		rule.Name, rule.ConditionField, rule.ConditionOp, rule.ConditionValue, rule.ActionType, rule.ActionValue, rule.Priority, boolInt(rule.Enabled), now, rule.ID)
+	if err != nil {
+		return core.Rule{}, err
+	}
+	return rule, nil
+}
+
+func (s *SQLiteStore) DeleteRule(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM rules WHERE id = ?`, id)
+	return err
+}
+
+func (s *SQLiteStore) ApplyRules(ctx context.Context) (core.ApplyRulesResult, error) {
+	rules, err := s.ListRules(ctx)
+	if err != nil {
+		return core.ApplyRulesResult{}, err
+	}
+	if len(rules) == 0 {
+		return core.ApplyRulesResult{}, nil
+	}
+
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id, name, merchant_name, amount_minor_units, category_id
+FROM transactions
+WHERE removed = 0`)
+	if err != nil {
+		return core.ApplyRulesResult{}, err
+	}
+	defer rows.Close()
+	var transactions []txRow
+	for rows.Next() {
+		var t txRow
+		if err := rows.Scan(&t.id, &t.name, &t.merchantName, &t.amountMinor, &t.categoryID); err != nil {
+			return core.ApplyRulesResult{}, err
+		}
+		transactions = append(transactions, t)
+	}
+	if err := rows.Err(); err != nil {
+		return core.ApplyRulesResult{}, err
+	}
+
+	var updated int
+	for _, tx := range transactions {
+		for _, rule := range rules {
+			if !ruleMatches(tx, rule) {
+				continue
+			}
+			if err := s.applyRuleAction(ctx, tx.id, rule); err != nil {
+				return core.ApplyRulesResult{TransactionsUpdated: updated}, err
+			}
+			updated++
+			break // highest-priority match wins
+		}
+	}
+	return core.ApplyRulesResult{TransactionsUpdated: updated}, nil
+}
+
+type txRow struct {
+	id           string
+	name         string
+	merchantName string
+	amountMinor  int64
+	categoryID   sql.NullString
+}
+
+func ruleMatches(tx txRow, rule core.Rule) bool {
+	var fieldValue string
+	switch rule.ConditionField {
+	case "merchant_name":
+		fieldValue = tx.merchantName
+	case "name":
+		fieldValue = tx.name
+	default:
+		return false
+	}
+
+	switch rule.ConditionOp {
+	case "contains":
+		return strings.Contains(strings.ToLower(fieldValue), strings.ToLower(rule.ConditionValue))
+	case "equals":
+		return strings.EqualFold(fieldValue, rule.ConditionValue)
+	default:
+		return false
+	}
+}
+
+func (s *SQLiteStore) applyRuleAction(ctx context.Context, txID string, rule core.Rule) error {
+	switch rule.ActionType {
+	case "set_category":
+		var categoryName string
+		_ = s.db.QueryRowContext(ctx, `SELECT name FROM categories WHERE id = ?`, rule.ActionValue).Scan(&categoryName)
+		_, err := s.db.ExecContext(ctx, `UPDATE transactions SET category_id = ?, category_name = NULLIF(?, ''), category_source = 'local' WHERE id = ?`, rule.ActionValue, categoryName, txID)
+		return err
+	case "set_note":
+		_, err := s.db.ExecContext(ctx, `UPDATE transactions SET note = ? WHERE id = ?`, rule.ActionValue, txID)
+		return err
+	default:
+		return fmt.Errorf("unknown rule action type: %s", rule.ActionType)
+	}
+}
+
 func (s *SQLiteStore) hydrateTransactionTags(ctx context.Context, transactions []core.Transaction) error {
 	for i := range transactions {
 		tags, err := s.tagsForTransaction(ctx, transactions[i].ID)
@@ -568,6 +971,93 @@ func displayName(account core.Account) string {
 		return account.Name
 	}
 	return account.OfficialName
+}
+
+func (s *SQLiteStore) UpsertImportedAccount(ctx context.Context, account core.Account) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	if account.UpdatedAt == "" {
+		account.UpdatedAt = now
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO accounts (
+  id, source_kind, import_source_id, import_batch_id, name, official_name, alias,
+  type, subtype, current_balance_minor_units, currency, hidden, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, NULLIF(?, ''), ?, ?, 0, ?, ?)`,
+		account.ID, account.Source.Kind,
+		nullString(account.Source.ImportSourceID), nullString(account.Source.ImportBatchID),
+		account.Name, account.OfficialName, account.Alias,
+		account.Type, account.Subtype,
+		account.CurrentBalanceMinorUnits, account.Currency,
+		now, account.UpdatedAt)
+	return err
+}
+
+func (s *SQLiteStore) UpsertImportedTransaction(ctx context.Context, tx core.Transaction, sourceRowHash string) (bool, []string, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	lastChanged := tx.LastChangedAt
+	if lastChanged == "" {
+		lastChanged = now
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO transactions (
+  id, account_id, source_kind, import_source_id, import_batch_id, source_row_hash,
+  date, amount_minor_units, currency, name, merchant_name,
+  category_id, category_name, category_source, provider_category, provider_subcategory,
+  pending, removed, needs_review, note, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, NULLIF(?, ''), NULLIF(?, ''), ?, 0, 0, NULLIF(?, ''), ?, ?)`,
+		tx.ID, tx.AccountID, tx.Source.Kind,
+		nullString(tx.Source.ImportSourceID), nullString(tx.Source.ImportBatchID), sourceRowHash,
+		tx.Date, tx.AmountMinorUnits, tx.Currency, tx.Name, nullString(&tx.MerchantName),
+		nullString(tx.CategoryID), nullString(tx.CategoryName), tx.CategorySource,
+		nullString(tx.ProviderCategory), nullString(tx.ProviderSubcategory),
+		boolInt(tx.Pending), nullString(tx.Note), now, lastChanged)
+	if err != nil {
+		if isUniqueConstraintError(err) {
+			return false, nil, nil // same-batch duplicate, skipped
+		}
+		return false, nil, err
+	}
+
+	possibleDups, err := s.findPossibleDuplicates(ctx, tx)
+	return true, possibleDups, err
+}
+
+func (s *SQLiteStore) findPossibleDuplicates(ctx context.Context, tx core.Transaction) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id FROM transactions
+WHERE account_id = ? AND date = ? AND amount_minor_units = ? AND id != ?
+  AND (import_source_id IS DISTINCT FROM ? OR import_batch_id IS DISTINCT FROM ?)
+LIMIT 5`,
+		tx.AccountID, tx.Date, tx.AmountMinorUnits, tx.ID,
+		nullString(tx.Source.ImportSourceID), nullString(tx.Source.ImportBatchID))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func isUniqueConstraintError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unique constraint failed") || strings.Contains(msg, "constraint violation")
+}
+
+func nullString(s *string) sql.NullString {
+	if s == nil || *s == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: *s, Valid: true}
 }
 
 func boolInt(value bool) int {

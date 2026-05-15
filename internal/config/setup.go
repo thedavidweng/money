@@ -93,10 +93,13 @@ var PlaidSpec = ProviderSpec{
 	Name:         "plaid",
 	SecretFields: []string{"client_id", "secret"},
 	OptionalFields: map[string]string{
-		"environment":   "sandbox",
-		"products":      "transactions",
-		"country_codes": "US",
-		"redirect_uri":  "",
+		"environment":                    "sandbox",
+		"products":                       "transactions",
+		"country_codes":                  "US",
+		"redirect_uri":                   "",
+		"additional_consented_products":  "",
+		"required_if_supported_products": "",
+		"optional_products":              "",
 	},
 	HelpURL: "https://dashboard.plaid.com/developers/keys",
 }
@@ -130,15 +133,12 @@ type ConfigureResult struct {
 
 // ConfigureProvider writes provider credentials to .env and env: references to config.yaml.
 func ConfigureProvider(configPath string, profile string, spec ProviderSpec, secrets map[string]string, options map[string]string, force bool) (ConfigureResult, error) {
-	if err := validateProfile(profile); err != nil {
+	meta, err := ResolveMetadata(Options{ConfigPath: configPath, Profile: profile})
+	if err != nil {
 		return ConfigureResult{}, err
 	}
-	if configPath == "" {
-		configPath = DefaultConfigPath(profile)
-	}
-	configPath = expandHome(configPath)
-	configPath, _ = filepath.Abs(configPath)
-	envPath := filepath.Join(filepath.Dir(configPath), ".env")
+	configPath = meta.ConfigPath
+	envPath := meta.EnvPath
 
 	result := ConfigureResult{
 		Provider:   spec.Name,
@@ -154,13 +154,18 @@ func ConfigureProvider(configPath string, profile string, spec ProviderSpec, sec
 	}
 
 	keysWritten := 0
+	var conflicts []string
 	for _, field := range spec.SecretFields {
 		envVar := providerEnvVar(spec.Name, field)
 		if !force && existing[envVar] != "" {
+			conflicts = append(conflicts, envVar)
 			continue
 		}
 		envLines = setEnvLine(envLines, envVar, secrets[field])
 		keysWritten++
+	}
+	if len(conflicts) > 0 {
+		return result, fmt.Errorf("env file already contains %s; use --force to overwrite", strings.Join(conflicts, ", "))
 	}
 	result.KeysWritten = keysWritten
 
@@ -174,6 +179,22 @@ func ConfigureProvider(configPath string, profile string, spec ProviderSpec, sec
 	}
 
 	return result, nil
+}
+
+func ProviderCredentialConflicts(configPath string, profile string, spec ProviderSpec) ([]string, string, error) {
+	meta, err := ResolveMetadata(Options{ConfigPath: configPath, Profile: profile})
+	if err != nil {
+		return nil, "", err
+	}
+	existing, _ := readDotEnv(meta.EnvPath)
+	var conflicts []string
+	for _, field := range spec.SecretFields {
+		envVar := providerEnvVar(spec.Name, field)
+		if existing[envVar] != "" {
+			conflicts = append(conflicts, envVar)
+		}
+	}
+	return conflicts, meta.EnvPath, nil
 }
 
 func providerEnvVar(provider, field string) string {
@@ -227,6 +248,17 @@ func updateProviderConfig(configPath string, spec ProviderSpec, options map[stri
 			providerBlock[field] = val
 		}
 	}
+	// Preserve existing fields not managed by this update (e.g. consent
+	// product fields configured outside the login flow). Without this,
+	// updateProviderConfig silently drops them when building a fresh block.
+	if existing, ok := providers[spec.Name].(map[string]any); ok {
+		for k, v := range existing {
+			if _, exists := providerBlock[k]; !exists {
+				providerBlock[k] = v
+			}
+		}
+	}
+
 	providers[spec.Name] = providerBlock
 
 	out, err := yaml.Marshal(raw)

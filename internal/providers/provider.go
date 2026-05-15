@@ -34,9 +34,9 @@ type LiabilityQuerier interface {
 }
 
 type InvestmentHoldings struct {
-	Accounts   []FinancialAccount     `json:"accounts"`
-	Holdings   []InvestmentHolding    `json:"holdings"`
-	Securities []InvestmentSecurity   `json:"securities"`
+	Accounts   []FinancialAccount   `json:"accounts"`
+	Holdings   []InvestmentHolding  `json:"holdings"`
+	Securities []InvestmentSecurity `json:"securities"`
 }
 
 type InvestmentHolding struct {
@@ -50,16 +50,16 @@ type InvestmentHolding struct {
 }
 
 type InvestmentSecurity struct {
-	SecurityID      string  `json:"security_id"`
-	ISIN            *string `json:"isin,omitempty"`
-	CUSIP           *string `json:"cusip,omitempty"`
-	SEDOL           *string `json:"sedol,omitempty"`
-	Name            string  `json:"name"`
-	TickerSymbol    *string `json:"ticker_symbol,omitempty"`
-	Type            string  `json:"type"`
-	ClosePrice      float64 `json:"close_price"`
-	ClosePriceAsOf  *string `json:"close_price_as_of,omitempty"`
-	Currency        string  `json:"currency"`
+	SecurityID     string  `json:"security_id"`
+	ISIN           *string `json:"isin,omitempty"`
+	CUSIP          *string `json:"cusip,omitempty"`
+	SEDOL          *string `json:"sedol,omitempty"`
+	Name           string  `json:"name"`
+	TickerSymbol   *string `json:"ticker_symbol,omitempty"`
+	Type           string  `json:"type"`
+	ClosePrice     float64 `json:"close_price"`
+	ClosePriceAsOf *string `json:"close_price_as_of,omitempty"`
+	Currency       string  `json:"currency"`
 }
 
 type Liabilities struct {
@@ -68,16 +68,16 @@ type Liabilities struct {
 }
 
 type Liability struct {
-	AccountID       string  `json:"account_id"`
-	Type            string  `json:"type"`
-	CurrentBalance  float64 `json:"current_balance"`
-	OriginalBalance *float64 `json:"original_balance,omitempty"`
-	Currency        string  `json:"currency"`
-	Name            string  `json:"name"`
-	LastPaymentDate *string `json:"last_payment_date,omitempty"`
-	LastPaymentAmount *float64 `json:"last_payment_amount,omitempty"`
-	NextPaymentDueDate *string `json:"next_payment_due_date,omitempty"`
-	APR             *float64 `json:"apr,omitempty"`
+	AccountID          string   `json:"account_id"`
+	Type               string   `json:"type"`
+	CurrentBalance     float64  `json:"current_balance"`
+	OriginalBalance    *float64 `json:"original_balance,omitempty"`
+	Currency           string   `json:"currency"`
+	Name               string   `json:"name"`
+	LastPaymentDate    *string  `json:"last_payment_date,omitempty"`
+	LastPaymentAmount  *float64 `json:"last_payment_amount,omitempty"`
+	NextPaymentDueDate *string  `json:"next_payment_due_date,omitempty"`
+	APR                *float64 `json:"apr,omitempty"`
 }
 
 type SyncSink interface {
@@ -175,11 +175,23 @@ type ConfigDiagnostic struct {
 }
 
 type LinkRequest struct {
-	Institution  Institution
-	Products     []string
-	CountryCodes []string
-	RedirectURI  string
-	State        string
+	Institution                 Institution
+	Products                    []string
+	CountryCodes                []string
+	RedirectURI                 string
+	State                       string
+	AdditionalConsentedProducts []string
+	RequiredIfSupportedProducts []string
+	OptionalProducts            []string
+}
+
+type SandboxPublicTokenRequest struct {
+	InstitutionID string
+	Products      []string
+}
+
+type SandboxPublicTokenCreator interface {
+	CreateSandboxPublicToken(ctx context.Context, request SandboxPublicTokenRequest) (string, error)
 }
 
 type LinkSession struct {
@@ -187,6 +199,7 @@ type LinkSession struct {
 	URL                     string   `json:"url,omitempty"`
 	LinkToken               string   `json:"link_token,omitempty"`
 	State                   string   `json:"state"`
+	Products                []string `json:"products,omitempty"`
 	ProviderAccessToken     string   `json:"-"`
 	ExistingProviderItemIDs []string `json:"-"`
 }
@@ -194,12 +207,23 @@ type LinkSession struct {
 type LinkCallback struct {
 	PublicToken string
 	State       string
+	Status      string
 	Metadata    LinkMetadata
+	Error       LinkError
 }
 
 type LinkMetadata struct {
-	Institution LinkInstitutionMetadata `json:"institution"`
-	Accounts    []LinkAccountMetadata   `json:"accounts"`
+	Institution   LinkInstitutionMetadata `json:"institution"`
+	Accounts      []LinkAccountMetadata   `json:"accounts"`
+	RequestID     string                  `json:"request_id"`
+	LinkSessionID string                  `json:"link_session_id"`
+}
+
+type LinkError struct {
+	Type           string `json:"error_type"`
+	Code           string `json:"error_code"`
+	Message        string `json:"error_message"`
+	DisplayMessage string `json:"display_message"`
 }
 
 type LinkInstitutionMetadata struct {

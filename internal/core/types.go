@@ -87,6 +87,26 @@ func onlyDigits(value string) bool {
 	return true
 }
 
+type CashflowPeriod struct {
+	Period        string `json:"period"`
+	Income        string `json:"income"`
+	IncomeMinor   int64  `json:"-"`
+	Expenses      string `json:"expenses"`
+	ExpensesMinor int64  `json:"-"`
+	Net           string `json:"net"`
+	NetMinor      int64  `json:"-"`
+	Currency      string `json:"currency"`
+}
+
+type NetWorth struct {
+	Total          string `json:"total"`
+	TotalMinor     int64  `json:"-"`
+	Currency       string `json:"currency"`
+	AssetCount     int    `json:"asset_count"`
+	LiabilityCount int    `json:"liability_count"`
+	UpdatedAt      string `json:"updated_at,omitempty"`
+}
+
 type Source struct {
 	Kind                   string  `json:"kind"`
 	Provider               *string `json:"provider"`
@@ -217,4 +237,46 @@ type Recurring struct {
 	NextDate                *string `json:"next_date"`
 	Source                  Source  `json:"source"`
 	UpdatedAt               string  `json:"updated_at,omitempty"`
+}
+
+type Budget struct {
+	ID         string           `json:"id"`
+	Name       string           `json:"name"`
+	Currency   string           `json:"currency"`
+	Period     string           `json:"period"`
+	StartDate  string           `json:"start_date"`
+	EndDate    string           `json:"end_date"`
+	Categories []BudgetCategory `json:"categories,omitempty"`
+	CreatedAt  string           `json:"created_at,omitempty"`
+	UpdatedAt  string           `json:"updated_at,omitempty"`
+}
+
+type BudgetCategory struct {
+	ID              string  `json:"id"`
+	BudgetID        string  `json:"budget_id"`
+	CategoryID      *string `json:"category_id"`
+	Name            string  `json:"name"`
+	LimitMinorUnits int64   `json:"-"`
+	Limit           string  `json:"limit"`
+	Currency        string  `json:"currency"`
+	CreatedAt       string  `json:"created_at,omitempty"`
+	UpdatedAt       string  `json:"updated_at,omitempty"`
+}
+
+type Rule struct {
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	ConditionField string `json:"condition_field"`
+	ConditionOp    string `json:"condition_op"`
+	ConditionValue string `json:"condition_value"`
+	ActionType     string `json:"action_type"`
+	ActionValue    string `json:"action_value"`
+	Priority       int    `json:"priority"`
+	Enabled        bool   `json:"enabled"`
+	CreatedAt      string `json:"created_at,omitempty"`
+	UpdatedAt      string `json:"updated_at,omitempty"`
+}
+
+type ApplyRulesResult struct {
+	TransactionsUpdated int `json:"transactions_updated"`
 }
