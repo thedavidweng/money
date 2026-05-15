@@ -1239,9 +1239,7 @@ func runPlaidLoginLive(ctx context.Context, state *runtimeState, stdout io.Write
 	if err != nil {
 		return err
 	}
-	if !state.json {
-		fmt.Fprintf(stderr, "Plaid Dashboard OAuth URL: %s\n", authURL)
-	}
+	fmt.Fprintf(stderr, "Plaid Dashboard OAuth URL: %s\n", authURL)
 	if !opts.NoOpen && !state.json {
 		if state.stdin == nil {
 			return fmt.Errorf("stdin is required before opening a browser")
