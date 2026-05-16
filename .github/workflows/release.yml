@@ -30,6 +30,21 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v4.1.2
 
+      - name: Verify Homebrew tap token
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error title=Missing HOMEBREW_TAP_GITHUB_TOKEN::Create a GitHub token that can write contents to thedavidweng/homebrew-tap before running a release."
+            exit 1
+          fi
+
+          can_push="$(gh api repos/thedavidweng/homebrew-tap --jq '.permissions.push')"
+          if [ "$can_push" != "true" ]; then
+            echo "::error title=Invalid HOMEBREW_TAP_GITHUB_TOKEN::The token must have write access to thedavidweng/homebrew-tap. For a fine-grained PAT, select that repository and grant Contents: Read and write."
+            exit 1
+          fi
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:
