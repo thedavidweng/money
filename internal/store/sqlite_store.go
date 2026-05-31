@@ -804,6 +804,11 @@ func (s *SQLiteStore) DeleteRule(ctx context.Context, id string) error {
 	return err
 }
 
+type ruleMatch struct {
+	TxID string
+	Rule core.Rule
+}
+
 func (s *SQLiteStore) ApplyRules(ctx context.Context) (core.ApplyRulesResult, error) {
 	rules, err := s.ListRules(ctx)
 	if err != nil {
@@ -833,20 +838,37 @@ WHERE removed = 0`)
 		return core.ApplyRulesResult{}, err
 	}
 
-	var updated int
+	// Collect all matches in memory first.
+	var matches []ruleMatch
 	for _, tx := range transactions {
 		for _, rule := range rules {
 			if !ruleMatches(tx, rule) {
 				continue
 			}
-			if err := s.applyRuleAction(ctx, tx.id, rule); err != nil {
-				return core.ApplyRulesResult{TransactionsUpdated: updated}, err
-			}
-			updated++
+			matches = append(matches, ruleMatch{TxID: tx.id, Rule: rule})
 			break // highest-priority match wins
 		}
 	}
-	return core.ApplyRulesResult{TransactionsUpdated: updated}, nil
+	if len(matches) == 0 {
+		return core.ApplyRulesResult{}, nil
+	}
+
+	// Apply all matches in a single transaction.
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return core.ApplyRulesResult{}, err
+	}
+	defer tx.Rollback()
+
+	for _, m := range matches {
+		if err := applyRuleActionTx(ctx, tx, m.TxID, m.Rule); err != nil {
+			return core.ApplyRulesResult{}, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return core.ApplyRulesResult{}, err
+	}
+	return core.ApplyRulesResult{TransactionsUpdated: len(matches)}, nil
 }
 
 type txRow struct {
@@ -878,15 +900,15 @@ func ruleMatches(tx txRow, rule core.Rule) bool {
 	}
 }
 
-func (s *SQLiteStore) applyRuleAction(ctx context.Context, txID string, rule core.Rule) error {
+func applyRuleActionTx(ctx context.Context, tx *sql.Tx, txID string, rule core.Rule) error {
 	switch rule.ActionType {
 	case "set_category":
 		var categoryName string
-		_ = s.db.QueryRowContext(ctx, `SELECT name FROM categories WHERE id = ?`, rule.ActionValue).Scan(&categoryName)
-		_, err := s.db.ExecContext(ctx, `UPDATE transactions SET category_id = ?, category_name = NULLIF(?, ''), category_source = 'local' WHERE id = ?`, rule.ActionValue, categoryName, txID)
+		_ = tx.QueryRowContext(ctx, `SELECT name FROM categories WHERE id = ?`, rule.ActionValue).Scan(&categoryName)
+		_, err := tx.ExecContext(ctx, `UPDATE transactions SET category_id = ?, category_name = NULLIF(?, ''), category_source = 'local' WHERE id = ?`, rule.ActionValue, categoryName, txID)
 		return err
 	case "set_note":
-		_, err := s.db.ExecContext(ctx, `UPDATE transactions SET note = ? WHERE id = ?`, rule.ActionValue, txID)
+		_, err := tx.ExecContext(ctx, `UPDATE transactions SET note = ? WHERE id = ?`, rule.ActionValue, txID)
 		return err
 	default:
 		return fmt.Errorf("unknown rule action type: %s", rule.ActionType)
