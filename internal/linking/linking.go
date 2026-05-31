@@ -9,17 +9,13 @@ import (
 	"github.com/thedavidweng/money/internal/store"
 )
 
-type Store interface {
-	StoreLinkedProviderItem(ctx context.Context, linked store.LinkedProviderItem) error
-}
-
 type LinkResult struct {
 	Provider       string `json:"provider"`
 	ProviderItemID string `json:"provider_item_id"`
 	InstitutionID  string `json:"institution_id"`
 }
 
-func CompleteProviderLink(ctx context.Context, target Store, provider providers.Provider, session providers.LinkSession, callback providers.LinkCallback) (LinkResult, error) {
+func CompleteProviderLink(ctx context.Context, target store.Store, provider providers.Provider, session providers.LinkSession, callback providers.LinkCallback) (LinkResult, error) {
 	switch callback.Status {
 	case "", "success":
 	case "cancel":

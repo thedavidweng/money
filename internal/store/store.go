@@ -7,6 +7,7 @@ import (
 )
 
 type Store interface {
+	// Read-side
 	ListAccounts(ctx context.Context) ([]core.Account, error)
 	CreateManualAccount(ctx context.Context, account core.Account) (core.Account, error)
 	ListTransactions(ctx context.Context, query TransactionListQuery) ([]core.Transaction, error)
@@ -38,6 +39,21 @@ type Store interface {
 	UpdateRule(ctx context.Context, rule core.Rule) (core.Rule, error)
 	DeleteRule(ctx context.Context, id string) error
 	ApplyRules(ctx context.Context) (core.ApplyRulesResult, error)
+
+	// Write-side (sync + link)
+	UpsertInstitution(ctx context.Context, institution core.Institution) error
+	UpsertProviderItem(ctx context.Context, item core.ProviderItem) error
+	UpsertAccount(ctx context.Context, account core.FinancialAccount) error
+	UpsertTransaction(ctx context.Context, transaction core.ProviderTransaction) error
+	UpsertRecurring(ctx context.Context, recurring core.ProviderRecurring) error
+	MarkTransactionRemoved(ctx context.Context, providerItemID string, providerTransactionID string) error
+	RecordSyncRun(ctx context.Context, run core.SyncRun) error
+	UpsertSecurity(ctx context.Context, security core.InvestmentSecurity) error
+	UpsertHolding(ctx context.Context, providerItemID string, holding core.InvestmentHolding) error
+	ClearHoldings(ctx context.Context, providerItemID string) error
+	UpsertLiability(ctx context.Context, providerItemID string, liability core.Liability) error
+	ClearLiabilities(ctx context.Context, providerItemID string) error
+	StoreLinkedProviderItem(ctx context.Context, linked LinkedProviderItem) error
 }
 
 type TransactionListQuery struct {

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/thedavidweng/money/internal/providers"
+	"github.com/thedavidweng/money/internal/core"
 )
 
 func TestSQLiteStoreSyncSinkUpsertsAccountsTransactionsAndRemovedState(t *testing.T) {
@@ -31,7 +31,7 @@ func TestSQLiteStoreSyncSinkUpsertsAccountsTransactionsAndRemovedState(t *testin
 		t.Fatalf("store linked item: %v", err)
 	}
 
-	if err := db.UpsertAccount(ctx, providers.FinancialAccount{
+	if err := db.UpsertAccount(ctx, core.FinancialAccount{
 		ProviderItemID:           "pi_sync",
 		ProviderAccountID:        "acc_provider",
 		Name:                     "Checking",
@@ -50,7 +50,7 @@ func TestSQLiteStoreSyncSinkUpsertsAccountsTransactionsAndRemovedState(t *testin
 		t.Fatalf("synced account id = %q, want local acc_ id", localAccountID)
 	}
 	category := "Food"
-	if err := db.UpsertTransaction(ctx, providers.Transaction{
+	if err := db.UpsertTransaction(ctx, core.ProviderTransaction{
 		ProviderItemID:        "pi_sync",
 		ProviderTransactionID: "tx_provider",
 		ProviderAccountID:     "acc_provider",
@@ -84,7 +84,7 @@ func TestSQLiteStoreSyncSinkUpsertsAccountsTransactionsAndRemovedState(t *testin
 	if len(removed) != 2 {
 		t.Fatalf("removed transactions = %d, want demo removed plus synced removed", len(removed))
 	}
-	if err := db.UpsertTransaction(ctx, providers.Transaction{
+	if err := db.UpsertTransaction(ctx, core.ProviderTransaction{
 		ProviderItemID:        "pi_sync",
 		ProviderTransactionID: "tx_provider",
 		ProviderAccountID:     "acc_provider",
@@ -113,7 +113,7 @@ func TestSQLiteStoreRecordsSyncRunCounts(t *testing.T) {
 	}
 	defer db.Close()
 
-	if err := db.RecordSyncRun(ctx, providers.SyncRun{
+	if err := db.RecordSyncRun(ctx, core.SyncRun{
 		Provider:             "plaid",
 		ProviderItemID:       "pi_demo_plaid",
 		StartedAt:            "2026-05-10T10:00:00Z",

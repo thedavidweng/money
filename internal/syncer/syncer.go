@@ -9,11 +9,6 @@ import (
 	"github.com/thedavidweng/money/internal/store"
 )
 
-type Store interface {
-	ListProviderItems(ctx context.Context, query store.ProviderItemQuery) ([]store.LinkedItem, error)
-	providers.SyncSink
-}
-
 type Registry interface {
 	Get(name string) (providers.Provider, bool)
 }
@@ -57,7 +52,7 @@ func (e PartialFailure) Error() string {
 	return "one or more provider items failed to sync"
 }
 
-func Sync(ctx context.Context, target Store, registry Registry, options Options) (Result, error) {
+func Sync(ctx context.Context, target store.Store, registry Registry, options Options) (Result, error) {
 	linkedItems, err := target.ListProviderItems(ctx, store.ProviderItemQuery{Provider: options.Provider, ProviderItemID: options.ProviderItemID})
 	if err != nil {
 		return Result{}, err
@@ -81,7 +76,7 @@ func Sync(ctx context.Context, target Store, registry Registry, options Options)
 	return result, nil
 }
 
-func syncOne(ctx context.Context, target Store, registry Registry, linked store.LinkedItem, startDate string, endDate string) ItemResult {
+func syncOne(ctx context.Context, target store.Store, registry Registry, linked store.LinkedItem, startDate string, endDate string) ItemResult {
 	started := time.Now().UTC().Format(time.RFC3339)
 	itemResult := ItemResult{Provider: linked.Provider, ProviderItemID: linked.ID, Status: "ok"}
 	provider, ok := registry.Get(linked.Provider)
@@ -272,7 +267,7 @@ func hasProduct(products []string, target string) bool {
 	return false
 }
 
-func recordSyncRun(ctx context.Context, target Store, itemResult ItemResult, started string) {
+func recordSyncRun(ctx context.Context, target store.Store, itemResult ItemResult, started string) {
 	_ = target.RecordSyncRun(ctx, providers.SyncRun{
 		Provider:             itemResult.Provider,
 		ProviderItemID:       itemResult.ProviderItemID,

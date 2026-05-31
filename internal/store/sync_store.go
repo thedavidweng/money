@@ -7,10 +7,9 @@ import (
 	"time"
 
 	"github.com/thedavidweng/money/internal/core"
-	"github.com/thedavidweng/money/internal/providers"
 )
 
-func (s *SQLiteStore) UpsertAccount(ctx context.Context, account providers.FinancialAccount) error {
+func (s *SQLiteStore) UpsertAccount(ctx context.Context, account core.FinancialAccount) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	id, err := s.localAccountIDForProviderAccount(ctx, account.ProviderItemID, account.ProviderAccountID)
 	if err != nil {
@@ -39,7 +38,7 @@ ON CONFLICT(provider_item_id, provider_account_id) DO UPDATE SET
 	return err
 }
 
-func (s *SQLiteStore) UpsertTransaction(ctx context.Context, transaction providers.Transaction) error {
+func (s *SQLiteStore) UpsertTransaction(ctx context.Context, transaction core.ProviderTransaction) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	id, err := s.localTransactionIDForProviderTransaction(ctx, transaction.ProviderItemID, transaction.ProviderTransactionID)
 	if err != nil {
@@ -85,7 +84,7 @@ ON CONFLICT(provider_item_id, provider_transaction_id) DO UPDATE SET
 	return err
 }
 
-func (s *SQLiteStore) UpsertRecurring(ctx context.Context, recurring providers.Recurring) error {
+func (s *SQLiteStore) UpsertRecurring(ctx context.Context, recurring core.ProviderRecurring) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	id, err := s.localRecurringIDForProviderRecurring(ctx, recurring.ProviderItemID, recurring.ProviderRecurringID)
 	if err != nil {
@@ -127,7 +126,7 @@ WHERE provider_item_id = ? AND provider_transaction_id = ?`,
 	return err
 }
 
-func (s *SQLiteStore) RecordSyncRun(ctx context.Context, run providers.SyncRun) error {
+func (s *SQLiteStore) RecordSyncRun(ctx context.Context, run core.SyncRun) error {
 	id, err := core.NewLocalID("sync_")
 	if err != nil {
 		return err
@@ -203,7 +202,7 @@ WHERE provider_item_id = ? AND provider_recurring_id = ?`, providerItemID, provi
 	return core.NewLocalID("rec_")
 }
 
-func (s *SQLiteStore) UpsertSecurity(ctx context.Context, security providers.InvestmentSecurity) error {
+func (s *SQLiteStore) UpsertSecurity(ctx context.Context, security core.InvestmentSecurity) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	id, err := s.localSecurityIDForSecurityID(ctx, security.SecurityID)
 	if err != nil {
@@ -243,7 +242,7 @@ func (s *SQLiteStore) localSecurityIDForSecurityID(ctx context.Context, security
 	return core.NewLocalID("sec_")
 }
 
-func (s *SQLiteStore) UpsertHolding(ctx context.Context, providerItemID string, holding providers.InvestmentHolding) error {
+func (s *SQLiteStore) UpsertHolding(ctx context.Context, providerItemID string, holding core.InvestmentHolding) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	id, err := s.localHoldingID(ctx, providerItemID, holding.AccountID, holding.SecurityID)
 	if err != nil {
@@ -291,7 +290,7 @@ func (s *SQLiteStore) ClearHoldings(ctx context.Context, providerItemID string) 
 	return err
 }
 
-func (s *SQLiteStore) UpsertLiability(ctx context.Context, providerItemID string, liability providers.Liability) error {
+func (s *SQLiteStore) UpsertLiability(ctx context.Context, providerItemID string, liability core.Liability) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	id, err := s.localLiabilityID(ctx, providerItemID, liability.AccountID, liability.Type, liability.Name)
 	if err != nil {

@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/thedavidweng/money/internal/providers"
+	"github.com/thedavidweng/money/internal/core"
 )
 
 type LinkedProviderItem struct {
@@ -147,7 +147,7 @@ WHERE id = ?`, id).Scan(
 	return item, nil
 }
 
-func (s *SQLiteStore) UpsertInstitution(ctx context.Context, institution providers.Institution) error {
+func (s *SQLiteStore) UpsertInstitution(ctx context.Context, institution core.Institution) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.ExecContext(ctx, `
 INSERT INTO institutions (id, name, provider, provider_institution_id, created_at, updated_at)
@@ -203,7 +203,7 @@ func (s *SQLiteStore) RemoveProviderItem(ctx context.Context, id string) error {
 	return tx.Commit()
 }
 
-func (s *SQLiteStore) UpsertProviderItem(ctx context.Context, item providers.ProviderItem) error {
+func (s *SQLiteStore) UpsertProviderItem(ctx context.Context, item core.ProviderItem) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	products, err := json.Marshal(item.Products)
 	if err != nil {
