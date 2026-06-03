@@ -116,7 +116,7 @@ Read commands and sync support --json for machine-readable output. Manual write 
 
 - GitHub Issues: ${repo}/issues
 - Repository: ${repo}
-- License: MIT
+- License: Apache 2.0
 
 ## Machine-Readable Endpoints
 

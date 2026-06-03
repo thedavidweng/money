@@ -99,7 +99,7 @@ money items list                    List linked provider items
 money items get <id>                Get a linked provider item
 money items rename <id> <name>      Rename a provider item alias
 money items remove <id>             Remove a linked provider item with cascade delete
-money import <source> <file>        Import transactions from CSV (source: monarch)
+money import <source> <file>        Import data from external sources (source: monarch, csv)
 money cashflow                      Show cashflow summary by period
 money net-worth                     Show net worth breakdown
 

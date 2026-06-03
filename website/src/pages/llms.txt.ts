@@ -24,7 +24,7 @@ It does not embed AI chat, model providers, hosted billing, telemetry, or a requ
 - CLI-first — human output by default; --json when you need parseable stdout
 - Explicit sync boundary — read commands use local data only; network I/O only on link/sync
 - Demo mode — try without credentials: money demo accounts list --json
-- MIT licensed, single Go binary, no telemetry
+- Apache 2.0 licensed, single Go binary, no telemetry
 
 ## Quick start
 
@@ -38,7 +38,7 @@ It does not embed AI chat, model providers, hosted billing, telemetry, or a requ
 
 - GitHub Issues: ${repo}/issues
 - Repository: ${repo}
-- License: MIT
+- License: Apache 2.0
 
 ## Machine-Readable Endpoints
 

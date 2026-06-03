@@ -16,7 +16,7 @@ A local-first, self-hostable personal finance backend for AI agents and power us
 
 Pull accounts and transactions from providers you configure, store them in encrypted SQLite, and automate with stable CLI + JSON contracts. No embedded AI, no hosted ledger, no long-running server required.
 
-- ✓ MIT licensed
+- ✓ Apache 2.0 licensed
 - ✓ Single Go binary
 - ✓ No telemetry
 

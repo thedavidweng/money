@@ -12,7 +12,7 @@ export const GET: APIRoute = async () => {
 			description: 'A local-first, self-hostable personal finance backend for AI agents and power users.',
 			url: siteUrl,
 			repository: repo,
-			license: 'MIT',
+			license: 'Apache-2.0',
 			version: '0.x (pre-release)',
 		},
 		services: [
@@ -46,7 +46,7 @@ export const GET: APIRoute = async () => {
 				'CLI-first — human output by default, --json for automation',
 				'Explicit sync boundary — read uses local data only',
 				'Demo mode — try without credentials against sample data',
-				'MIT licensed, single Go binary, no telemetry',
+				'Apache 2.0 licensed, single Go binary, no telemetry',
 			],
 			documentation: [
 				{ name: 'PRD', url: `${repo}/blob/main/docs/PRD.md` },
