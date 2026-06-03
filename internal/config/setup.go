@@ -18,6 +18,8 @@ type SetupResult struct {
 	DatabasePath  string `json:"database_path"`
 	SecretCreated bool   `json:"secret_created"`
 	DBCreated     bool   `json:"db_created"`
+	LinksFixed    int    `json:"links_fixed,omitempty"`
+	SyncFixed     int    `json:"sync_fixed,omitempty"`
 }
 
 func Setup(configPath string, profile string, force bool) (SetupResult, error) {

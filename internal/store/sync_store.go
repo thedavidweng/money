@@ -144,6 +144,60 @@ VALUES (?, NULLIF(?, ''), ?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, NULLIF(?, ''), 
 	return err
 }
 
+// SyncRunSummary holds the latest sync run per provider item for doctor diagnostics.
+type SyncRunSummary struct {
+	ProviderItemID string
+	Provider       string
+	StartedAt      string
+	FinishedAt     string
+	Status         string
+	ErrorCode      string
+	ErrorMessage   string
+}
+
+// MarkStuckSyncRunsInterrupted marks sync runs with no finished_at as "interrupted".
+// Returns the number of runs updated.
+func (s *SQLiteStore) MarkStuckSyncRunsInterrupted(ctx context.Context) (int, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	result, err := s.db.ExecContext(ctx, `
+UPDATE sync_runs
+SET status = 'interrupted', finished_at = ?
+WHERE finished_at IS NULL`, now)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := result.RowsAffected()
+	return int(n), nil
+}
+
+// LatestSyncRuns returns the most recent sync run for each provider item.
+func (s *SQLiteStore) LatestSyncRuns(ctx context.Context) ([]SyncRunSummary, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT sr.provider_item_id, COALESCE(sr.provider, ''), sr.started_at, COALESCE(sr.finished_at, ''),
+       sr.status, COALESCE(sr.error_code, ''), COALESCE(sr.error_message, '')
+FROM sync_runs sr
+INNER JOIN (
+  SELECT provider_item_id, MAX(started_at) AS max_started
+  FROM sync_runs
+  GROUP BY provider_item_id
+) latest ON sr.provider_item_id = latest.provider_item_id AND sr.started_at = latest.max_started
+ORDER BY sr.provider_item_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var runs []SyncRunSummary
+	for rows.Next() {
+		var r SyncRunSummary
+		if err := rows.Scan(&r.ProviderItemID, &r.Provider, &r.StartedAt, &r.FinishedAt, &r.Status, &r.ErrorCode, &r.ErrorMessage); err != nil {
+			return nil, err
+		}
+		runs = append(runs, r)
+	}
+	return runs, rows.Err()
+}
+
 func (s *SQLiteStore) localAccountIDForProviderAccount(ctx context.Context, providerItemID string, providerAccountID string) (string, error) {
 	id, err := s.queryAccountIDForProviderAccount(ctx, providerItemID, providerAccountID)
 	if err == nil {

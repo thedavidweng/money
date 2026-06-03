@@ -21,7 +21,7 @@ This does not remove your local `~/.money` configuration, secrets, or encrypted 
 
 ### macOS / Linux / all platforms (Go)
 
-Requires Go 1.25 or later:
+Requires Go 1.26 or later:
 
 ```bash
 go install github.com/thedavidweng/money/cmd/money@latest
@@ -135,7 +135,7 @@ money items rename <id> "My Chase Savings"
 
 ## Pricing
 
-`money` itself is free and open source under the MIT license. You bring your own provider credentials (BYOK). Provider costs depend on the provider you choose.
+`money` itself is free and open source under the [Apache 2.0 license](../LICENSE). You bring your own provider credentials (BYOK). Provider costs depend on the provider you choose.
 
 ### Plaid
 

@@ -12,7 +12,7 @@
   <a href="https://github.com/thedavidweng/money/actions"><img src="https://img.shields.io/github/actions/workflow/status/thedavidweng/money/ci.yml?branch=main&style=flat-square" alt="CI"></a>
   <a href="https://github.com/thedavidweng/money/releases"><img src="https://img.shields.io/github/v/release/thedavidweng/money?style=flat-square" alt="Release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/thedavidweng/money?style=flat-square" alt="License"></a>
-  <img src="https://img.shields.io/badge/go-%3E%3D1.25-blue?style=flat-square" alt="Go">
+  <img src="https://img.shields.io/badge/go-%3E%3D1.26-blue?style=flat-square" alt="Go">
 </p>
 
 ---
@@ -29,7 +29,7 @@ Existing personal finance tools either lock data behind a paid SaaS, embed opini
 
 - **Local-first data ownership** — your financial data lives in an encrypted file you control.
 - **Agent-friendly contracts** — stable JSON envelopes that any AI agent, script, or automation can parse.
-- **Provider-neutral** — Plaid, Bridge, MX, Finicity, CSV imports — providers are replaceable adapters.
+- **Provider-neutral** — Plaid, Bridge, CSV imports — providers are replaceable adapters.
 - **No server required** — runs as a CLI on your laptop, in cron, or in CI.
 
 ## Getting Started
@@ -80,7 +80,7 @@ money demo transactions search "coffee" --json
 ```text
 # Getting Started
 money setup                         Initialize configuration and encrypted database
-money doctor                        Check configuration and system health
+money doctor                        Check configuration and system health (--fix, --dry-run)
 money demo <command>                Run against non-persistent sample data
 
 # Data Queries
@@ -88,6 +88,7 @@ money accounts list                 List financial accounts
 money accounts create-manual        Create a local manual account
 money transactions list             List transactions with filters
 money transactions search           Search transactions by text
+money tx                            Alias for transactions
 money categories list               List transaction categories
 money tags list                     List transaction tags
 money recurring list                List recurring transactions
@@ -98,6 +99,21 @@ money items list                    List linked provider items
 money items get <id>                Get a linked provider item
 money items rename <id> <name>      Rename a provider item alias
 money items remove <id>             Remove a linked provider item with cascade delete
+money import <source> <file>        Import transactions from CSV (source: monarch)
+money cashflow                      Show cashflow summary by period
+money net-worth                     Show net worth breakdown
+
+# Budgets & Rules
+money budgets list                  List budgets
+money budgets create                Create a budget
+money budgets get <id>              Get budget details with categories
+money budgets delete <id>           Delete a budget
+money budgets categories create     Add a category to a budget
+money budgets categories delete     Remove a category from a budget
+money rules list                    List transaction rules
+money rules create                  Create a transaction rule
+money rules delete <id>             Delete a transaction rule
+money rules apply                   Apply rules to transactions
 
 # Provider Management
 money link                          Link a financial institution
@@ -128,11 +144,17 @@ Read commands and provisional sync diagnostics support `--json` for machine-read
 
 ```text
 cmd/money/             CLI entrypoint (Cobra)
+internal/cli/          CLI commands and doctor diagnostics
+internal/config/       Configuration loading and validation
 internal/contracts/    JSON envelopes, schema versions, error codes
 internal/core/         Finance primitives and domain types
+internal/importsource/ CSV and Monarch Money importers
+internal/linking/      Plaid Link helper functions
+internal/plaidlogin/   Plaid Dashboard OAuth login flow
+internal/prompt/       Interactive TUI prompts (via Charm huh)
 internal/providers/    Provider adapters (Plaid, Bridge, …)
 internal/store/        Encrypted SQLite store and migrations
-internal/config/       Configuration loading and validation
+internal/syncer/       Transaction sync orchestration
 ```
 
 Read commands use local data only. Sync is the explicit boundary where outbound provider calls happen. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design.
@@ -157,6 +179,8 @@ Read commands use local data only. Sync is the explicit boundary where outbound 
 | [`docs/SCHEMA.md`](docs/SCHEMA.md) | Database schema contract |
 | [`docs/CONFIG.md`](docs/CONFIG.md) | Configuration loading rules |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Development phases |
+| [`CHANGELOG.md`](CHANGELOG.md) | Release history |
+| [`SECURITY.md`](SECURITY.md) | Vulnerability reporting policy |
 
 ## Website
 
@@ -180,4 +204,4 @@ npm run build  # output in website/dist
 
 ## License
 
-[MIT](LICENSE)
+[Apache 2.0](LICENSE)

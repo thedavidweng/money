@@ -6,13 +6,16 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/thedavidweng/money/internal/config"
+	"github.com/thedavidweng/money/internal/core"
 	"github.com/thedavidweng/money/internal/plaidlogin"
 	"github.com/thedavidweng/money/internal/prompt"
+	"github.com/thedavidweng/money/internal/store"
 )
 
 // promptForProviderCredentials tests
@@ -411,5 +414,289 @@ func TestRunSetupWizardConfigureAllProviders(t *testing.T) {
 
 	if !strings.Contains(stdout.String(), "All providers configured") {
 		t.Fatalf("should show all done message, got: %s", stdout.String())
+	}
+}
+
+// Links diagnostics tests
+
+func TestAppendLinksDiagnosticsNoItems(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenDemo(ctx)
+	if err != nil {
+		t.Fatalf("open demo: %v", err)
+	}
+	defer db.Close()
+
+	diags := appendLinksDiagnostics(ctx, db)
+	if len(diags) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %d", len(diags))
+	}
+	if diags[0].Section != "Links" {
+		t.Fatalf("section = %q", diags[0].Section)
+	}
+	if diags[0].Status != "ok" {
+		t.Fatalf("status = %q, want ok", diags[0].Status)
+	}
+}
+
+func TestAppendLinksDiagnosticsWithItems(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenDemo(ctx)
+	if err != nil {
+		t.Fatalf("open demo: %v", err)
+	}
+	defer db.Close()
+
+	// Demo already has plaid items. Add a bridge item.
+	if err := db.StoreLinkedProviderItem(ctx, store.LinkedProviderItem{
+		Institution: store.LinkedInstitution{ID: "inst_bridge", Name: "Bridge Bank", Provider: "bridge", ProviderInstitutionID: "ins_bridge"},
+		Item: store.LinkedItem{
+			ID: "pi_bridge", Provider: "bridge", InstitutionID: "inst_bridge",
+			ProviderExternalItemID: "item_bridge", EncryptedAccessToken: []byte("tok"),
+			Status: "active", Products: []string{"transactions"},
+		},
+	}); err != nil {
+		t.Fatalf("store bridge item: %v", err)
+	}
+
+	diags := appendLinksDiagnostics(ctx, db)
+	if len(diags) != 2 {
+		t.Fatalf("expected 2 diagnostics (bridge + plaid), got %d", len(diags))
+	}
+	for _, d := range diags {
+		if d.Section != "Links" {
+			t.Fatalf("section = %q", d.Section)
+		}
+		if d.Status != "ok" {
+			t.Fatalf("status = %q, want ok", d.Status)
+		}
+	}
+}
+
+// Sync diagnostics tests
+
+func TestAppendSyncDiagnosticsNoItemsNoRuns(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenDemo(ctx)
+	if err != nil {
+		t.Fatalf("open demo: %v", err)
+	}
+	defer db.Close()
+
+	// No provider items in clean demo → no sync diagnostics expected.
+	diags := appendSyncDiagnostics(ctx, db)
+	// Demo has provider items, so we expect a warning about no sync runs.
+	hasWarn := false
+	for _, d := range diags {
+		if d.Section == "Sync" && d.Status == "warn" {
+			hasWarn = true
+		}
+	}
+	if !hasWarn {
+		t.Fatalf("expected sync warn diagnostic, got: %+v", diags)
+	}
+}
+
+func TestAppendSyncDiagnosticsWithRecentRun(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenDemo(ctx)
+	if err != nil {
+		t.Fatalf("open demo: %v", err)
+	}
+	defer db.Close()
+
+	// Record a successful sync run for the demo plaid item.
+	if err := db.RecordSyncRun(ctx, core.SyncRun{
+		Provider:       "plaid",
+		ProviderItemID: "pi_demo_plaid",
+		StartedAt:      "2026-05-10T10:00:00Z",
+		FinishedAt:     "2026-05-10T10:00:02Z",
+		Status:         "ok",
+	}); err != nil {
+		t.Fatalf("record sync run: %v", err)
+	}
+
+	diags := appendSyncDiagnostics(ctx, db)
+	hasOK := false
+	for _, d := range diags {
+		if d.Section == "Sync" && d.Status == "ok" {
+			hasOK = true
+			if !strings.Contains(d.Message, "ok") {
+				t.Fatalf("expected ok in message, got %q", d.Message)
+			}
+		}
+	}
+	if !hasOK {
+		t.Fatalf("expected sync ok diagnostic, got: %+v", diags)
+	}
+}
+
+// Doctor fix tests
+
+func TestRunDoctorFixLinksRemovesErroredItems(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenDemo(ctx)
+	if err != nil {
+		t.Fatalf("open demo: %v", err)
+	}
+	defer db.Close()
+
+	// Add an errored provider item.
+	if err := db.StoreLinkedProviderItem(ctx, store.LinkedProviderItem{
+		Institution: store.LinkedInstitution{ID: "inst_err", Name: "Err Bank", Provider: "plaid", ProviderInstitutionID: "ins_err"},
+		Item: store.LinkedItem{
+			ID: "pi_err", Provider: "plaid", InstitutionID: "inst_err",
+			ProviderExternalItemID: "item_err", EncryptedAccessToken: []byte("tok"),
+			Status: "error", Products: []string{"transactions"},
+		},
+	}); err != nil {
+		t.Fatalf("store errored item: %v", err)
+	}
+
+	fixed, err := runDoctorFixLinks(ctx, db)
+	if err != nil {
+		t.Fatalf("fix links: %v", err)
+	}
+	if fixed != 1 {
+		t.Fatalf("expected 1 fixed, got %d", fixed)
+	}
+
+	// Verify the errored item is gone.
+	items, err := db.ListProviderItems(ctx, store.ProviderItemQuery{})
+	if err != nil {
+		t.Fatalf("list items: %v", err)
+	}
+	for _, item := range items {
+		if item.ID == "pi_err" {
+			t.Fatal("errored item should have been removed")
+		}
+	}
+}
+
+func TestRunDoctorFixLinksSkipsActiveItems(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenDemo(ctx)
+	if err != nil {
+		t.Fatalf("open demo: %v", err)
+	}
+	defer db.Close()
+
+	// Demo has active plaid items — fix should not remove them.
+	fixed, err := runDoctorFixLinks(ctx, db)
+	if err != nil {
+		t.Fatalf("fix links: %v", err)
+	}
+	if fixed != 0 {
+		t.Fatalf("expected 0 fixed, got %d", fixed)
+	}
+}
+
+func TestRunDoctorFixSyncMarksStuckRuns(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenDemo(ctx)
+	if err != nil {
+		t.Fatalf("open demo: %v", err)
+	}
+	defer db.Close()
+
+	// RecordSyncRun with empty finished_at produces a stuck run (NULL finished_at).
+	if err := db.RecordSyncRun(ctx, core.SyncRun{
+		Provider:       "plaid",
+		ProviderItemID: "pi_demo_plaid",
+		StartedAt:      "2026-05-10T10:00:00Z",
+		FinishedAt:     "",
+		Status:         "ok",
+	}); err != nil {
+		t.Fatalf("record stuck run: %v", err)
+	}
+
+	fixed, err := runDoctorFixSync(ctx, db)
+	if err != nil {
+		t.Fatalf("fix sync: %v", err)
+	}
+	if fixed != 1 {
+		t.Fatalf("expected 1 fixed, got %d", fixed)
+	}
+}
+
+// Structured logging tests
+
+func TestDoctorDiagnosticsLogToSlog(t *testing.T) {
+	var buf bytes.Buffer
+	handler := slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})
+	logger := slog.New(handler)
+
+	ctx := context.Background()
+	db, err := store.OpenDemo(ctx)
+	if err != nil {
+		t.Fatalf("open demo: %v", err)
+	}
+	defer db.Close()
+
+	diags := appendLinksDiagnostics(ctx, db)
+	logDiagnostics(logger, diags)
+
+	output := buf.String()
+	if !strings.Contains(output, "Links") {
+		t.Fatalf("expected Links in slog output, got: %s", output)
+	}
+	if !strings.Contains(output, "LINKS_OK") {
+		t.Fatalf("expected LINKS_OK in slog output, got: %s", output)
+	}
+}
+
+func TestDoctorSyncDiagnosticsLogToSlog(t *testing.T) {
+	var buf bytes.Buffer
+	handler := slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})
+	logger := slog.New(handler)
+
+	ctx := context.Background()
+	db, err := store.OpenDemo(ctx)
+	if err != nil {
+		t.Fatalf("open demo: %v", err)
+	}
+	defer db.Close()
+
+	diags := appendSyncDiagnostics(ctx, db)
+	logDiagnostics(logger, diags)
+
+	output := buf.String()
+	if !strings.Contains(output, "Sync") {
+		t.Fatalf("expected Sync in slog output, got: %s", output)
+	}
+}
+
+func TestDoctorFixLogsToSlog(t *testing.T) {
+	var buf bytes.Buffer
+	handler := slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})
+	logger := slog.New(handler)
+
+	ctx := context.Background()
+	db, err := store.OpenDemo(ctx)
+	if err != nil {
+		t.Fatalf("open demo: %v", err)
+	}
+	defer db.Close()
+
+	// Add an errored item to trigger a fix.
+	if err := db.StoreLinkedProviderItem(ctx, store.LinkedProviderItem{
+		Institution: store.LinkedInstitution{ID: "inst_err2", Name: "Err Bank", Provider: "plaid", ProviderInstitutionID: "ins_err2"},
+		Item: store.LinkedItem{
+			ID: "pi_err2", Provider: "plaid", InstitutionID: "inst_err2",
+			ProviderExternalItemID: "item_err2", EncryptedAccessToken: []byte("tok"),
+			Status: "error", Products: []string{"transactions"},
+		},
+	}); err != nil {
+		t.Fatalf("store errored item: %v", err)
+	}
+
+	logFixResult(logger, "links", 1)
+
+	output := buf.String()
+	if !strings.Contains(output, "doctor fix") {
+		t.Fatalf("expected 'doctor fix' in slog output, got: %s", output)
+	}
+	if !strings.Contains(output, "links") {
+		t.Fatalf("expected 'links' in slog output, got: %s", output)
 	}
 }

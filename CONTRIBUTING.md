@@ -13,16 +13,42 @@ Thanks for your interest in contributing to `money`.
 
 ## Development
 
+### Prerequisites
+
+- [Go 1.26](https://go.dev/dl/) or later (see `go.mod` for the exact version)
+
+### Setup
+
 ```bash
 git clone https://github.com/thedavidweng/money.git
 cd money
 go mod download
+```
 
-# Run tests
-go test ./...
+### Build and Test
 
-# Build
+```bash
+# Static analysis
+go vet ./...
+
+# Run tests with race detector (matches CI)
+go test ./... -race
+
+# Run tests with coverage summary
+go test ./... -cover
+
+# Build the binary
 go build ./cmd/money
+```
+
+CI runs `go vet`, `go test -race`, and `go build` on both `ubuntu-latest` and `macos-latest` for every push and pull request.
+
+### Release Workflow
+
+Releases are automated via [GoReleaser](https://goreleaser.com/) and triggered by pushing a `v*` tag. The release workflow requires a `HOMEBREW_TAP_GITHUB_TOKEN` secret with push access to the Homebrew tap repository. To test the release process locally:
+
+```bash
+goreleaser release --snapshot --clean
 ```
 
 ## Pull Requests

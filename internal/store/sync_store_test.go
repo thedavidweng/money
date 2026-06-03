@@ -162,3 +162,119 @@ func TestSQLiteStoreListsProviderItemsForSync(t *testing.T) {
 		t.Fatalf("provider item token was not loaded: %#v", items[0])
 	}
 }
+
+func TestSQLiteStoreLatestSyncRunsEmpty(t *testing.T) {
+	ctx := context.Background()
+	db, err := OpenDemo(ctx)
+	if err != nil {
+		t.Fatalf("open demo: %v", err)
+	}
+	defer db.Close()
+
+	runs, err := db.LatestSyncRuns(ctx)
+	if err != nil {
+		t.Fatalf("latest sync runs: %v", err)
+	}
+	if len(runs) != 0 {
+		t.Fatalf("expected 0 sync runs from demo, got %d", len(runs))
+	}
+}
+
+func TestSQLiteStoreLatestSyncRunsReturnsMostRecentPerProviderItem(t *testing.T) {
+	ctx := context.Background()
+	db, err := OpenDemo(ctx)
+	if err != nil {
+		t.Fatalf("open demo: %v", err)
+	}
+	defer db.Close()
+
+	// Record two runs for the same provider item — latest should win.
+	if err := db.RecordSyncRun(ctx, core.SyncRun{
+		Provider:       "plaid",
+		ProviderItemID: "pi_demo_plaid",
+		StartedAt:      "2026-05-10T10:00:00Z",
+		FinishedAt:     "2026-05-10T10:00:02Z",
+		Status:         "ok",
+	}); err != nil {
+		t.Fatalf("record first sync run: %v", err)
+	}
+	if err := db.RecordSyncRun(ctx, core.SyncRun{
+		Provider:       "plaid",
+		ProviderItemID: "pi_demo_plaid",
+		StartedAt:      "2026-05-11T10:00:00Z",
+		FinishedAt:     "2026-05-11T10:00:05Z",
+		Status:         "error",
+		ErrorCode:      "ITEM_LOGIN_REQUIRED",
+		ErrorMessage:   "credentials need refresh",
+	}); err != nil {
+		t.Fatalf("record second sync run: %v", err)
+	}
+
+	runs, err := db.LatestSyncRuns(ctx)
+	if err != nil {
+		t.Fatalf("latest sync runs: %v", err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("expected 1 run, got %d", len(runs))
+	}
+	run := runs[0]
+	if run.ProviderItemID != "pi_demo_plaid" {
+		t.Fatalf("provider item id = %q", run.ProviderItemID)
+	}
+	if run.Status != "error" {
+		t.Fatalf("expected latest run status=error, got %q", run.Status)
+	}
+	if run.StartedAt != "2026-05-11T10:00:00Z" {
+		t.Fatalf("expected latest started_at, got %q", run.StartedAt)
+	}
+	if run.ErrorCode != "ITEM_LOGIN_REQUIRED" {
+		t.Fatalf("error code = %q", run.ErrorCode)
+	}
+}
+
+func TestSQLiteStoreMarkStuckSyncRunsInterrupted(t *testing.T) {
+	ctx := context.Background()
+	db, err := OpenDemo(ctx)
+	if err != nil {
+		t.Fatalf("open demo: %v", err)
+	}
+	defer db.Close()
+
+	// Record a stuck run (no finished_at).
+	if _, err := db.db.ExecContext(ctx, `
+INSERT INTO sync_runs (id, provider, provider_item_id, started_at, status)
+VALUES ('sync_stuck', 'plaid', 'pi_demo_plaid', '2026-05-10T10:00:00Z', 'ok')`); err != nil {
+		t.Fatalf("insert stuck run: %v", err)
+	}
+
+	// Record a completed run.
+	if err := db.RecordSyncRun(ctx, core.SyncRun{
+		Provider:       "plaid",
+		ProviderItemID: "pi_demo_plaid",
+		StartedAt:      "2026-05-11T10:00:00Z",
+		FinishedAt:     "2026-05-11T10:00:02Z",
+		Status:         "ok",
+	}); err != nil {
+		t.Fatalf("record completed run: %v", err)
+	}
+
+	count, err := db.MarkStuckSyncRunsInterrupted(ctx)
+	if err != nil {
+		t.Fatalf("mark stuck: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 stuck run marked, got %d", count)
+	}
+
+	// Verify the stuck run was updated.
+	var status, finishedAt string
+	if err := db.db.QueryRowContext(ctx, `SELECT status, finished_at FROM sync_runs WHERE id = 'sync_stuck'`).Scan(&status, &finishedAt); err != nil {
+		t.Fatalf("query stuck run: %v", err)
+	}
+	if status != "interrupted" {
+		t.Fatalf("status = %q, want interrupted", status)
+	}
+	if finishedAt == "" {
+		t.Fatal("expected finished_at to be set")
+	}
+}

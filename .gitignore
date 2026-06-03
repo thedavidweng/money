@@ -18,6 +18,7 @@ tmp/
 *.sqlite3
 
 # Build and test outputs.
+money
 bin/
 dist/
 

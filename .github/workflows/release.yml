@@ -27,8 +27,8 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v4.1.2
+      - name: Run tests
+        run: go test ./... -race
 
       - name: Verify Homebrew tap token
         env:

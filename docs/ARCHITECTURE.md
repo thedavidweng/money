@@ -33,7 +33,7 @@ Sync JSON is provisional during the Plaid and Bridge milestone. The first stable
 
 Removed provider transactions are soft-deleted. Sync marks them as removed and preserves the local row and annotations. Transaction read commands exclude removed records by default and support `--removed exclude|include|only`. Permanent cleanup is a separate write operation that requires dry-run and confirmation.
 
-The cleanup command follows Monarch-compatible transaction naming: `money transactions cleanup --removed --dry-run --json` previews permanent deletion, and `money transactions cleanup --removed --confirm --json` applies it. `tx cleanup` may exist as an alias, but cleanup must always name the cleanup target explicitly.
+[Planned] The cleanup command follows Monarch-compatible transaction naming: `money transactions cleanup --removed --dry-run --json` previews permanent deletion, and `money transactions cleanup --removed --confirm --json` applies it. `tx cleanup` may exist as an alias, but cleanup must always name the cleanup target explicitly.
 
 Write operations use Monarch-style safety gates. Local mutations such as cleanup, annotations, category/tag mutations, merge apply, and manual account changes require `--dry-run` or `--confirm`. Read commands do not. Provider link and sync are explicit outbound commands and do not require confirmation by default, but destructive relink, remove, or purge operations do.
 
@@ -75,7 +75,7 @@ Accounts may store and expose provider-supplied `mask` when available to help di
 
 Account `display_name` is derived as alias first, then provider name, then official name. Provider `name`, `official_name`, local `alias`, and `mask` remain separate fields; changing an alias must not mutate Provider-supplied names.
 
-The first account write operation may be `money accounts update <id> --alias <name>`, following Monarch-compatible naming. It only changes the local alias and requires dry-run or confirmation.
+[Planned] The first account write operation may be `money accounts update <id> --alias <name>`, following Monarch-compatible naming. It only changes the local alias and requires dry-run or confirmation.
 
 ## Store Boundary
 
@@ -121,7 +121,7 @@ All human-mode choice prompts use the same Hermes Agent-style selector: arrow ke
 
 Human output is the default CLI mode and `--json` is opt-in, matching Monarch CLI habits. JSON contracts remain the automation source of truth and are the focus of contract tests.
 
-JSON output is compact by default for machine use. `--pretty` may format JSON for humans, but stdout must still contain only JSON.
+JSON output is compact by default for machine use. [Planned] `--pretty` may format JSON for humans, but stdout must still contain only JSON.
 
 The first implementation includes a demo environment so users and tests can exercise `money` without real financial data or Provider credentials. Demo mode is isolated from the real encrypted store, uses synthetic initial data, allows normal read and write operations inside the demo runtime, and resets to the initial state when the demo run ends.
 

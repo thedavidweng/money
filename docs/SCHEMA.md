@@ -13,7 +13,7 @@ This document is the first migration contract for the local SQLite store. The im
 
 ## ID and Money Conventions
 
-- Local IDs are text primary keys with stable prefixes: `inst_`, `pi_`, `acc_`, `tx_`, `cat_`, `tag_`, and `rec_`.
+- Local IDs are text primary keys with stable prefixes: `inst_`, `pi_`, `acc_`, `tx_`, `cat_`, `tag_`, `rec_`, `sec_`, `hold_`, `lia_`, `bud_`, `bcat_`, and `rule_`.
 - Provider-native IDs are provenance fields, never local primary keys.
 - Money is stored as signed integer minor units with an ISO 4217 `currency` column.
 - JSON contracts render money as decimal strings such as `"123.45"` or `"-45.67"`.
@@ -177,6 +177,113 @@ CREATE INDEX idx_transactions_removed ON transactions(removed);
 CREATE INDEX idx_transaction_tags_tag ON transaction_tags(tag_id, transaction_id);
 CREATE INDEX idx_recurring_account ON recurring(account_id);
 CREATE INDEX idx_sync_runs_item_started ON sync_runs(provider_item_id, started_at DESC);
+```
+
+### Migration 0002: Investments and Liabilities
+
+```sql
+CREATE TABLE securities (
+  id TEXT PRIMARY KEY,
+  security_id TEXT NOT NULL UNIQUE,
+  isin TEXT,
+  cusip TEXT,
+  sedol TEXT,
+  name TEXT NOT NULL,
+  ticker_symbol TEXT,
+  type TEXT,
+  close_price REAL,
+  close_price_as_of TEXT,
+  currency TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE holdings (
+  id TEXT PRIMARY KEY,
+  provider_item_id TEXT NOT NULL REFERENCES provider_items(id) ON DELETE CASCADE,
+  account_id TEXT NOT NULL REFERENCES accounts(id),
+  provider_account_id TEXT NOT NULL,
+  security_id TEXT,
+  quantity REAL NOT NULL,
+  institution_price REAL NOT NULL,
+  institution_value REAL NOT NULL,
+  cost_basis REAL,
+  currency TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (provider_item_id, provider_account_id, security_id)
+);
+
+CREATE TABLE liabilities (
+  id TEXT PRIMARY KEY,
+  provider_item_id TEXT NOT NULL REFERENCES provider_items(id) ON DELETE CASCADE,
+  account_id TEXT NOT NULL REFERENCES accounts(id),
+  provider_account_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  current_balance REAL NOT NULL,
+  original_balance REAL,
+  currency TEXT NOT NULL,
+  name TEXT NOT NULL,
+  last_payment_date TEXT,
+  last_payment_amount REAL,
+  next_payment_due_date TEXT,
+  apr REAL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (provider_item_id, provider_account_id, type, name)
+);
+
+CREATE INDEX idx_holdings_account ON holdings(account_id);
+CREATE INDEX idx_liabilities_account ON liabilities(account_id);
+```
+
+### Migration 0003: Budgets
+
+```sql
+CREATE TABLE budgets (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  currency TEXT NOT NULL,
+  period TEXT NOT NULL CHECK (period IN ('monthly', 'yearly')),
+  start_date TEXT NOT NULL,
+  end_date TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE budget_categories (
+  id TEXT PRIMARY KEY,
+  budget_id TEXT NOT NULL REFERENCES budgets(id) ON DELETE CASCADE,
+  category_id TEXT REFERENCES categories(id),
+  name TEXT NOT NULL,
+  limit_minor_units INTEGER NOT NULL,
+  currency TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_budgets_period ON budgets(period, start_date, end_date);
+CREATE INDEX idx_budget_categories_budget ON budget_categories(budget_id);
+```
+
+### Migration 0004: Rules
+
+```sql
+CREATE TABLE rules (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  condition_field TEXT NOT NULL,
+  condition_op TEXT NOT NULL,
+  condition_value TEXT NOT NULL,
+  action_type TEXT NOT NULL,
+  action_value TEXT NOT NULL,
+  priority INTEGER NOT NULL DEFAULT 0,
+  enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_rules_priority ON rules(enabled, priority DESC);
 ```
 
 ## Source Mapping

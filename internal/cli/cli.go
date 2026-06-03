@@ -1516,6 +1516,10 @@ func commandName(cmd *cobra.Command) string {
 
 var noColorForced = os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb"
 
+func isTerminal(f *os.File) bool {
+	return term.IsTerminal(int(f.Fd()))
+}
+
 func supportsColor(w io.Writer) bool {
 	if noColorForced {
 		return false

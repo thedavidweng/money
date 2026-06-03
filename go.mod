@@ -1,6 +1,6 @@
 module github.com/thedavidweng/money
 
-go 1.25.8
+go 1.26.4
 
 require (
 	github.com/ncruces/go-sqlite3 v0.34.1

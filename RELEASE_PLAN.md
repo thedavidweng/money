@@ -152,7 +152,7 @@ Goal: every push is tested, and a tag produces published binaries.
 Steps:
 
 1. Create `.github/workflows/ci.yml` that triggers on `push` to `main` and on `pull_request`.
-2. Steps: checkout, setup Go 1.25, `go vet ./...`, `go test ./... -race`, verify `go build ./...`.
+2. Steps: checkout, setup Go 1.26, `go vet ./...`, `go test ./... -race`, verify `go build ./...`.
 3. Cache Go modules and the Go build cache keyed on `go.sum`.
 4. Run on `ubuntu-latest` and `macos-latest`.
 5. Make the README CI badge resolve to this workflow.

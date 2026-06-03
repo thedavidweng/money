@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"runtime"
 	"strings"
@@ -112,10 +113,16 @@ func newDoctorCommand(_ context.Context, state *runtimeState, stdout io.Writer) 
 		Use:   "doctor",
 		Short: "Check configuration and system health",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Only log to slog when stderr is a TTY (not piped/combined).
+			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+			if f, ok := state.stderr.(*os.File); ok && isTerminal(f) {
+				logger = slog.New(slog.NewTextHandler(state.stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+			}
 			if fix {
-				return runDoctorFix(state, stdout, dryRun)
+				return runDoctorFix(state, stdout, logger, dryRun)
 			}
 			diagnostics := runDiagnostics(state.configPath, state.profile)
+			logDiagnostics(logger, diagnostics)
 			if state.json {
 				env := contracts.NewSuccess("doctor", map[string]any{"diagnostics": diagnostics})
 				return contracts.WriteJSON(stdout, env)
@@ -139,7 +146,7 @@ func newDoctorCommand(_ context.Context, state *runtimeState, stdout io.Writer) 
 	return cmd
 }
 
-func runDoctorFix(state *runtimeState, stdout io.Writer, dryRun bool) error {
+func runDoctorFix(state *runtimeState, stdout io.Writer, logger *slog.Logger, dryRun bool) error {
 	result, err := config.Setup(state.configPath, state.profile, false)
 	if dryRun {
 		if state.json {
@@ -162,16 +169,28 @@ func runDoctorFix(state *runtimeState, stdout io.Writer, dryRun bool) error {
 			exitCode: 1,
 		}
 	}
-	// Open DB to ensure migrations run
+	// Open DB to ensure migrations run, then fix links and sync.
+	ctx := context.Background()
 	cfg, loadErr := config.Load(config.Options{ConfigPath: result.ConfigPath, Profile: state.profile})
 	if loadErr == nil {
-		opened, openErr := store.OpenEncrypted(context.Background(), cfg.DatabasePath, cfg.DatabaseEncryptionKeyBytes)
+		opened, openErr := store.OpenEncrypted(ctx, cfg.DatabasePath, cfg.DatabaseEncryptionKeyBytes)
 		if openErr == nil {
-			opened.Close()
 			result.DBCreated = true
+			linksFixed, _ := runDoctorFixLinks(ctx, opened)
+			syncFixed, _ := runDoctorFixSync(ctx, opened)
+			opened.Close()
+			result.LinksFixed = linksFixed
+			result.SyncFixed = syncFixed
+			if linksFixed > 0 {
+				logFixResult(logger, "links", linksFixed)
+			}
+			if syncFixed > 0 {
+				logFixResult(logger, "sync", syncFixed)
+			}
 		}
 	}
 	diagnostics := runDiagnostics(result.ConfigPath, state.profile)
+	logDiagnostics(logger, diagnostics)
 	if state.json {
 		env := contracts.NewSuccess("doctor", map[string]any{
 			"mode":        "fix",
@@ -238,19 +257,26 @@ func runDiagnostics(configPath string, profile string) []Diagnostic {
 	}
 
 	// Store section
-	opened, openErr := store.OpenEncrypted(context.Background(), cfg.DatabasePath, cfg.DatabaseEncryptionKeyBytes)
+	ctx := context.Background()
+	opened, openErr := store.OpenEncrypted(ctx, cfg.DatabasePath, cfg.DatabaseEncryptionKeyBytes)
 	if openErr != nil {
 		diags = append(diags, Diagnostic{
 			Section: "Store", Code: "STORE_OPEN_FAILED", Status: "error",
 			Message: openErr.Error(), Category: "internal",
 		})
-	} else {
-		opened.Close()
-		diags = append(diags, Diagnostic{
-			Section: "Store", Code: "STORE_OK", Status: "ok",
-			Message: "Database opened at " + cfg.DatabasePath, Category: "internal",
-		})
+		return diags
 	}
+	defer opened.Close()
+	diags = append(diags, Diagnostic{
+		Section: "Store", Code: "STORE_OK", Status: "ok",
+		Message: "Database opened at " + cfg.DatabasePath, Category: "internal",
+	})
+
+	// Links section
+	diags = append(diags, appendLinksDiagnostics(ctx, opened)...)
+
+	// Sync section
+	diags = append(diags, appendSyncDiagnostics(ctx, opened)...)
 
 	// Providers section
 	for _, name := range []string{"plaid", "bridge"} {
@@ -278,6 +304,150 @@ func runDiagnostics(configPath string, profile string) []Diagnostic {
 	}
 
 	return diags
+}
+
+func appendLinksDiagnostics(ctx context.Context, db *store.SQLiteStore) []Diagnostic {
+	var diags []Diagnostic
+	items, err := db.ListProviderItems(ctx, store.ProviderItemQuery{})
+	if err != nil {
+		diags = append(diags, Diagnostic{
+			Section: "Links", Code: "LINKS_QUERY_FAILED", Status: "error",
+			Message: err.Error(), Category: "internal",
+		})
+		return diags
+	}
+	if len(items) == 0 {
+		diags = append(diags, Diagnostic{
+			Section: "Links", Code: "LINKS_NONE", Status: "ok",
+			Message: "No linked provider items.", Category: "internal",
+		})
+		return diags
+	}
+	// Count items per provider.
+	counts := map[string]int{}
+	for _, item := range items {
+		counts[item.Provider]++
+	}
+	for provider, count := range counts {
+		diags = append(diags, Diagnostic{
+			Section: "Links", Code: "LINKS_OK", Status: "ok",
+			Message: fmt.Sprintf("%s: %d linked item(s)", provider, count), Category: "internal",
+		})
+	}
+	return diags
+}
+
+func appendSyncDiagnostics(ctx context.Context, db *store.SQLiteStore) []Diagnostic {
+	var diags []Diagnostic
+	items, err := db.ListProviderItems(ctx, store.ProviderItemQuery{})
+	if err != nil {
+		diags = append(diags, Diagnostic{
+			Section: "Sync", Code: "SYNC_QUERY_FAILED", Status: "error",
+			Message: err.Error(), Category: "internal",
+		})
+		return diags
+	}
+	if len(items) == 0 {
+		diags = append(diags, Diagnostic{
+			Section: "Sync", Code: "SYNC_NO_ITEMS", Status: "ok",
+			Message: "No provider items to sync.", Category: "internal",
+		})
+		return diags
+	}
+
+	runs, err := db.LatestSyncRuns(ctx)
+	if err != nil {
+		diags = append(diags, Diagnostic{
+			Section: "Sync", Code: "SYNC_QUERY_FAILED", Status: "error",
+			Message: err.Error(), Category: "internal",
+		})
+		return diags
+	}
+
+	// Index latest runs by provider item ID.
+	latestByItem := map[string]store.SyncRunSummary{}
+	for _, r := range runs {
+		latestByItem[r.ProviderItemID] = r
+	}
+
+	for _, item := range items {
+		run, ok := latestByItem[item.ID]
+		if !ok {
+			diags = append(diags, Diagnostic{
+				Section: "Sync", Code: "SYNC_NO_RUNS", Status: "warn",
+				Message:  fmt.Sprintf("%s (%s): never synced", item.ID, item.Provider),
+				Category: "internal",
+			})
+			continue
+		}
+		if run.Status == "error" {
+			diags = append(diags, Diagnostic{
+				Section: "Sync", Code: "SYNC_LAST_ERROR", Status: "error",
+				Message:  fmt.Sprintf("%s (%s): last sync failed at %s — %s", item.ID, item.Provider, run.StartedAt, run.ErrorMessage),
+				Category: "internal",
+			})
+		} else {
+			diags = append(diags, Diagnostic{
+				Section: "Sync", Code: "SYNC_OK", Status: "ok",
+				Message:  fmt.Sprintf("%s (%s): last sync ok at %s", item.ID, item.Provider, run.StartedAt),
+				Category: "internal",
+			})
+		}
+	}
+	return diags
+}
+
+// runDoctorFixLinks removes provider items with non-active status.
+// Returns the number of items removed.
+func runDoctorFixLinks(ctx context.Context, db *store.SQLiteStore) (int, error) {
+	items, err := db.ListProviderItems(ctx, store.ProviderItemQuery{})
+	if err != nil {
+		return 0, err
+	}
+	fixed := 0
+	for _, item := range items {
+		if item.Status != "active" {
+			if err := db.RemoveProviderItem(ctx, item.ID); err != nil {
+				return fixed, err
+			}
+			fixed++
+		}
+	}
+	return fixed, nil
+}
+
+// runDoctorFixSync marks stuck sync runs (no finished_at) as "interrupted".
+// Returns the number of runs updated.
+func runDoctorFixSync(ctx context.Context, db *store.SQLiteStore) (int, error) {
+	return db.MarkStuckSyncRunsInterrupted(ctx)
+}
+
+// logDiagnostics emits each diagnostic as a structured slog entry.
+func logDiagnostics(logger *slog.Logger, diags []Diagnostic) {
+	for _, d := range diags {
+		level := slog.LevelInfo
+		switch d.Status {
+		case "warn":
+			level = slog.LevelWarn
+		case "error":
+			level = slog.LevelError
+		}
+		logger.LogAttrs(context.Background(), level, "doctor diagnostic",
+			slog.String("section", d.Section),
+			slog.String("code", d.Code),
+			slog.String("status", d.Status),
+			slog.String("message", d.Message),
+			slog.String("category", d.Category),
+		)
+	}
+}
+
+// logFixResult logs the result of a doctor fix operation.
+func logFixResult(logger *slog.Logger, target string, count int) {
+	logger.Info("doctor fix",
+		slog.String("target", target),
+		slog.Int("fixed", count),
+	)
 }
 
 func printDiagnostics(w io.Writer, diags []Diagnostic) {
