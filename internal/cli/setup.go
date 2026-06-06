@@ -22,8 +22,9 @@ import (
 func newSetupCommand(_ context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
 	var force bool
 	cmd := &cobra.Command{
-		Use:   "setup",
-		Short: "Initialize money configuration and encrypted database",
+		Use:     "setup",
+		Short:   "Initialize money configuration and encrypted database",
+		Example: "  money setup\n  money setup --force",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			result, err := config.Setup(state.configPath, state.profile, force)
 			if err != nil {
@@ -110,8 +111,9 @@ type Diagnostic struct {
 func newDoctorCommand(_ context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
 	var fix, dryRun bool
 	cmd := &cobra.Command{
-		Use:   "doctor",
-		Short: "Check configuration and system health",
+		Use:     "doctor",
+		Short:   "Check configuration and system health",
+		Example: "  money doctor\n  money doctor --fix\n  money doctor --fix --dry-run",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Only log to slog when stderr is a TTY (not piped/combined).
 			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -803,9 +805,13 @@ func confirmProviderCredentialOverwrite(state *runtimeState, output io.Writer, s
 
 func newConfigureCommand(state *runtimeState, stdout io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "configure <provider>",
-		Short: "Configure provider credentials",
-		Args:  cobra.ExactArgs(1),
+		Use:     "configure <provider>",
+		Short:   "Configure provider credentials",
+		Example: "  money providers configure plaid\n  money providers configure bridge --force",
+		Args:    cobra.ExactArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return []string{"plaid", "bridge"}, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var reader *bufio.Reader
 			if state.stdin != nil {
@@ -820,6 +826,9 @@ func newConfigureCommand(state *runtimeState, stdout io.Writer) *cobra.Command {
 	cmd.Flags().String("secret", "", "provider secret")
 	cmd.Flags().String("client-secret", "", "provider client secret")
 	cmd.Flags().String("environment", "", "provider environment (e.g. sandbox)")
+	_ = cmd.RegisterFlagCompletionFunc("environment", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"sandbox", "production"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().String("products", "", "comma-separated products")
 	cmd.Flags().String("country-codes", "", "comma-separated country codes")
 	cmd.Flags().String("redirect-uri", "", "redirect URI")

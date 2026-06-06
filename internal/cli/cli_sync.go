@@ -18,8 +18,9 @@ func newSyncCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 	var providerName, providerItemID, startDate, endDate string
 	var verbose bool
 	cmd := &cobra.Command{
-		Use:   "sync",
-		Short: "Sync linked Provider Items",
+		Use:     "sync",
+		Short:   "Sync linked Provider Items",
+		Example: "  money sync\n  money sync --provider plaid\n  money sync --provider-item item_123 --verbose",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			activeStore, err := requireStore(state)
 			if err != nil {
@@ -43,6 +44,9 @@ func newSyncCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 		},
 	}
 	cmd.Flags().StringVar(&providerName, "provider", "", "sync only one provider")
+	_ = cmd.RegisterFlagCompletionFunc("provider", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"plaid", "bridge"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().StringVar(&providerItemID, "provider-item", "", "sync only one provider item")
 	cmd.Flags().StringVar(&startDate, "start-date", "", "backfill transactions from this date (YYYY-MM-DD); requires --end-date")
 	cmd.Flags().StringVar(&endDate, "end-date", "", "backfill transactions until this date (YYYY-MM-DD); requires --start-date")

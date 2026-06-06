@@ -13,7 +13,11 @@ import (
 )
 
 func newRulesCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
-	cmd := &cobra.Command{Use: "rules"}
+	cmd := &cobra.Command{
+		Use:     "rules",
+		Short:   "Manage transaction categorization rules",
+		Example: "  money rules list\n  money rules create --name \"Groceries\" --condition-field merchant_name --condition-op contains --condition-value \"whole foods\" --action-type set_category --action-value groceries --confirm\n  money rules apply\n  money rules delete <id>",
+	}
 	cmd.AddCommand(newRulesListCommand(ctx, state, stdout))
 	cmd.AddCommand(newRulesCreateCommand(ctx, state, stdout))
 	cmd.AddCommand(newRulesDeleteCommand(ctx, state, stdout))
@@ -58,8 +62,9 @@ func newRulesCreateCommand(ctx context.Context, state *runtimeState, stdout io.W
 	var priority int
 	var dryRun, confirm bool
 	cmd := &cobra.Command{
-		Use:   "create",
-		Short: "Create a rule",
+		Use:     "create",
+		Short:   "Create a rule",
+		Example: "  money rules create --name \"Mark Uber\" --condition-field merchant_name --condition-op contains --condition-value uber --action-type set_category --action-value transport --confirm\n  money rules create --name \"Add note\" --condition-field name --condition-op equals --condition-value \"Starbucks\" --action-type set_note --action-value \"coffee\" --dry-run",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if state.json && !dryRun && !confirm {
 				return cliError{
@@ -113,9 +118,18 @@ func newRulesCreateCommand(ctx context.Context, state *runtimeState, stdout io.W
 	}
 	cmd.Flags().StringVar(&name, "name", "", "rule name")
 	cmd.Flags().StringVar(&conditionField, "condition-field", "", "field to match: merchant_name or name")
+	_ = cmd.RegisterFlagCompletionFunc("condition-field", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"merchant_name", "name"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().StringVar(&conditionOp, "condition-op", "", "operator: contains or equals")
+	_ = cmd.RegisterFlagCompletionFunc("condition-op", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"contains", "equals"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().StringVar(&conditionValue, "condition-value", "", "value to match")
 	cmd.Flags().StringVar(&actionType, "action-type", "", "action: set_category or set_note")
+	_ = cmd.RegisterFlagCompletionFunc("action-type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"set_category", "set_note"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().StringVar(&actionValue, "action-value", "", "action value")
 	cmd.Flags().IntVar(&priority, "priority", 0, "rule priority (higher first)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show write plan without saving")
@@ -128,6 +142,21 @@ func newRulesDeleteCommand(ctx context.Context, state *runtimeState, stdout io.W
 		Use:   "delete <id>",
 		Short: "Delete a rule",
 		Args:  cobra.ExactArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			rules, err := activeStore.ListRules(ctx)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			var ids []string
+			for _, r := range rules {
+				ids = append(ids, r.ID+"\t"+r.Name)
+			}
+			return ids, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			activeStore, err := requireStore(state)
 			if err != nil {

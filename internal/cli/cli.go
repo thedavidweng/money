@@ -105,6 +105,13 @@ If this is your first time, run:
 This creates your config, encryption key, and database. After setup, you can
 link financial institutions and sync transactions locally.
 `,
+		Version:       fmt.Sprintf("%s (commit %s)", Version, Commit),
+		Example: `  money setup
+  money link "Chase"
+  money sync
+  money transactions list --category groceries
+  money accounts list --json
+  money demo transactions list`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -118,9 +125,14 @@ link financial institutions and sync transactions locally.
 	root.AddGroup(&cobra.Group{ID: "config", Title: "Configuration"})
 	root.AddGroup(&cobra.Group{ID: "utils", Title: "Utilities"})
 
+	completionCmd := newCompletionCommand(stdout)
+	completionCmd.GroupID = "utils"
+	root.AddCommand(completionCmd)
+
 	versionCmd := &cobra.Command{
 		Use:     "version",
 		Short:   "Print version",
+		Example: "  money version\n  money version --json",
 		GroupID: "utils",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if state.json {
@@ -249,7 +261,11 @@ func (e cliExit) Error() string {
 }
 
 func newInvestmentsCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
-	cmd := &cobra.Command{Use: "investments"}
+	cmd := &cobra.Command{
+		Use:     "investments",
+		Short:   "Manage investment accounts",
+		Example: "  money investments holdings\n  money investments securities --json",
+	}
 	cmd.AddCommand(&cobra.Command{
 		Use:   "holdings",
 		Short: "List investment holdings",
@@ -312,7 +328,11 @@ func newInvestmentsCommand(ctx context.Context, state *runtimeState, stdout io.W
 }
 
 func newLiabilitiesCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
-	cmd := &cobra.Command{Use: "liabilities"}
+	cmd := &cobra.Command{
+		Use:     "liabilities",
+		Short:   "Manage liabilities",
+		Example: "  money liabilities list\n  money liabilities list --json",
+	}
 	cmd.AddCommand(&cobra.Command{
 		Use:   "list",
 		Short: "List liabilities",
@@ -345,8 +365,9 @@ func newLiabilitiesCommand(ctx context.Context, state *runtimeState, stdout io.W
 
 func newFeedbackCommand(state *runtimeState, stdout io.Writer) *cobra.Command {
 	return &cobra.Command{
-		Use:   "feedback",
-		Short: "Open the project's GitHub issues page in a browser",
+		Use:     "feedback",
+		Short:   "Open the project's GitHub issues page in a browser",
+		Example: "  money feedback",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			url := "https://github.com/thedavidweng/money/issues"
 			if state.json {
@@ -366,6 +387,10 @@ func newDemoCommand(ctx context.Context, state *runtimeState, stdout io.Writer, 
 	cmd := &cobra.Command{
 		Use:   "demo <command...>",
 		Short: "Run a command against bundled non-persistent sample data",
+		Example: `  money demo accounts list
+  money demo transactions list --verbose
+  money demo net-worth
+  money demo categories list`,
 		Long: `demo runs money commands against bundled non-persistent sample data.
 
 This is a safe sandbox to explore the CLI without linking real institutions.
@@ -442,10 +467,15 @@ All data is stored in memory and discarded when the command exits.
 
 func newAccountsCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
 	var verbose bool
-	cmd := &cobra.Command{Use: "accounts"}
+	cmd := &cobra.Command{
+		Use:     "accounts",
+		Short:   "Manage accounts",
+		Example: "  money accounts list\n  money accounts list --verbose --json\n  money accounts create-manual --name Savings --type depository --balance 1000.00 --currency USD --confirm",
+	}
 	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List accounts",
+		Example: "  money accounts list\n  money accounts list --verbose\n  money accounts list --json",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			activeStore, err := requireStore(state)
 			if err != nil {
@@ -505,8 +535,9 @@ func newCreateManualCommand(ctx context.Context, state *runtimeState, stdout io.
 	var name, accountType, subtype, balance, currency, alias string
 	var dryRun, confirm bool
 	cmd := &cobra.Command{
-		Use:   "create-manual",
-		Short: "Create a local manual account",
+		Use:     "create-manual",
+		Short:   "Create a local manual account",
+		Example: "  money accounts create-manual --name Savings --type depository --balance 5000.00 --currency USD --confirm\n  money accounts create-manual --name \"Credit Card\" --type credit --balance 500.00 --dry-run",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if state.json && !dryRun && !confirm {
 				return cliError{
@@ -568,6 +599,9 @@ func newCreateManualCommand(ctx context.Context, state *runtimeState, stdout io.
 	}
 	cmd.Flags().StringVar(&name, "name", "", "account name")
 	cmd.Flags().StringVar(&accountType, "type", "", "account type")
+	_ = cmd.RegisterFlagCompletionFunc("type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"depository", "credit", "investment", "loan", "property", "vehicle", "other_asset", "other_liability"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().StringVar(&subtype, "subtype", "", "account subtype")
 	cmd.Flags().StringVar(&balance, "balance", "", "unsigned balance")
 	cmd.Flags().StringVar(&currency, "currency", "USD", "currency")
@@ -581,13 +615,16 @@ func newTransactionsCommand(ctx context.Context, state *runtimeState, stdout io.
 	cmd := &cobra.Command{
 		Use:     "transactions",
 		Aliases: []string{"transaction"},
+		Short:   "Manage transactions",
+		Example: "  money transactions list\n  money transactions search \"grocery\"\n  money tx list --account acc_123 --date-from 2024-01-01",
 	}
 	cmd.AddCommand(newTransactionsListCommand(ctx, state, stdout))
 	var searchLimit int
 	var searchVerbose bool
 	searchCmd := &cobra.Command{
-		Use:   "search <query>",
-		Short: "Search transactions",
+		Use:     "search <query>",
+		Short:   "Search transactions",
+		Example: "  money transactions search \"whole foods\"\n  money transactions search uber --limit 10",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			activeStore, err := requireStore(state)
@@ -614,8 +651,9 @@ func newTransactionsListCommand(ctx context.Context, state *runtimeState, stdout
 	var limit, offset int
 	var verbose bool
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List transactions",
+		Use:     "list",
+		Short:   "List transactions",
+		Example: "  money transactions list\n  money transactions list --category groceries --date-from 2024-01-01\n  money transactions list --merchant amazon --limit 20 --json",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			activeStore, err := requireStore(state)
 			if err != nil {
@@ -654,6 +692,9 @@ func newTransactionsListCommand(ctx context.Context, state *runtimeState, stdout
 		},
 	}
 	cmd.Flags().StringVar(&removedMode, "removed", string(store.RemovedExclude), "removed transaction mode: exclude, include, or only")
+	_ = cmd.RegisterFlagCompletionFunc("removed", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"exclude", "include", "only"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().StringVar(&accountID, "account", "", "filter by account id")
 	cmd.Flags().StringVar(&categoryID, "category", "", "filter by category id")
 	cmd.Flags().StringVar(&merchant, "merchant", "", "filter by merchant or transaction name")
@@ -661,8 +702,17 @@ func newTransactionsListCommand(ctx context.Context, state *runtimeState, stdout
 	cmd.Flags().StringVar(&dateFrom, "date-from", "", "filter by inclusive start date")
 	cmd.Flags().StringVar(&dateTo, "date-to", "", "filter by inclusive end date")
 	cmd.Flags().StringVar(&needsReview, "needs-review", "", "filter by review state: true or false")
+	_ = cmd.RegisterFlagCompletionFunc("needs-review", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"true", "false"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().StringVar(&pending, "pending", "", "filter by pending state: true or false")
+	_ = cmd.RegisterFlagCompletionFunc("pending", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"true", "false"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().StringVar(&recurring, "recurring", "", "filter by recurring state: true or false")
+	_ = cmd.RegisterFlagCompletionFunc("recurring", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"true", "false"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().IntVar(&limit, "limit", 50, "maximum transactions to return")
 	cmd.Flags().IntVar(&offset, "offset", 0, "transactions to skip")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "show local IDs, source provenance, notes, tags, and provider categories")
@@ -671,10 +721,15 @@ func newTransactionsListCommand(ctx context.Context, state *runtimeState, stdout
 
 func newCategoriesCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
 	var verbose bool
-	cmd := &cobra.Command{Use: "categories"}
+	cmd := &cobra.Command{
+		Use:     "categories",
+		Short:   "Manage transaction categories",
+		Example: "  money categories list\n  money categories list --verbose --json",
+	}
 	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List categories",
+		Example: "  money categories list\n  money categories list --verbose",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			activeStore, err := requireStore(state)
 			if err != nil {
@@ -722,7 +777,11 @@ func newCategoriesCommand(ctx context.Context, state *runtimeState, stdout io.Wr
 
 func newTagsCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
 	var verbose bool
-	cmd := &cobra.Command{Use: "tags"}
+	cmd := &cobra.Command{
+		Use:     "tags",
+		Short:   "Manage transaction tags",
+		Example: "  money tags list\n  money tags list --verbose",
+	}
 	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List tags",
@@ -764,7 +823,11 @@ func newTagsCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 }
 
 func newItemsCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
-	cmd := &cobra.Command{Use: "items"}
+	cmd := &cobra.Command{
+		Use:     "items",
+		Short:   "Manage linked provider items",
+		Example: "  money items list\n  money items get <id>\n  money items rename <id> \"My Bank\"\n  money items remove <id>",
+	}
 	cmd.AddCommand(&cobra.Command{
 		Use:   "list",
 		Short: "List linked provider items",
@@ -800,6 +863,21 @@ func newItemsCommand(ctx context.Context, state *runtimeState, stdout io.Writer)
 		Use:   "get <id>",
 		Short: "Get a linked provider item",
 		Args:  cobra.ExactArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			items, err := activeStore.ListProviderItems(ctx, store.ProviderItemQuery{})
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			var ids []string
+			for _, item := range items {
+				ids = append(ids, item.ID+"\t"+item.Provider+": "+item.InstitutionID)
+			}
+			return ids, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			activeStore, err := requireStore(state)
 			if err != nil {
@@ -818,6 +896,24 @@ func newItemsCommand(ctx context.Context, state *runtimeState, stdout io.Writer)
 		Use:   "rename <id> <name>",
 		Short: "Rename a linked provider item alias",
 		Args:  cobra.ExactArgs(2),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) == 0 {
+				activeStore, err := requireStore(state)
+				if err != nil {
+					return nil, cobra.ShellCompDirectiveNoFileComp
+				}
+				items, err := activeStore.ListProviderItems(ctx, store.ProviderItemQuery{})
+				if err != nil {
+					return nil, cobra.ShellCompDirectiveNoFileComp
+				}
+				var ids []string
+				for _, item := range items {
+					ids = append(ids, item.ID+"\t"+item.Provider+": "+item.InstitutionID)
+				}
+				return ids, cobra.ShellCompDirectiveNoFileComp
+			}
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			activeStore, err := requireStore(state)
 			if err != nil {
@@ -840,6 +936,21 @@ func newItemsCommand(ctx context.Context, state *runtimeState, stdout io.Writer)
 		Use:   "remove <id>",
 		Short: "Remove a linked provider item",
 		Args:  cobra.ExactArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			items, err := activeStore.ListProviderItems(ctx, store.ProviderItemQuery{})
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			var ids []string
+			for _, item := range items {
+				ids = append(ids, item.ID+"\t"+item.Provider+": "+item.InstitutionID)
+			}
+			return ids, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			activeStore, err := requireStore(state)
 			if err != nil {
@@ -862,7 +973,11 @@ func newItemsCommand(ctx context.Context, state *runtimeState, stdout io.Writer)
 
 func newRecurringCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
 	var verbose bool
-	cmd := &cobra.Command{Use: "recurring"}
+	cmd := &cobra.Command{
+		Use:     "recurring",
+		Short:   "Manage recurring transactions",
+		Example: "  money recurring list\n  money recurring list --verbose --json",
+	}
 	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List recurring transactions",
@@ -908,7 +1023,11 @@ func newRecurringCommand(ctx context.Context, state *runtimeState, stdout io.Wri
 }
 
 func newImportCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
-	cmd := &cobra.Command{Use: "import"}
+	cmd := &cobra.Command{
+		Use:     "import",
+		Short:   "Import accounts and transactions from external sources",
+		Example: "  money import monarch transactions.csv\n  money import csv transactions.csv --dry-run\n  money import monarch data.csv --batch-id 20240101 --confirm",
+	}
 	registry := importsource.DefaultRegistry()
 	for _, name := range registry.Names() {
 		sourceName := name
@@ -995,8 +1114,9 @@ func newImportCommand(ctx context.Context, state *runtimeState, stdout io.Writer
 func newCashflowCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
 	var fromDate, toDate, period, currency string
 	cmd := &cobra.Command{
-		Use:   "cashflow",
-		Short: "Show income and expenses over time",
+		Use:     "cashflow",
+		Short:   "Show income and expenses over time",
+		Example: "  money cashflow --from 2024-01-01 --to 2024-12-31\n  money cashflow --from 2024-01-01 --to 2024-12-31 --period yearly --json",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if fromDate == "" || toDate == "" {
 				return fmt.Errorf("cashflow requires --from and --to dates")
@@ -1027,14 +1147,18 @@ func newCashflowCommand(ctx context.Context, state *runtimeState, stdout io.Writ
 	cmd.Flags().StringVar(&fromDate, "from", "", "start date (YYYY-MM-DD)")
 	cmd.Flags().StringVar(&toDate, "to", "", "end date (YYYY-MM-DD)")
 	cmd.Flags().StringVar(&period, "period", "monthly", "grouping period: monthly or yearly")
+	_ = cmd.RegisterFlagCompletionFunc("period", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"monthly", "yearly"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().StringVar(&currency, "currency", "USD", "currency to report")
 	return cmd
 }
 
 func newNetWorthCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "net-worth",
-		Short: "Show current net worth across all visible accounts",
+		Use:     "net-worth",
+		Short:   "Show current net worth across all visible accounts",
+		Example: "  money net-worth\n  money net-worth --json",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			activeStore, err := requireStore(state)
 			if err != nil {
@@ -1057,7 +1181,11 @@ func newNetWorthCommand(ctx context.Context, state *runtimeState, stdout io.Writ
 }
 
 func newProvidersCommand(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer) *cobra.Command {
-	cmd := &cobra.Command{Use: "providers"}
+	cmd := &cobra.Command{
+		Use:     "providers",
+		Short:   "Manage financial data providers",
+		Example: "  money providers plaid link\n  money providers bridge link\n  money providers configure plaid",
+	}
 	cmd.AddCommand(newPlaidProviderCommand(ctx, state, stdout, stderr))
 	cmd.AddCommand(newProviderLinkCommand(ctx, state, "bridge", stdout))
 	cmd.AddCommand(newConfigureCommand(state, stdout))
@@ -1073,8 +1201,9 @@ func newPlaidProviderCommand(ctx context.Context, state *runtimeState, stdout io
 
 func newPlaidCommand(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "plaid",
-		Short: "Plaid-specific setup and Dashboard commands",
+		Use:     "plaid",
+		Short:   "Plaid-specific setup and Dashboard commands",
+		Example: "  money plaid login\n  money plaid logout\n  money plaid sandbox link",
 	}
 	cmd.AddCommand(newPlaidLoginCommand(ctx, state, stdout, stderr, "plaid.login"))
 	cmd.AddCommand(newPlaidLogoutCommand(state, stdout, "plaid.logout"))
@@ -1084,8 +1213,9 @@ func newPlaidCommand(ctx context.Context, state *runtimeState, stdout io.Writer,
 
 func newPlaidSandboxCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "sandbox",
-		Short: "Plaid Sandbox helpers",
+		Use:     "sandbox",
+		Short:   "Plaid Sandbox helpers",
+		Example: "  money plaid sandbox link\n  money plaid sandbox link --institution-id ins_56 --products transactions,auth",
 	}
 	cmd.AddCommand(newPlaidSandboxLinkCommand(ctx, state, stdout))
 	return cmd
@@ -1094,8 +1224,9 @@ func newPlaidSandboxCommand(ctx context.Context, state *runtimeState, stdout io.
 func newPlaidSandboxLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
 	var institutionID, products string
 	cmd := &cobra.Command{
-		Use:   "link",
-		Short: "Create and store a Plaid Sandbox Provider Item",
+		Use:     "link",
+		Short:   "Create and store a Plaid Sandbox Provider Item",
+		Example: "  money plaid sandbox link\n  money plaid sandbox link --institution-id ins_56 --products transactions",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := config.Load(config.Options{ConfigPath: state.configPath, Profile: state.profile})
 			if err != nil {
@@ -1119,6 +1250,9 @@ func newPlaidSandboxLinkCommand(ctx context.Context, state *runtimeState, stdout
 	}
 	cmd.Flags().StringVar(&institutionID, "institution-id", "ins_56", "Plaid Sandbox institution ID")
 	cmd.Flags().StringVar(&products, "products", "transactions", "comma-separated Plaid Sandbox products")
+	_ = cmd.RegisterFlagCompletionFunc("products", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"transactions", "auth", "identity", "investments", "liabilities", "transfer"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	return cmd
 }
 
@@ -1126,8 +1260,9 @@ func newPlaidLoginCommand(_ context.Context, state *runtimeState, stdout io.Writ
 	var noOpen, force bool
 	var team, environment, products, countryCodes, redirectURI string
 	cmd := &cobra.Command{
-		Use:   "login",
-		Short: "Sign in to Plaid Dashboard and fetch API keys",
+		Use:     "login",
+		Short:   "Sign in to Plaid Dashboard and fetch API keys",
+		Example: "  money plaid login\n  money plaid login --environment production --no-open",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runPlaidLoginCLI(cmd.Context(), state, stdout, stderr, plaidLoginCLIOptions{
 				CommandName:  commandName,
@@ -1144,7 +1279,13 @@ func newPlaidLoginCommand(_ context.Context, state *runtimeState, stdout io.Writ
 	cmd.Flags().BoolVar(&noOpen, "no-open", false, "print the Dashboard OAuth URL without opening a browser")
 	cmd.Flags().StringVar(&team, "team", "", "team selector by ID, client ID, name, or 1-based index")
 	cmd.Flags().StringVar(&environment, "environment", "sandbox", "Plaid environment to write: sandbox or production")
+	_ = cmd.RegisterFlagCompletionFunc("environment", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"sandbox", "production"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().StringVar(&products, "products", "", "comma-separated Plaid Link products to write to config")
+	_ = cmd.RegisterFlagCompletionFunc("products", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"transactions", "auth", "identity", "investments", "liabilities", "transfer"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().StringVar(&countryCodes, "country-codes", "", "comma-separated Plaid country codes to write to config")
 	cmd.Flags().StringVar(&redirectURI, "redirect-uri", "", "Plaid Link redirect URI to write to config")
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing PLAID_CLIENT_ID and PLAID_SECRET")
@@ -1401,8 +1542,9 @@ func plaidLoginError(command string, err error) error {
 
 func newPlaidLogoutCommand(state *runtimeState, stdout io.Writer, commandName string) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "logout",
-		Short: "Remove stored Plaid Dashboard auth without deleting API keys",
+		Use:     "logout",
+		Short:   "Remove stored Plaid Dashboard auth without deleting API keys",
+		Example: "  money plaid logout",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			meta, err := config.ResolveMetadata(config.Options{ConfigPath: state.configPath, Profile: state.profile})
 			if err != nil {
