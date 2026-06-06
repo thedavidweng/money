@@ -36,7 +36,14 @@ signs:
       - "${artifact}"
 
 sboms:
-  - artifacts: archive
+  - cmd: syft
+    artifacts: archive
+    args:
+      - "${artifact}"
+      - --output
+      - spdx-json=${document}
+    documents:
+      - "${artifact}.spdx.json"
 
 changelog:
   sort: asc
@@ -77,8 +84,7 @@ release:
     To verify the checksums file:
     ```
     cosign verify-blob \
-      --certificate checksums.txt.cert \
-      --signature checksums.txt.sig \
+      --bundle checksums.txt.sig \
       --certificate-identity-regexp="https://github.com/thedavidweng/money" \
       --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
       checksums.txt
