@@ -28,11 +28,11 @@ checksum:
 signs:
   - artifacts: checksum
     cmd: cosign
+    output: true
     args:
       - "sign-blob"
       - "--yes"
-      - "--output-signature=${signature}"
-      - "--output-certificate=${certificate}"
+      - "--bundle=${signature}"
       - "${artifact}"
 
 sboms:
@@ -55,9 +55,6 @@ release:
   github:
     owner: thedavidweng
     name: money
-  extra_files:
-    - glob: checksums.txt.sig
-    - glob: checksums.txt.cert
   header: |
     ## Installation
 
