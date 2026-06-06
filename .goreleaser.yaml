@@ -14,17 +14,78 @@ builds:
       - amd64
       - arm64
 
+universal_binaries:
+  - name_template: "money_{{ .Version }}_darwin_all"
+
 archives:
   - formats: [tar.gz]
     name_template: "money_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
   name_template: "checksums.txt"
+  algorithm: sha256
+
+signs:
+  - artifacts: checksum
+    cmd: cosign
+    args:
+      - "sign-blob"
+      - "--yes"
+      - "--output-signature=${signature}"
+      - "--output-certificate=${certificate}"
+      - "${artifact}"
+
+sboms:
+  - artifacts: archive
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+      - "^style:"
+      - "^refactor:"
+      - Merge pull request
+      - Merge branch
 
 release:
   github:
     owner: thedavidweng
     name: money
+  extra_files:
+    - glob: checksums.txt.sig
+    - glob: checksums.txt.cert
+  header: |
+    ## Installation
+
+    **Homebrew (macOS):**
+    ```
+    brew tap thedavidweng/tap
+    brew install money
+    ```
+
+    **Go:**
+    ```
+    go install github.com/thedavidweng/money/cmd/money@{{ .Tag }}
+    ```
+
+    **Pre-built binaries:** Download below and verify with `checksums.txt`.
+
+    ## Verify signatures
+
+    This release is signed with [Sigstore](https://sigstore.dev) keyless signing.
+    To verify the checksums file:
+    ```
+    cosign verify-blob \
+      --certificate checksums.txt.cert \
+      --signature checksums.txt.sig \
+      --certificate-identity-regexp="https://github.com/thedavidweng/money" \
+      --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+      checksums.txt
+    ```
 
 homebrew_casks:
   - name: money

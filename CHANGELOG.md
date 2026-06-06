@@ -25,8 +25,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - README architecture section now lists all internal packages.
 - README removed unimplemented MX/Finicity provider references.
 - Release workflow now runs `go test ./... -race` before GoReleaser.
-- Removed unused cosign installer from release workflow.
 - ARCHITECTURE.md future features (cleanup, accounts update, --pretty) marked as [Planned].
+- Website license references corrected from MIT to Apache 2.0.
+- README monarch import description corrected (CSV → data sources).
+- Removed dead staticProvider code from providers/registry.go.
+
+### Changed
+- GoReleaser config: added auto-changelog, GPG signing, SBOM generation, macOS universal binaries.
+- Release workflow: added Syft (SBOM) and GPG key import steps.
 
 ## [0.2.0] - 2026-05-17
 
