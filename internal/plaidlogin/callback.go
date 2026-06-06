@@ -119,5 +119,5 @@ func (s *CallbackServer) handleCallback(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "callback already received", http.StatusConflict)
 		return
 	}
-	fmt.Fprint(w, "ok")
+	_, _ = fmt.Fprint(w, "ok")
 }

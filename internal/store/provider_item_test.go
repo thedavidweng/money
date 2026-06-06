@@ -13,7 +13,7 @@ func TestSQLiteStoreProviderItemUpdateNameAndRemoveCascade(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Store a linked item with transactions.
 	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
@@ -100,7 +100,7 @@ func TestSQLiteStoreListProviderItemsFilterByProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Demo already has plaid items. Add a bridge item.
 	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{

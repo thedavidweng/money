@@ -40,7 +40,7 @@ func (s *SQLiteStore) SeedDemo(ctx context.Context) error {
 	}
 	for _, statement := range statements {
 		if _, err := tx.ExecContext(ctx, statement.query, statement.args...); err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			return err
 		}
 	}

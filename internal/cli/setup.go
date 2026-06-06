@@ -22,8 +22,9 @@ import (
 func newSetupCommand(_ context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
 	var force bool
 	cmd := &cobra.Command{
-		Use:   "setup",
-		Short: "Initialize money configuration and encrypted database",
+		Use:     "setup",
+		Short:   "Initialize money configuration and encrypted database",
+		Example: "  money setup\n  money setup --force",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			result, err := config.Setup(state.configPath, state.profile, force)
 			if err != nil {
@@ -41,7 +42,7 @@ func newSetupCommand(_ context.Context, state *runtimeState, stdout io.Writer) *
 			if loadErr == nil {
 				opened, openErr := store.OpenEncrypted(context.Background(), cfg.DatabasePath, cfg.DatabaseEncryptionKeyBytes)
 				if openErr == nil {
-					opened.Close()
+					_ = opened.Close()
 					result.DBCreated = true
 				} else if state.json {
 					env := contracts.NewSuccess("setup", result)
@@ -52,7 +53,7 @@ func newSetupCommand(_ context.Context, state *runtimeState, stdout io.Writer) *
 					})
 					return contracts.WriteJSON(stdout, env)
 				} else {
-					fmt.Fprintf(stdout, "Config written. Database failed to open: %s\nRun `money doctor` to diagnose.\n", openErr)
+					_, _ = fmt.Fprintf(stdout, "Config written. Database failed to open: %s\nRun `money doctor` to diagnose.\n", openErr)
 					return nil
 				}
 			}
@@ -72,16 +73,16 @@ func newSetupCommand(_ context.Context, state *runtimeState, stdout io.Writer) *
 				return contracts.WriteJSON(stdout, env)
 			}
 
-			fmt.Fprintf(stdout, "Config:   %s\n", result.ConfigPath)
-			fmt.Fprintf(stdout, "Secrets:  %s\n", result.EnvPath)
-			fmt.Fprintf(stdout, "Database: %s\n", result.DatabasePath)
+			_, _ = fmt.Fprintf(stdout, "Config:   %s\n", result.ConfigPath)
+			_, _ = fmt.Fprintf(stdout, "Secrets:  %s\n", result.EnvPath)
+			_, _ = fmt.Fprintf(stdout, "Database: %s\n", result.DatabasePath)
 			if result.SecretCreated {
-				fmt.Fprintln(stdout, "Encryption key: created")
+				_, _ = fmt.Fprintln(stdout, "Encryption key: created")
 			} else {
-				fmt.Fprintln(stdout, "Encryption key: already exists")
+				_, _ = fmt.Fprintln(stdout, "Encryption key: already exists")
 			}
 			if result.DBCreated {
-				fmt.Fprintln(stdout, "Database: ready")
+				_, _ = fmt.Fprintln(stdout, "Database: ready")
 			}
 			printDiagnostics(stdout, diagnostics)
 
@@ -110,8 +111,9 @@ type Diagnostic struct {
 func newDoctorCommand(_ context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
 	var fix, dryRun bool
 	cmd := &cobra.Command{
-		Use:   "doctor",
-		Short: "Check configuration and system health",
+		Use:     "doctor",
+		Short:   "Check configuration and system health",
+		Example: "  money doctor\n  money doctor --fix\n  money doctor --fix --dry-run",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Only log to slog when stderr is a TTY (not piped/combined).
 			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -157,7 +159,7 @@ func runDoctorFix(state *runtimeState, stdout io.Writer, logger *slog.Logger, dr
 			})
 			return contracts.WriteJSON(stdout, env)
 		}
-		fmt.Fprintf(stdout, "Would create/verify:\n  Config:   %s\n  Secrets:  %s\n  Database: %s\n", result.ConfigPath, result.EnvPath, result.DatabasePath)
+		_, _ = fmt.Fprintf(stdout, "Would create/verify:\n  Config:   %s\n  Secrets:  %s\n  Database: %s\n", result.ConfigPath, result.EnvPath, result.DatabasePath)
 		return nil
 	}
 	if err != nil {
@@ -178,7 +180,7 @@ func runDoctorFix(state *runtimeState, stdout io.Writer, logger *slog.Logger, dr
 			result.DBCreated = true
 			linksFixed, _ := runDoctorFixLinks(ctx, opened)
 			syncFixed, _ := runDoctorFixSync(ctx, opened)
-			opened.Close()
+			_ = opened.Close()
 			result.LinksFixed = linksFixed
 			result.SyncFixed = syncFixed
 			if linksFixed > 0 {
@@ -199,7 +201,7 @@ func runDoctorFix(state *runtimeState, stdout io.Writer, logger *slog.Logger, dr
 		})
 		return contracts.WriteJSON(stdout, env)
 	}
-	fmt.Fprintln(stdout, "Repairs applied.")
+	_, _ = fmt.Fprintln(stdout, "Repairs applied.")
 	printDiagnostics(stdout, diagnostics)
 	return nil
 }
@@ -266,7 +268,7 @@ func runDiagnostics(configPath string, profile string) []Diagnostic {
 		})
 		return diags
 	}
-	defer opened.Close()
+	defer func() { _ = opened.Close() }()
 	diags = append(diags, Diagnostic{
 		Section: "Store", Code: "STORE_OK", Status: "ok",
 		Message: "Database opened at " + cfg.DatabasePath, Category: "internal",
@@ -459,7 +461,7 @@ func printDiagnostics(w io.Writer, diags []Diagnostic) {
 		case "error":
 			icon = "✗"
 		}
-		fmt.Fprintf(w, "  %s [%s] %s\n", icon, d.Section, d.Message)
+		_, _ = fmt.Fprintf(w, "  %s [%s] %s\n", icon, d.Section, d.Message)
 	}
 }
 
@@ -493,9 +495,9 @@ func runSetupWizard(ctx context.Context, state *runtimeState, stdout io.Writer, 
 		selector = prompt.HuhSelector{Input: state.stdin, Output: stdout}
 	}
 	for {
-		fmt.Fprintln(stdout)
-		fmt.Fprintf(stdout, "No providers are configured yet. To link financial institutions, you need at least one provider.\n")
-		fmt.Fprintln(stdout)
+		_, _ = fmt.Fprintln(stdout)
+		_, _ = fmt.Fprintf(stdout, "No providers are configured yet. To link financial institutions, you need at least one provider.\n")
+		_, _ = fmt.Fprintln(stdout)
 		choices := make([]prompt.Choice, 0, len(unconfigured)+1)
 		for _, name := range unconfigured {
 			if spec, ok := config.ProviderSpecByName(name); ok {
@@ -520,8 +522,8 @@ func runSetupWizard(ctx context.Context, state *runtimeState, stdout io.Writer, 
 				}
 				switch method {
 				case "skip":
-					fmt.Fprintln(stdout)
-					fmt.Fprintf(stdout, "You can always run `money providers configure plaid` later.\n")
+					_, _ = fmt.Fprintln(stdout)
+					_, _ = fmt.Fprintf(stdout, "You can always run `money providers configure plaid` later.\n")
 					return nil
 				case "dashboard":
 					stderr := state.stderr
@@ -567,24 +569,24 @@ func runSetupWizard(ctx context.Context, state *runtimeState, stdout io.Writer, 
 				}
 			}
 			if len(unconfigured) == 0 {
-				fmt.Fprintln(stdout)
-				fmt.Fprintf(stdout, "All providers configured. Run `money link <institution>` to connect an institution.\n")
+				_, _ = fmt.Fprintln(stdout)
+				_, _ = fmt.Fprintf(stdout, "All providers configured. Run `money link <institution>` to connect an institution.\n")
 				return nil
 			}
-			fmt.Fprintln(stdout)
-			fmt.Fprintf(stdout, "Would you like to configure another provider? (y/n): ")
+			_, _ = fmt.Fprintln(stdout)
+			_, _ = fmt.Fprintf(stdout, "Would you like to configure another provider? (y/n): ")
 			resp, err := reader.ReadString('\n')
 			if err != nil {
 				return fmt.Errorf("failed to read response: %w", err)
 			}
 			if strings.ToLower(strings.TrimSpace(resp)) != "y" {
-				fmt.Fprintln(stdout)
-				fmt.Fprintf(stdout, "You can always run `money providers configure <provider>` later.\n")
+				_, _ = fmt.Fprintln(stdout)
+				_, _ = fmt.Fprintf(stdout, "You can always run `money providers configure <provider>` later.\n")
 				return nil
 			}
 		} else {
-			fmt.Fprintln(stdout)
-			fmt.Fprintf(stdout, "You can always run `money providers configure <provider>` later.\n")
+			_, _ = fmt.Fprintln(stdout)
+			_, _ = fmt.Fprintf(stdout, "You can always run `money providers configure <provider>` later.\n")
 			return nil
 		}
 	}
@@ -614,31 +616,31 @@ func promptForProviderCredentials(stdout io.Writer, reader *bufio.Reader, spec c
 	}
 
 	if spec.HelpURL != "" {
-		fmt.Fprintf(stdout, "\n! %s credentials are required.\n", spec.Name)
-		fmt.Fprintf(stdout, "\n  1. Open %s in your browser\n", spec.HelpURL)
-		fmt.Fprintf(stdout, "     (or copy the URL and open it manually)\n")
+		_, _ = fmt.Fprintf(stdout, "\n! %s credentials are required.\n", spec.Name)
+		_, _ = fmt.Fprintf(stdout, "\n  1. Open %s in your browser\n", spec.HelpURL)
+		_, _ = fmt.Fprintf(stdout, "     (or copy the URL and open it manually)\n")
 		if err := openBrowser(spec.HelpURL); err != nil {
-			fmt.Fprintf(stdout, "     ! Could not open browser automatically.\n")
+			_, _ = fmt.Fprintf(stdout, "     ! Could not open browser automatically.\n")
 		}
-		fmt.Fprintln(stdout)
-		fmt.Fprintf(stdout, "  2. Copy the following fields from your %s dashboard:\n", spec.Name)
+		_, _ = fmt.Fprintln(stdout)
+		_, _ = fmt.Fprintf(stdout, "  2. Copy the following fields from your %s dashboard:\n", spec.Name)
 		for i, field := range spec.SecretFields {
-			fmt.Fprintf(stdout, "     %d. %s\n", i+1, strings.ReplaceAll(field, "_", "-"))
+			_, _ = fmt.Fprintf(stdout, "     %d. %s\n", i+1, strings.ReplaceAll(field, "_", "-"))
 		}
-		fmt.Fprintln(stdout)
-		fmt.Fprintf(stdout, "  Press Enter once you have copied them.")
+		_, _ = fmt.Fprintln(stdout)
+		_, _ = fmt.Fprintf(stdout, "  Press Enter once you have copied them.")
 		if _, err := reader.ReadString('\n'); err != nil {
 			return fmt.Errorf("failed to read ready signal: %w", err)
 		}
 	}
 
-	fmt.Fprintln(stdout)
+	_, _ = fmt.Fprintln(stdout)
 	for _, field := range spec.SecretFields {
 		if secrets[field] != "" {
 			continue
 		}
 		for {
-			fmt.Fprintf(stdout, "%s: ", strings.ReplaceAll(field, "_", "-"))
+			_, _ = fmt.Fprintf(stdout, "%s: ", strings.ReplaceAll(field, "_", "-"))
 			input, err := reader.ReadString('\n')
 			if err != nil {
 				return fmt.Errorf("failed to read %s: %w", field, err)
@@ -647,10 +649,10 @@ func promptForProviderCredentials(stdout io.Writer, reader *bufio.Reader, spec c
 			if secrets[field] != "" {
 				break
 			}
-			fmt.Fprintf(stdout, "  ! %s is required. Please provide a value.\n", strings.ReplaceAll(field, "_", "-"))
+			_, _ = fmt.Fprintf(stdout, "  ! %s is required. Please provide a value.\n", strings.ReplaceAll(field, "_", "-"))
 		}
 	}
-	fmt.Fprintln(stdout)
+	_, _ = fmt.Fprintln(stdout)
 	return nil
 }
 
@@ -746,9 +748,9 @@ func runInteractiveProviderConfigure(state *runtimeState, stdout io.Writer, prov
 	}
 
 	if result.KeysWritten > 0 {
-		fmt.Fprintf(stdout, "%s configured (%d credentials written).\n", providerName, result.KeysWritten)
+		_, _ = fmt.Fprintf(stdout, "%s configured (%d credentials written).\n", providerName, result.KeysWritten)
 	} else {
-		fmt.Fprintf(stdout, "%s credentials already present (use --force to overwrite).\n", providerName)
+		_, _ = fmt.Fprintf(stdout, "%s credentials already present (use --force to overwrite).\n", providerName)
 	}
 	printDiagnostics(stdout, providerDiags)
 	return nil
@@ -803,9 +805,13 @@ func confirmProviderCredentialOverwrite(state *runtimeState, output io.Writer, s
 
 func newConfigureCommand(state *runtimeState, stdout io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "configure <provider>",
-		Short: "Configure provider credentials",
-		Args:  cobra.ExactArgs(1),
+		Use:     "configure <provider>",
+		Short:   "Configure provider credentials",
+		Example: "  money providers configure plaid\n  money providers configure bridge --force",
+		Args:    cobra.ExactArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return []string{"plaid", "bridge"}, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var reader *bufio.Reader
 			if state.stdin != nil {
@@ -820,6 +826,9 @@ func newConfigureCommand(state *runtimeState, stdout io.Writer) *cobra.Command {
 	cmd.Flags().String("secret", "", "provider secret")
 	cmd.Flags().String("client-secret", "", "provider client secret")
 	cmd.Flags().String("environment", "", "provider environment (e.g. sandbox)")
+	_ = cmd.RegisterFlagCompletionFunc("environment", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"sandbox", "production"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().String("products", "", "comma-separated products")
 	cmd.Flags().String("country-codes", "", "comma-separated country codes")
 	cmd.Flags().String("redirect-uri", "", "redirect URI")

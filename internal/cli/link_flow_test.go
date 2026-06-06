@@ -20,7 +20,7 @@ func TestRunPlaidLinkFlowNoOpenStoresLinkedItem(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open encrypted store: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	oldStart := startPlaidLinkSessionServer
 	oldOpen := openBrowser
@@ -74,7 +74,7 @@ func TestRunPlaidLinkFlowWaitsForEnterBeforeOpeningBrowser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open encrypted store: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	oldStart := startPlaidLinkSessionServer
 	oldOpen := openBrowser
@@ -114,7 +114,7 @@ func TestRunPlaidLinkFlowPassesConsentProductOptions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open encrypted store: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	oldStart := startPlaidLinkSessionServer
 	t.Cleanup(func() { startPlaidLinkSessionServer = oldStart })
@@ -157,7 +157,7 @@ func TestRunPlaidSandboxLinkStoresLinkedItem(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open encrypted store: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	provider := &fakePlaidSandboxProvider{publicToken: "public-sandbox"}
 	var stdout bytes.Buffer
@@ -191,7 +191,7 @@ func TestRunPlaidSandboxLinkValidation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	state := &runtimeState{store: db}
 	for name, opts := range map[string]plaidSandboxLinkOptions{
 		"production": {Environment: "production", InstitutionID: "ins_56", Products: "transactions"},
@@ -214,7 +214,7 @@ func TestRunBridgeLinkFlowNoOpenStoresLinkedItem(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open encrypted store: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	oldOpen := openBrowser
 	t.Cleanup(func() { openBrowser = oldOpen })
@@ -340,7 +340,7 @@ func TestRunPlaidLinkFlowReturnsCLIErrorOnCancel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open encrypted store: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	oldStart := startPlaidLinkSessionServer
 	t.Cleanup(func() { startPlaidLinkSessionServer = oldStart })
@@ -388,7 +388,7 @@ func TestRunPlaidLinkFlowReturnsCLIErrorOnLinkError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open encrypted store: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	oldStart := startPlaidLinkSessionServer
 	t.Cleanup(func() { startPlaidLinkSessionServer = oldStart })
@@ -437,7 +437,7 @@ func TestRunPlaidLinkFlowWritesJSONWhenStateJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open encrypted store: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	oldStart := startPlaidLinkSessionServer
 	t.Cleanup(func() { startPlaidLinkSessionServer = oldStart })
@@ -480,7 +480,7 @@ func TestRunPlaidSandboxLinkWritesJSONWhenStateJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open encrypted store: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	provider := &fakePlaidSandboxProvider{publicToken: "public-sandbox"}
 	var stdout bytes.Buffer

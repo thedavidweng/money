@@ -15,7 +15,7 @@ func TestSyncReturnsWarningWhenNoProviderItems(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	result, err := Sync(ctx, db, fakeRegistry{}, Options{})
 	if err != nil {
@@ -32,7 +32,7 @@ func TestSyncDispatchesLinkedItemToProviderAndAdvancesCursor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	if err := db.StoreLinkedProviderItem(ctx, store.LinkedProviderItem{
 		Institution: store.LinkedInstitution{ID: "inst_sync", Name: "Sync Bank", Provider: "plaid", ProviderInstitutionID: "ins_sync"},
 		Item: store.LinkedItem{
@@ -80,7 +80,7 @@ func TestSyncPartialFailurePreservesPerItemResults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	for _, item := range []store.LinkedItem{
 		{ID: "pi_ok", Provider: "plaid", InstitutionID: "inst_1", ProviderExternalItemID: "item_ok", EncryptedAccessToken: []byte("token"), Status: "active"},
 		{ID: "pi_bad", Provider: "plaid", InstitutionID: "inst_1", ProviderExternalItemID: "item_bad", EncryptedAccessToken: []byte("token"), Status: "active"},
@@ -122,7 +122,7 @@ func TestSyncPartialFailureCoversPlaidAndBridgeItems(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	for _, linked := range []store.LinkedProviderItem{
 		{
 			Institution: store.LinkedInstitution{ID: "inst_plaid", Name: "Plaid Bank", Provider: "plaid", ProviderInstitutionID: "ins_plaid"},

@@ -185,7 +185,7 @@ ORDER BY sr.provider_item_id`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var runs []SyncRunSummary
 	for rows.Next() {

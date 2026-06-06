@@ -425,7 +425,7 @@ func TestAppendLinksDiagnosticsNoItems(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	diags := appendLinksDiagnostics(ctx, db)
 	if len(diags) != 1 {
@@ -445,7 +445,7 @@ func TestAppendLinksDiagnosticsWithItems(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Demo already has plaid items. Add a bridge item.
 	if err := db.StoreLinkedProviderItem(ctx, store.LinkedProviderItem{
@@ -481,7 +481,7 @@ func TestAppendSyncDiagnosticsNoItemsNoRuns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// No provider items in clean demo → no sync diagnostics expected.
 	diags := appendSyncDiagnostics(ctx, db)
@@ -503,7 +503,7 @@ func TestAppendSyncDiagnosticsWithRecentRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Record a successful sync run for the demo plaid item.
 	if err := db.RecordSyncRun(ctx, core.SyncRun{
@@ -539,7 +539,7 @@ func TestRunDoctorFixLinksRemovesErroredItems(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Add an errored provider item.
 	if err := db.StoreLinkedProviderItem(ctx, store.LinkedProviderItem{
@@ -579,7 +579,7 @@ func TestRunDoctorFixLinksSkipsActiveItems(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Demo has active plaid items — fix should not remove them.
 	fixed, err := runDoctorFixLinks(ctx, db)
@@ -597,7 +597,7 @@ func TestRunDoctorFixSyncMarksStuckRuns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// RecordSyncRun with empty finished_at produces a stuck run (NULL finished_at).
 	if err := db.RecordSyncRun(ctx, core.SyncRun{
@@ -631,7 +631,7 @@ func TestDoctorDiagnosticsLogToSlog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	diags := appendLinksDiagnostics(ctx, db)
 	logDiagnostics(logger, diags)
@@ -655,7 +655,7 @@ func TestDoctorSyncDiagnosticsLogToSlog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	diags := appendSyncDiagnostics(ctx, db)
 	logDiagnostics(logger, diags)
@@ -676,7 +676,7 @@ func TestDoctorFixLogsToSlog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Add an errored item to trigger a fix.
 	if err := db.StoreLinkedProviderItem(ctx, store.LinkedProviderItem{

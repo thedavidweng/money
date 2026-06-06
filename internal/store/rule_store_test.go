@@ -14,7 +14,7 @@ func TestSQLiteStoreRuleEngineAppliesCategoryByMerchantContains(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Store a linked item and a transaction with a known merchant.
 	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
@@ -133,7 +133,7 @@ func TestSQLiteStoreRuleEnginePriorityHighestWins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_pri", Name: "Pri Bank", Provider: "plaid", ProviderInstitutionID: "ins_pri"},
@@ -211,7 +211,7 @@ func TestSQLiteStoreRuleEngineSetNoteAction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_note", Name: "Note Bank", Provider: "plaid", ProviderInstitutionID: "ins_note"},
@@ -271,7 +271,7 @@ func TestSQLiteStoreRuleEngineDisabledRulesSkipped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_dis", Name: "Dis Bank", Provider: "plaid", ProviderInstitutionID: "ins_dis"},
@@ -327,7 +327,7 @@ func TestSQLiteStoreRuleCRUDAndListOnlyEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	r1, err := db.CreateRule(ctx, core.Rule{
 		Name: "Rule A", ConditionField: "name", ConditionOp: "contains",
@@ -401,7 +401,7 @@ func TestSQLiteStoreApplyRulesMatchesCaseInsensitive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_ci", Name: "CI Bank", Provider: "plaid", ProviderInstitutionID: "ins_ci"},
@@ -457,7 +457,7 @@ func TestSQLiteStoreApplyRulesReappliesOnSubsequentRuns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_idem", Name: "Idem Bank", Provider: "plaid", ProviderInstitutionID: "ins_idem"},
@@ -529,7 +529,7 @@ func TestSQLiteStoreApplyRulesUsesLocalCategorySource(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_cs", Name: "CS Bank", Provider: "plaid", ProviderInstitutionID: "ins_cs"},

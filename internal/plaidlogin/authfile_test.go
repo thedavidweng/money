@@ -82,7 +82,7 @@ func TestLoadFreshAuthRefreshesExpiredAuthFile(t *testing.T) {
 		if r.PostForm.Get("grant_type") != "refresh_token" || r.PostForm.Get("refresh_token") != "old-refresh" {
 			t.Fatalf("refresh form = %#v", r.PostForm)
 		}
-		w.Write([]byte(`{"access_token":"new-access","refresh_token":"new-refresh","expires_in":3600,"token_type":"Bearer"}`))
+		_, _ = w.Write([]byte(`{"access_token":"new-access","refresh_token":"new-refresh","expires_in":3600,"token_type":"Bearer"}`))
 	}))
 	defer server.Close()
 

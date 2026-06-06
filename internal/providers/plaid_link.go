@@ -22,19 +22,19 @@ type PlaidLinkTokenRequestConfig struct {
 
 func BuildPlaidLinkTokenCreateRequest(cfg PlaidLinkTokenRequestConfig) (plaid.LinkTokenCreateRequest, error) {
 	if cfg.ClientName == "" {
-		return plaid.LinkTokenCreateRequest{}, fmt.Errorf("Plaid client name is required")
+		return plaid.LinkTokenCreateRequest{}, fmt.Errorf("plaid client name is required")
 	}
 	if cfg.Language == "" {
-		return plaid.LinkTokenCreateRequest{}, fmt.Errorf("Plaid Link language is required")
+		return plaid.LinkTokenCreateRequest{}, fmt.Errorf("plaid Link language is required")
 	}
 	if cfg.ClientUserID == "" {
-		return plaid.LinkTokenCreateRequest{}, fmt.Errorf("Plaid client user ID is required")
+		return plaid.LinkTokenCreateRequest{}, fmt.Errorf("plaid client user ID is required")
 	}
 	if len(cfg.Products) == 0 {
-		return plaid.LinkTokenCreateRequest{}, fmt.Errorf("Plaid Link products are required")
+		return plaid.LinkTokenCreateRequest{}, fmt.Errorf("plaid Link products are required")
 	}
 	if len(cfg.CountryCodes) == 0 {
-		return plaid.LinkTokenCreateRequest{}, fmt.Errorf("Plaid Link country codes are required")
+		return plaid.LinkTokenCreateRequest{}, fmt.Errorf("plaid Link country codes are required")
 	}
 
 	countries, err := plaidCountryCodes(cfg.CountryCodes)

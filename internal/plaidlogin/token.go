@@ -62,7 +62,7 @@ func tokenRequest(ctx context.Context, cfg TokenClientConfig, values url.Values)
 	if err != nil {
 		return Auth{}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 		return Auth{}, Error{Code: ErrorPlaidDashboardLoginRejected, Message: "Plaid rejected Dashboard login; configure Plaid manually"}
 	}

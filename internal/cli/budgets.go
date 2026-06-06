@@ -14,7 +14,11 @@ import (
 )
 
 func newBudgetsCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
-	cmd := &cobra.Command{Use: "budgets"}
+	cmd := &cobra.Command{
+		Use:     "budgets",
+		Short:   "Manage budgets",
+		Example: "  money budgets list\n  money budgets create --name Groceries --period monthly --start-date 2024-01-01 --end-date 2024-12-31 --confirm\n  money budgets get <id>\n  money budgets delete <id>",
+	}
 	cmd.AddCommand(newBudgetsListCommand(ctx, state, stdout))
 	cmd.AddCommand(newBudgetsCreateCommand(ctx, state, stdout))
 	cmd.AddCommand(newBudgetsGetCommand(ctx, state, stdout))
@@ -26,8 +30,9 @@ func newBudgetsCommand(ctx context.Context, state *runtimeState, stdout io.Write
 func newBudgetsListCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
 	var verbose bool
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List budgets",
+		Use:     "list",
+		Short:   "List budgets",
+		Example: "  money budgets list\n  money budgets list --verbose --json",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			activeStore, err := requireStore(state)
 			if err != nil {
@@ -68,8 +73,9 @@ func newBudgetsCreateCommand(ctx context.Context, state *runtimeState, stdout io
 	var name, currency, period, startDate, endDate string
 	var dryRun, confirm bool
 	cmd := &cobra.Command{
-		Use:   "create",
-		Short: "Create a budget",
+		Use:     "create",
+		Short:   "Create a budget",
+		Example: "  money budgets create --name Groceries --period monthly --start-date 2024-01-01 --end-date 2024-12-31 --confirm\n  money budgets create --name Rent --period yearly --start-date 2024-01-01 --end-date 2024-12-31 --dry-run",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if state.json && !dryRun && !confirm {
 				return cliError{
@@ -100,7 +106,7 @@ func newBudgetsCreateCommand(ctx context.Context, state *runtimeState, stdout io
 					env.Meta.Demo = state.demo
 					return contracts.WriteJSON(stdout, env)
 				}
-				fmt.Fprintf(stdout, "Would create budget %q (%s, %s to %s)\n", budget.Name, budget.Period, budget.StartDate, budget.EndDate)
+				_, _ = fmt.Fprintf(stdout, "Would create budget %q (%s, %s to %s)\n", budget.Name, budget.Period, budget.StartDate, budget.EndDate)
 				return nil
 			}
 			activeStore, err := requireStore(state)
@@ -116,13 +122,16 @@ func newBudgetsCreateCommand(ctx context.Context, state *runtimeState, stdout io
 				env.Meta.Demo = state.demo
 				return contracts.WriteJSON(stdout, env)
 			}
-			fmt.Fprintf(stdout, "Created budget %s (%s)\n", created.Name, created.ID)
+			_, _ = fmt.Fprintf(stdout, "Created budget %s (%s)\n", created.Name, created.ID)
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&name, "name", "", "budget name")
 	cmd.Flags().StringVar(&currency, "currency", "USD", "budget currency")
 	cmd.Flags().StringVar(&period, "period", "monthly", "budget period: monthly or yearly")
+	_ = cmd.RegisterFlagCompletionFunc("period", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"monthly", "yearly"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().StringVar(&startDate, "start-date", "", "budget start date (YYYY-MM-DD)")
 	cmd.Flags().StringVar(&endDate, "end-date", "", "budget end date (YYYY-MM-DD)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show write plan without saving")
@@ -135,6 +144,21 @@ func newBudgetsGetCommand(ctx context.Context, state *runtimeState, stdout io.Wr
 		Use:   "get <id>",
 		Short: "Get a budget with its categories",
 		Args:  cobra.ExactArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			budgets, err := activeStore.ListBudgets(ctx)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			var ids []string
+			for _, b := range budgets {
+				ids = append(ids, b.ID+"\t"+b.Name)
+			}
+			return ids, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			activeStore, err := requireStore(state)
 			if err != nil {
@@ -145,12 +169,12 @@ func newBudgetsGetCommand(ctx context.Context, state *runtimeState, stdout io.Wr
 				return err
 			}
 			if !state.json {
-				fmt.Fprintf(stdout, "Budget: %s (%s)\n", budget.Name, budget.ID)
-				fmt.Fprintf(stdout, "Period: %s\n", budget.Period)
-				fmt.Fprintf(stdout, "Range: %s to %s\n", budget.StartDate, budget.EndDate)
-				fmt.Fprintf(stdout, "Currency: %s\n", budget.Currency)
+				_, _ = fmt.Fprintf(stdout, "Budget: %s (%s)\n", budget.Name, budget.ID)
+				_, _ = fmt.Fprintf(stdout, "Period: %s\n", budget.Period)
+				_, _ = fmt.Fprintf(stdout, "Range: %s to %s\n", budget.StartDate, budget.EndDate)
+				_, _ = fmt.Fprintf(stdout, "Currency: %s\n", budget.Currency)
 				if len(budget.Categories) > 0 {
-					fmt.Fprintln(stdout, "Categories:")
+					_, _ = fmt.Fprintln(stdout, "Categories:")
 					table := tablewriter.NewWriter(stdout)
 					table.SetHeader([]string{"NAME", "LIMIT", "CATEGORY ID"})
 					table.SetBorder(false)
@@ -177,6 +201,21 @@ func newBudgetsDeleteCommand(ctx context.Context, state *runtimeState, stdout io
 		Use:   "delete <id>",
 		Short: "Delete a budget",
 		Args:  cobra.ExactArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			budgets, err := activeStore.ListBudgets(ctx)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			var ids []string
+			for _, b := range budgets {
+				ids = append(ids, b.ID+"\t"+b.Name)
+			}
+			return ids, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			activeStore, err := requireStore(state)
 			if err != nil {
@@ -190,14 +229,18 @@ func newBudgetsDeleteCommand(ctx context.Context, state *runtimeState, stdout io
 				env.Meta.Demo = state.demo
 				return contracts.WriteJSON(stdout, env)
 			}
-			fmt.Fprintf(stdout, "Deleted budget %s\n", args[0])
+			_, _ = fmt.Fprintf(stdout, "Deleted budget %s\n", args[0])
 			return nil
 		},
 	}
 }
 
 func newBudgetCategoriesCommand(ctx context.Context, state *runtimeState, stdout io.Writer) *cobra.Command {
-	cmd := &cobra.Command{Use: "categories"}
+	cmd := &cobra.Command{
+		Use:     "categories",
+		Short:   "Manage budget categories",
+		Example: "  money budgets categories create --budget-id <id> --name Groceries --limit 50000 --confirm\n  money budgets categories delete <id>",
+	}
 	cmd.AddCommand(newBudgetCategoriesCreateCommand(ctx, state, stdout))
 	cmd.AddCommand(newBudgetCategoriesDeleteCommand(ctx, state, stdout))
 	return cmd
@@ -208,8 +251,9 @@ func newBudgetCategoriesCreateCommand(ctx context.Context, state *runtimeState, 
 	var limitMinor int64
 	var dryRun, confirm bool
 	cmd := &cobra.Command{
-		Use:   "create",
-		Short: "Create a budget category",
+		Use:     "create",
+		Short:   "Create a budget category",
+		Example: "  money budgets categories create --budget-id <id> --name Groceries --limit 50000 --confirm\n  money budgets categories create --budget-id <id> --name Dining --limit 30000 --currency USD --dry-run",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if state.json && !dryRun && !confirm {
 				return cliError{
@@ -240,7 +284,7 @@ func newBudgetCategoriesCreateCommand(ctx context.Context, state *runtimeState, 
 					env.Meta.Demo = state.demo
 					return contracts.WriteJSON(stdout, env)
 				}
-				fmt.Fprintf(stdout, "Would create budget category %q with limit %s %s\n", bc.Name, core.FormatMinorUnits(bc.LimitMinorUnits, bc.Currency), bc.Currency)
+				_, _ = fmt.Fprintf(stdout, "Would create budget category %q with limit %s %s\n", bc.Name, core.FormatMinorUnits(bc.LimitMinorUnits, bc.Currency), bc.Currency)
 				return nil
 			}
 			activeStore, err := requireStore(state)
@@ -256,7 +300,7 @@ func newBudgetCategoriesCreateCommand(ctx context.Context, state *runtimeState, 
 				env.Meta.Demo = state.demo
 				return contracts.WriteJSON(stdout, env)
 			}
-			fmt.Fprintf(stdout, "Created budget category %s (%s)\n", created.Name, created.ID)
+			_, _ = fmt.Fprintf(stdout, "Created budget category %s (%s)\n", created.Name, created.ID)
 			return nil
 		},
 	}
@@ -275,6 +319,23 @@ func newBudgetCategoriesDeleteCommand(ctx context.Context, state *runtimeState, 
 		Use:   "delete <id>",
 		Short: "Delete a budget category",
 		Args:  cobra.ExactArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			activeStore, err := requireStore(state)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			budgets, err := activeStore.ListBudgets(ctx)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			var ids []string
+			for _, b := range budgets {
+				for _, bc := range b.Categories {
+					ids = append(ids, bc.ID+"\t"+bc.Name+" ("+b.Name+")")
+				}
+			}
+			return ids, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			activeStore, err := requireStore(state)
 			if err != nil {
@@ -288,7 +349,7 @@ func newBudgetCategoriesDeleteCommand(ctx context.Context, state *runtimeState, 
 				env.Meta.Demo = state.demo
 				return contracts.WriteJSON(stdout, env)
 			}
-			fmt.Fprintf(stdout, "Deleted budget category %s\n", args[0])
+			_, _ = fmt.Fprintf(stdout, "Deleted budget category %s\n", args[0])
 			return nil
 		},
 	}

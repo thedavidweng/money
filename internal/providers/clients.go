@@ -27,7 +27,7 @@ type PlaidClient struct {
 
 func NewPlaidClient(cfg PlaidClientConfig) (PlaidClient, error) {
 	if cfg.ClientID == "" || cfg.Secret == "" {
-		return PlaidClient{}, fmt.Errorf("Plaid client ID and secret are required")
+		return PlaidClient{}, fmt.Errorf("plaid client ID and secret are required")
 	}
 
 	configuration := plaid.NewConfiguration()
@@ -238,7 +238,7 @@ type BridgeClient struct {
 
 func NewBridgeClient(cfg BridgeClientConfig) (BridgeClient, error) {
 	if cfg.ClientID == "" || cfg.ClientSecret == "" {
-		return BridgeClient{}, fmt.Errorf("Bridge client ID and client secret are required")
+		return BridgeClient{}, fmt.Errorf("bridge client ID and client secret are required")
 	}
 	baseURL := strings.TrimRight(cfg.BaseURL, "/")
 	if baseURL == "" {
@@ -465,7 +465,7 @@ func (c BridgeClient) doBridge(req *http.Request, output any) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
 		return ProviderAPIError{

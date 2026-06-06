@@ -24,9 +24,10 @@ func newLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 	var noOpen bool
 	var additionalConsentedProducts, requiredIfSupportedProducts, optionalProducts string
 	cmd := &cobra.Command{
-		Use:   "link <institution-query>",
-		Short: "Link an institution through a Provider",
-		Args:  cobra.ExactArgs(1),
+		Use:     "link <institution-query>",
+		Short:   "Link an institution through a Provider",
+		Example: "  money link \"Chase\"\n  money link \"Wells Fargo\" --provider plaid\n  money link \"Amex\" --no-open",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if providerName != "plaid" {
 				return cliError{
@@ -84,7 +85,7 @@ func newLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 			if err != nil {
 				if len(institutions) > 1 && institutionID == "" {
 					for _, candidate := range institutions {
-						fmt.Fprintf(stdout, "%s\t%s\t%s\n", candidate.Provider, candidate.ProviderInstitutionID, candidate.Name)
+						_, _ = fmt.Fprintf(stdout, "%s\t%s\t%s\n", candidate.Provider, candidate.ProviderInstitutionID, candidate.Name)
 					}
 				}
 				return cliError{
@@ -108,6 +109,9 @@ func newLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 		},
 	}
 	cmd.Flags().StringVar(&providerName, "provider", "plaid", "provider to use")
+	_ = cmd.RegisterFlagCompletionFunc("provider", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"plaid", "bridge"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().StringVar(&institutionID, "institution-id", "", "provider institution id from search results")
 	cmd.Flags().BoolVar(&noOpen, "no-open", false, "print the Link URL without opening a browser")
 	cmd.Flags().StringVar(&additionalConsentedProducts, "additional-consented-products", "", "comma-separated Plaid products to collect consent for without initializing")
@@ -287,7 +291,7 @@ func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider provide
 		return err
 	}
 	if session.LinkToken == "" {
-		return fmt.Errorf("Plaid Link session did not return a link token")
+		return fmt.Errorf("plaid Link session did not return a link token")
 	}
 	server, err := startPlaidLinkSessionServer(session.LinkToken, session.State, 5*time.Minute)
 	if err != nil {
@@ -300,14 +304,14 @@ func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider provide
 	}()
 
 	if !state.json && state.stderr != nil {
-		fmt.Fprintf(state.stderr, "Plaid Link URL: %s\n", server.LinkURL())
+		_, _ = fmt.Fprintf(state.stderr, "Plaid Link URL: %s\n", server.LinkURL())
 	}
 	if !opts.NoOpen && !state.json {
 		if state.stdin == nil {
 			return fmt.Errorf("stdin is required before opening a browser")
 		}
 		if state.stderr != nil {
-			fmt.Fprintln(state.stderr, "Press Enter to open the browser.")
+			_, _ = fmt.Fprintln(state.stderr, "Press Enter to open the browser.")
 		}
 		if _, err := bufio.NewReader(state.stdin).ReadString('\n'); err != nil {
 			return err
@@ -355,8 +359,8 @@ func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider provide
 		})
 		return contracts.WriteJSON(stdout, env)
 	}
-	fmt.Fprintf(stdout, "Linked %s Provider Item %s.\n", result.Provider, result.ProviderItemID)
-	fmt.Fprintln(stdout, "No sync was run. Run `money sync` after linking.")
+	_, _ = fmt.Fprintf(stdout, "Linked %s Provider Item %s.\n", result.Provider, result.ProviderItemID)
+	_, _ = fmt.Fprintln(stdout, "No sync was run. Run `money sync` after linking.")
 	return nil
 }
 
@@ -433,8 +437,8 @@ func runPlaidSandboxLink(ctx context.Context, state *runtimeState, sandboxCreato
 		})
 		return contracts.WriteJSON(stdout, env)
 	}
-	fmt.Fprintf(stdout, "Linked %s Sandbox Provider Item %s.\n", result.Provider, result.ProviderItemID)
-	fmt.Fprintln(stdout, "No sync was run. Run `money sync` after linking.")
+	_, _ = fmt.Fprintf(stdout, "Linked %s Sandbox Provider Item %s.\n", result.Provider, result.ProviderItemID)
+	_, _ = fmt.Fprintln(stdout, "No sync was run. Run `money sync` after linking.")
 	return nil
 }
 
@@ -455,14 +459,14 @@ func runBridgeLinkFlow(ctx context.Context, state *runtimeState, provider provid
 		return err
 	}
 	if session.URL == "" {
-		return fmt.Errorf("Bridge connect session did not return a URL")
+		return fmt.Errorf("bridge connect session did not return a URL")
 	}
-	fmt.Fprintf(stdout, "Bridge Connect URL: %s\n", session.URL)
+	_, _ = fmt.Fprintf(stdout, "Bridge Connect URL: %s\n", session.URL)
 	if !noOpen {
 		if state.stdin == nil {
 			return fmt.Errorf("stdin is required before opening a browser")
 		}
-		fmt.Fprintln(stdout, "Press Enter to open the browser.")
+		_, _ = fmt.Fprintln(stdout, "Press Enter to open the browser.")
 		if _, err := bufio.NewReader(state.stdin).ReadString('\n'); err != nil {
 			return err
 		}
@@ -476,8 +480,8 @@ func runBridgeLinkFlow(ctx context.Context, state *runtimeState, provider provid
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "Linked %s Provider Item %s.\n", result.Provider, result.ProviderItemID)
-	fmt.Fprintln(stdout, "No sync was run. Run `money sync` after linking.")
+	_, _ = fmt.Fprintf(stdout, "Linked %s Provider Item %s.\n", result.Provider, result.ProviderItemID)
+	_, _ = fmt.Fprintln(stdout, "No sync was run. Run `money sync` after linking.")
 	return nil
 }
 

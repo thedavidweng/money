@@ -190,7 +190,7 @@ func (p bridgeProvider) Sync(ctx context.Context, item ProviderItem, sink SyncSi
 		externalUserID = item.ExternalUserID
 	}
 	if externalUserID == "" {
-		return SyncResult{}, fmt.Errorf("Bridge external user ID is required")
+		return SyncResult{}, fmt.Errorf("bridge external user ID is required")
 	}
 	token, err := client.CreateBridgeAuthToken(ctx, externalUserID)
 	if err != nil {
@@ -252,7 +252,7 @@ func (p bridgeProvider) bridgeClient() (bridgeAPI, error) {
 
 func (p bridgeProvider) linkedItem(session LinkSession, item BridgeItem) (LinkedItem, error) {
 	if item.ID == "" || item.ProviderID == "" || item.ProviderName == "" {
-		return LinkedItem{}, fmt.Errorf("Bridge item metadata is incomplete")
+		return LinkedItem{}, fmt.Errorf("bridge item metadata is incomplete")
 	}
 	institutionID := providerScopedID("bridge", item.ProviderID)
 	return LinkedItem{

@@ -163,7 +163,7 @@ func parseCSVAmount(amount string) (int64, error) {
 func hashCSVRow(row []string) string {
 	h := sha256.New()
 	for _, cell := range row {
-		fmt.Fprintf(h, "%s\n", cell)
+		_, _ = fmt.Fprintf(h, "%s\n", cell)
 	}
 	return fmt.Sprintf("%x", h.Sum(nil))[:16]
 }

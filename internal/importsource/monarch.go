@@ -155,7 +155,7 @@ func mapMonarchType(monarchType string) string {
 
 func hashMonarchRow(mt monarchTransaction) string {
 	h := sha256.New()
-	fmt.Fprintf(h, "%s|%s|%s|%d|%s|%s|%t", mt.ID, mt.AccountID, mt.Date, int64(mt.Amount*100), mt.Currency, mt.Name, mt.Pending)
+	_, _ = fmt.Fprintf(h, "%s|%s|%s|%d|%s|%s|%t", mt.ID, mt.AccountID, mt.Date, int64(mt.Amount*100), mt.Currency, mt.Name, mt.Pending)
 	return hex.EncodeToString(h.Sum(nil))
 }
 

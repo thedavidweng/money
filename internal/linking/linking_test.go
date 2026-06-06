@@ -16,7 +16,7 @@ func TestCompleteProviderLinkExchangesTokenAndStoresProviderItem(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	result, err := CompleteProviderLink(ctx, db, fakeProvider{}, providers.LinkSession{
 		Provider: "plaid",
@@ -48,7 +48,7 @@ func TestCompleteProviderLinkStoresTokenInEncryptedStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open encrypted store: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	result, err := CompleteProviderLink(ctx, db, fakeProvider{}, providers.LinkSession{
 		Provider: "plaid",
@@ -76,7 +76,7 @@ func TestCompleteProviderLinkDoesNotExchangeTokenForCancelOrError(t *testing.T) 
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	_, err = CompleteProviderLink(ctx, db, exchangeCountingProvider{}, providers.LinkSession{Provider: "plaid", State: "state"}, providers.LinkCallback{
 		Status: "cancel",

@@ -18,8 +18,9 @@ func newSyncCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 	var providerName, providerItemID, startDate, endDate string
 	var verbose bool
 	cmd := &cobra.Command{
-		Use:   "sync",
-		Short: "Sync linked Provider Items",
+		Use:     "sync",
+		Short:   "Sync linked Provider Items",
+		Example: "  money sync\n  money sync --provider plaid\n  money sync --provider-item item_123 --verbose",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			activeStore, err := requireStore(state)
 			if err != nil {
@@ -43,6 +44,9 @@ func newSyncCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 		},
 	}
 	cmd.Flags().StringVar(&providerName, "provider", "", "sync only one provider")
+	_ = cmd.RegisterFlagCompletionFunc("provider", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"plaid", "bridge"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().StringVar(&providerItemID, "provider-item", "", "sync only one provider item")
 	cmd.Flags().StringVar(&startDate, "start-date", "", "backfill transactions from this date (YYYY-MM-DD); requires --end-date")
 	cmd.Flags().StringVar(&endDate, "end-date", "", "backfill transactions until this date (YYYY-MM-DD); requires --start-date")
@@ -68,7 +72,7 @@ func writeSyncJSON(stdout io.Writer, result syncer.Result, err error) error {
 
 func writeSyncHuman(stdout io.Writer, result syncer.Result, verbose bool) {
 	for _, warning := range result.Warnings {
-		fmt.Fprintf(stdout, "warning\t%s\t%s\n", warning.Code, warning.Message)
+		_, _ = fmt.Fprintf(stdout, "warning\t%s\t%s\n", warning.Code, warning.Message)
 	}
 	if len(result.Items) == 0 {
 		return
@@ -81,12 +85,12 @@ func writeSyncHuman(stdout io.Writer, result syncer.Result, verbose bool) {
 			errorCount++
 		}
 		if verbose {
-			fmt.Fprintf(stdout, "%s\t%s\t%s\taccounts=%d\tadded=%d\tmodified=%d\tremoved=%d\n",
+			_, _ = fmt.Fprintf(stdout, "%s\t%s\t%s\taccounts=%d\tadded=%d\tmodified=%d\tremoved=%d\n",
 				item.Provider, item.ProviderItemID, item.Status, item.AccountsSeen,
 				item.TransactionsAdded, item.TransactionsModified, item.TransactionsRemoved)
 		}
 	}
 	if !verbose {
-		fmt.Fprintf(stdout, "synced\tok=%d\terrors=%d\n", okCount, errorCount)
+		_, _ = fmt.Fprintf(stdout, "synced\tok=%d\terrors=%d\n", okCount, errorCount)
 	}
 }

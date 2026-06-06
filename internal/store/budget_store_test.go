@@ -13,7 +13,7 @@ func TestSQLiteStoreBudgetCRUDLifecycleWithCategories(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Create a budget.
 	budget, err := db.CreateBudget(ctx, core.Budget{
@@ -142,7 +142,7 @@ func TestSQLiteStoreBudgetCategoryWithLinkedCategory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	categories, err := db.ListCategories(ctx)
 	if err != nil {

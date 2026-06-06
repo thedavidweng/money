@@ -59,7 +59,7 @@ ON CONFLICT(provider, provider_institution_id) DO UPDATE SET
   updated_at = excluded.updated_at`,
 		linked.Institution.ID, linked.Institution.Name, linked.Institution.Provider, linked.Institution.ProviderInstitutionID, now, now)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return err
 	}
 
@@ -83,7 +83,7 @@ ON CONFLICT(provider, provider_external_item_id) DO UPDATE SET
 		linked.Item.ID, linked.Item.Provider, linked.Item.InstitutionID, linked.Item.ProviderExternalItemID, token,
 		linked.Item.ExternalUserID, linked.Item.Status, string(products), linked.Item.TransactionCursor, now, now)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return err
 	}
 	return tx.Commit()
@@ -101,7 +101,7 @@ ORDER BY provider, id`
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []LinkedItem
 	for rows.Next() {
@@ -173,7 +173,7 @@ func (s *SQLiteStore) RemoveProviderItem(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Cascade-delete in dependency order:
 	// transaction_tags → transactions → recurring → sync_runs → accounts → provider_items
