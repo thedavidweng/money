@@ -95,7 +95,7 @@ func newRulesCreateCommand(ctx context.Context, state *runtimeState, stdout io.W
 					env.Meta.Demo = state.demo
 					return contracts.WriteJSON(stdout, env)
 				}
-				fmt.Fprintf(stdout, "Would create rule %q: if %s %s %q then %s %q (priority %d)\n",
+				_, _ = fmt.Fprintf(stdout, "Would create rule %q: if %s %s %q then %s %q (priority %d)\n",
 					rule.Name, rule.ConditionField, rule.ConditionOp, rule.ConditionValue, rule.ActionType, rule.ActionValue, rule.Priority)
 				return nil
 			}
@@ -112,7 +112,7 @@ func newRulesCreateCommand(ctx context.Context, state *runtimeState, stdout io.W
 				env.Meta.Demo = state.demo
 				return contracts.WriteJSON(stdout, env)
 			}
-			fmt.Fprintf(stdout, "Created rule %s (%s)\n", created.Name, created.ID)
+			_, _ = fmt.Fprintf(stdout, "Created rule %s (%s)\n", created.Name, created.ID)
 			return nil
 		},
 	}
@@ -170,7 +170,7 @@ func newRulesDeleteCommand(ctx context.Context, state *runtimeState, stdout io.W
 				env.Meta.Demo = state.demo
 				return contracts.WriteJSON(stdout, env)
 			}
-			fmt.Fprintf(stdout, "Deleted rule %s\n", args[0])
+			_, _ = fmt.Fprintf(stdout, "Deleted rule %s\n", args[0])
 			return nil
 		},
 	}
@@ -190,7 +190,7 @@ func newRulesApplyCommand(ctx context.Context, state *runtimeState, stdout io.Wr
 				return err
 			}
 			if !state.json {
-				fmt.Fprintf(stdout, "Updated %d transactions\n", result.TransactionsUpdated)
+				_, _ = fmt.Fprintf(stdout, "Updated %d transactions\n", result.TransactionsUpdated)
 				return nil
 			}
 			env := contracts.NewSuccess("rules.apply", map[string]any{"result": result})

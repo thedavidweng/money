@@ -14,7 +14,7 @@ func TestSQLiteStoreSyncSinkUpsertsAccountsTransactionsAndRemovedState(t *testin
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_sync", Name: "Sync Bank", Provider: "plaid", ProviderInstitutionID: "ins_sync"},
@@ -111,7 +111,7 @@ func TestSQLiteStoreRecordsSyncRunCounts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := db.RecordSyncRun(ctx, core.SyncRun{
 		Provider:             "plaid",
@@ -149,7 +149,7 @@ func TestSQLiteStoreListsProviderItemsForSync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	items, err := db.ListProviderItems(ctx, ProviderItemQuery{Provider: "plaid"})
 	if err != nil {
@@ -169,7 +169,7 @@ func TestSQLiteStoreLatestSyncRunsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	runs, err := db.LatestSyncRuns(ctx)
 	if err != nil {
@@ -186,7 +186,7 @@ func TestSQLiteStoreLatestSyncRunsReturnsMostRecentPerProviderItem(t *testing.T)
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Record two runs for the same provider item — latest should win.
 	if err := db.RecordSyncRun(ctx, core.SyncRun{
@@ -238,7 +238,7 @@ func TestSQLiteStoreMarkStuckSyncRunsInterrupted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Record a stuck run (no finished_at).
 	if _, err := db.db.ExecContext(ctx, `

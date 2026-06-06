@@ -13,7 +13,7 @@ func TestLiabilitySyncLifecycleUpsertThenClear(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Link a provider item for the liability account.
 	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{

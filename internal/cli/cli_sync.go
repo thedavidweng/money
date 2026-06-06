@@ -72,7 +72,7 @@ func writeSyncJSON(stdout io.Writer, result syncer.Result, err error) error {
 
 func writeSyncHuman(stdout io.Writer, result syncer.Result, verbose bool) {
 	for _, warning := range result.Warnings {
-		fmt.Fprintf(stdout, "warning\t%s\t%s\n", warning.Code, warning.Message)
+		_, _ = fmt.Fprintf(stdout, "warning\t%s\t%s\n", warning.Code, warning.Message)
 	}
 	if len(result.Items) == 0 {
 		return
@@ -85,12 +85,12 @@ func writeSyncHuman(stdout io.Writer, result syncer.Result, verbose bool) {
 			errorCount++
 		}
 		if verbose {
-			fmt.Fprintf(stdout, "%s\t%s\t%s\taccounts=%d\tadded=%d\tmodified=%d\tremoved=%d\n",
+			_, _ = fmt.Fprintf(stdout, "%s\t%s\t%s\taccounts=%d\tadded=%d\tmodified=%d\tremoved=%d\n",
 				item.Provider, item.ProviderItemID, item.Status, item.AccountsSeen,
 				item.TransactionsAdded, item.TransactionsModified, item.TransactionsRemoved)
 		}
 	}
 	if !verbose {
-		fmt.Fprintf(stdout, "synced\tok=%d\terrors=%d\n", okCount, errorCount)
+		_, _ = fmt.Fprintf(stdout, "synced\tok=%d\terrors=%d\n", okCount, errorCount)
 	}
 }

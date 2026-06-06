@@ -20,14 +20,14 @@ func TestDashboardClientListsTeamsAndFetchesKeys(t *testing.T) {
 		case "/cli/teams/list":
 			sawTeams = true
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"teams":[{"team_id":"team_1","client_id":"client_1","company":"Acme","role":"admin"}],"pagination":{"total":1}}`))
+			_, _ = w.Write([]byte(`{"teams":[{"team_id":"team_1","client_id":"client_1","company":"Acme","role":"admin"}],"pagination":{"total":1}}`))
 		case "/cli/keys/fetch":
 			sawKeys = true
 			if r.Method != http.MethodPost {
 				t.Fatalf("keys method = %s, want POST", r.Method)
 			}
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"client_id":"client_1","secrets":{"sandbox":["sandbox-secret"],"production":["prod-secret"]},"request_id":"req_123"}`))
+			_, _ = w.Write([]byte(`{"client_id":"client_1","secrets":{"sandbox":["sandbox-secret"],"production":["prod-secret"]},"request_id":"req_123"}`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -78,7 +78,7 @@ func TestDashboardClientClassifiesContractDriftAndKnown401Codes(t *testing.T) {
 					status = http.StatusUnauthorized
 				}
 				w.WriteHeader(status)
-				w.Write([]byte(tc.body))
+				_, _ = w.Write([]byte(tc.body))
 			}))
 			defer server.Close()
 			client := NewDashboardClient(DashboardClientConfig{

@@ -11,7 +11,7 @@ func TestStoreLinkedProviderItemPersistsInstitutionAndTokenOnlyInStore(t *testin
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	err = db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
 		Institution: LinkedInstitution{

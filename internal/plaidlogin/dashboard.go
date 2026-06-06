@@ -65,7 +65,7 @@ func (c DashboardClient) ListTeams(ctx context.Context) ([]Team, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusUnauthorized {
 		return nil, classifyDashboard401(resp.Body)
 	}
@@ -113,7 +113,7 @@ func (c DashboardClient) FetchKeys(ctx context.Context, teamID string) (Keys, er
 	if err != nil {
 		return Keys{}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusUnauthorized {
 		return Keys{}, classifyDashboard401(resp.Body)
 	}

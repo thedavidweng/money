@@ -11,7 +11,7 @@ func TestDemoStoreSeedsDeterministicFeatureCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	accounts, err := db.ListAccounts(ctx)
 	if err != nil {

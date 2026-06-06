@@ -128,13 +128,13 @@ func (p plaidProvider) CreateSandboxPublicToken(ctx context.Context, request San
 
 func (p plaidProvider) ExchangeLinkToken(ctx context.Context, session LinkSession, callback LinkCallback) (LinkedItem, error) {
 	if callback.State != session.State {
-		return LinkedItem{}, fmt.Errorf("Plaid Link callback state does not match session state")
+		return LinkedItem{}, fmt.Errorf("plaid Link callback state does not match session state")
 	}
 	if callback.PublicToken == "" {
-		return LinkedItem{}, fmt.Errorf("Plaid Link callback public token is required")
+		return LinkedItem{}, fmt.Errorf("plaid Link callback public token is required")
 	}
 	if callback.Metadata.Institution.ID == "" || callback.Metadata.Institution.Name == "" {
-		return LinkedItem{}, fmt.Errorf("Plaid Link callback institution metadata is required")
+		return LinkedItem{}, fmt.Errorf("plaid Link callback institution metadata is required")
 	}
 	client, err := p.plaidClient()
 	if err != nil {
@@ -172,7 +172,7 @@ func (p plaidProvider) QueryTransactions(ctx context.Context, item ProviderItem,
 	}
 	accessToken := string(item.EncryptedAccessToken)
 	if accessToken == "" {
-		return nil, fmt.Errorf("Plaid access token is required")
+		return nil, fmt.Errorf("plaid access token is required")
 	}
 	plaidTxs, err := client.GetTransactions(ctx, accessToken, startDate, endDate)
 	if err != nil {
@@ -192,7 +192,7 @@ func (p plaidProvider) Sync(ctx context.Context, item ProviderItem, sink SyncSin
 	}
 	accessToken := string(item.EncryptedAccessToken)
 	if accessToken == "" {
-		return SyncResult{}, fmt.Errorf("Plaid access token is required")
+		return SyncResult{}, fmt.Errorf("plaid access token is required")
 	}
 	result := SyncResult{Provider: "plaid", ProviderItemID: item.ID}
 	accounts, err := client.GetAccounts(ctx, accessToken)

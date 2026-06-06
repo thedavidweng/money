@@ -11,7 +11,7 @@ func TestListTransactionsRemovedModes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// RemovedOnly: only the removed transaction.
 	removed, err := db.ListTransactions(ctx, TransactionListQuery{RemovedMode: RemovedOnly, Limit: 100})
@@ -38,7 +38,7 @@ func TestListTransactionsFilterByAccountAndCategory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Filter by checking account — has coffee, rent (removed excluded by default).
 	checking, err := db.ListTransactions(ctx, TransactionListQuery{AccountID: "acc_demo_checking", Limit: 100})
@@ -79,7 +79,7 @@ func TestListTransactionsFilterByPendingAndNeedsReview(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	pendingTrue := true
 	pending, err := db.ListTransactions(ctx, TransactionListQuery{Pending: &pendingTrue, Limit: 100})
@@ -115,7 +115,7 @@ func TestListTransactionsFilterByTagAndDateRange(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Tag filter — tag_demo_travel is attached to tx_demo_coffee only.
 	tagged, err := db.ListTransactions(ctx, TransactionListQuery{TagID: "tag_demo_travel", Limit: 100})
@@ -155,7 +155,7 @@ func TestListTransactionsFilterByMerchantAndRecurring(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Merchant LIKE filter — partial match on merchant_name or name.
 	coffee, err := db.ListTransactions(ctx, TransactionListQuery{Merchant: "Blue Bottle", Limit: 100})
@@ -201,7 +201,7 @@ func TestListTransactionsPagination(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Get all 4 non-removed transactions.
 	all, err := db.ListTransactions(ctx, TransactionListQuery{Limit: 100})
@@ -251,7 +251,7 @@ func TestListTransactionsCombinedFilters(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Combine: checking account + pending only → only tx_demo_coffee.
 	pendingTrue := true
@@ -288,7 +288,7 @@ func TestListTransactionsDefaultLimit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Limit=0 should default to 50.
 	txDefault, err := db.ListTransactions(ctx, TransactionListQuery{})
@@ -307,7 +307,7 @@ func TestListTransactionsHydratesAccountName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	txs, err := db.ListTransactions(ctx, TransactionListQuery{AccountID: "acc_demo_checking", Limit: 100})
 	if err != nil {
@@ -340,7 +340,7 @@ func TestCashflowSummaryGroupsByPeriod(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Cashflow for April–May 2026.
 	periods, err := db.CashflowSummary(ctx, "2026-04-01", "2026-05-31", "monthly", "USD")
@@ -368,7 +368,7 @@ func TestNetWorthSumsAllAccounts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	nw, err := db.NetWorth(ctx)
 	if err != nil {
@@ -391,7 +391,7 @@ func TestSearchTransactionsMatchesNameMerchantAndNote(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Search by merchant name.
 	coffee, err := db.SearchTransactions(ctx, "Blue Bottle", 10)
@@ -438,7 +438,7 @@ func TestListRecurringReturnsDemoStreams(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	recurring, err := db.ListRecurring(ctx)
 	if err != nil {
@@ -471,7 +471,7 @@ func TestDemoSeedIsSelfConsistent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Every transaction's account_id should resolve to an account.
 	accounts, err := db.ListAccounts(ctx)
@@ -556,7 +556,7 @@ func TestListTransactionsExcludesRemovedByDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open demo: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	txs, err := db.ListTransactions(ctx, TransactionListQuery{Limit: 100})
 	if err != nil {

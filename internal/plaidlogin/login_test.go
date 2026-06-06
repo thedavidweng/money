@@ -26,11 +26,11 @@ func TestRunLoginWritesFetchedKeysAndDashboardAuth(t *testing.T) {
 				t.Fatal(err)
 			}
 			callbackURL = r.Form.Get("redirect_uri")
-			w.Write([]byte(`{"access_token":"dashboard-access","refresh_token":"dashboard-refresh","expires_in":3600,"token_type":"Bearer"}`))
+			_, _ = w.Write([]byte(`{"access_token":"dashboard-access","refresh_token":"dashboard-refresh","expires_in":3600,"token_type":"Bearer"}`))
 		case "/cli/teams/list":
-			w.Write([]byte(`{"teams":[{"team_id":"team_1","client_id":"client_1","company":"Acme"}]}`))
+			_, _ = w.Write([]byte(`{"teams":[{"team_id":"team_1","client_id":"client_1","company":"Acme"}]}`))
 		case "/cli/keys/fetch":
-			w.Write([]byte(`{"client_id":"client_1","secrets":{"sandbox":["sandbox-secret"]}}`))
+			_, _ = w.Write([]byte(`{"client_id":"client_1","secrets":{"sandbox":["sandbox-secret"]}}`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -88,11 +88,11 @@ providers:
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/oauth/token":
-			w.Write([]byte(`{"access_token":"a","refresh_token":"r","expires_in":3600,"token_type":"Bearer"}`))
+			_, _ = w.Write([]byte(`{"access_token":"a","refresh_token":"r","expires_in":3600,"token_type":"Bearer"}`))
 		case "/cli/teams/list":
-			w.Write([]byte(`{"teams":[{"team_id":"team_1","client_id":"client_1","company":"Acme"}]}`))
+			_, _ = w.Write([]byte(`{"teams":[{"team_id":"team_1","client_id":"client_1","company":"Acme"}]}`))
 		case "/cli/keys/fetch":
-			w.Write([]byte(`{"client_id":"client_1","secrets":{"sandbox":["sandbox-secret"]}}`))
+			_, _ = w.Write([]byte(`{"client_id":"client_1","secrets":{"sandbox":["sandbox-secret"]}}`))
 		}
 	}))
 	defer server.Close()
@@ -275,11 +275,11 @@ func TestRunLoginPromptsForMultiTeamSelection(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/oauth/token":
-			w.Write([]byte(`{"access_token":"a","refresh_token":"r","expires_in":3600,"token_type":"Bearer"}`))
+			_, _ = w.Write([]byte(`{"access_token":"a","refresh_token":"r","expires_in":3600,"token_type":"Bearer"}`))
 		case "/cli/teams/list":
-			w.Write([]byte(`{"teams":[{"team_id":"team_1","client_id":"client_1","company":"First"},{"team_id":"team_2","client_id":"client_2","company":"Second"}]}`))
+			_, _ = w.Write([]byte(`{"teams":[{"team_id":"team_1","client_id":"client_1","company":"First"},{"team_id":"team_2","client_id":"client_2","company":"Second"}]}`))
 		case "/cli/keys/fetch":
-			w.Write([]byte(`{"client_id":"client_2","secrets":{"sandbox":["sandbox-secret"]}}`))
+			_, _ = w.Write([]byte(`{"client_id":"client_2","secrets":{"sandbox":["sandbox-secret"]}}`))
 		}
 	}))
 	defer server.Close()
@@ -407,7 +407,7 @@ func TestRunLoginDoesNotWritePartialCredentialsWhenDashboardStepsFail(t *testing
 		"teams": func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
 			case "/oauth/token":
-				w.Write([]byte(`{"access_token":"a","refresh_token":"r","expires_in":3600,"token_type":"Bearer"}`))
+				_, _ = w.Write([]byte(`{"access_token":"a","refresh_token":"r","expires_in":3600,"token_type":"Bearer"}`))
 			case "/cli/teams/list":
 				http.Error(w, "no teams", http.StatusUnauthorized)
 			}
@@ -415,9 +415,9 @@ func TestRunLoginDoesNotWritePartialCredentialsWhenDashboardStepsFail(t *testing
 		"keys": func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
 			case "/oauth/token":
-				w.Write([]byte(`{"access_token":"a","refresh_token":"r","expires_in":3600,"token_type":"Bearer"}`))
+				_, _ = w.Write([]byte(`{"access_token":"a","refresh_token":"r","expires_in":3600,"token_type":"Bearer"}`))
 			case "/cli/teams/list":
-				w.Write([]byte(`{"teams":[{"team_id":"team_1","client_id":"client_1","company":"Acme"}]}`))
+				_, _ = w.Write([]byte(`{"teams":[{"team_id":"team_1","client_id":"client_1","company":"Acme"}]}`))
 			case "/cli/keys/fetch":
 				http.Error(w, "no keys", http.StatusUnauthorized)
 			}
@@ -425,11 +425,11 @@ func TestRunLoginDoesNotWritePartialCredentialsWhenDashboardStepsFail(t *testing
 		"missing-environment": func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
 			case "/oauth/token":
-				w.Write([]byte(`{"access_token":"a","refresh_token":"r","expires_in":3600,"token_type":"Bearer"}`))
+				_, _ = w.Write([]byte(`{"access_token":"a","refresh_token":"r","expires_in":3600,"token_type":"Bearer"}`))
 			case "/cli/teams/list":
-				w.Write([]byte(`{"teams":[{"team_id":"team_1","client_id":"client_1","company":"Acme"}]}`))
+				_, _ = w.Write([]byte(`{"teams":[{"team_id":"team_1","client_id":"client_1","company":"Acme"}]}`))
 			case "/cli/keys/fetch":
-				w.Write([]byte(`{"client_id":"client_1","secrets":{"production":["prod-secret"]}}`))
+				_, _ = w.Write([]byte(`{"client_id":"client_1","secrets":{"production":["prod-secret"]}}`))
 			}
 		},
 	} {
@@ -470,11 +470,11 @@ func loginFakeDashboard(t *testing.T, clientID string, secret string) *httptest.
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/oauth/token":
-			w.Write([]byte(`{"access_token":"a","refresh_token":"r","expires_in":3600,"token_type":"Bearer"}`))
+			_, _ = w.Write([]byte(`{"access_token":"a","refresh_token":"r","expires_in":3600,"token_type":"Bearer"}`))
 		case "/cli/teams/list":
-			w.Write([]byte(`{"teams":[{"team_id":"team_1","client_id":"` + clientID + `","company":"Acme"}]}`))
+			_, _ = w.Write([]byte(`{"teams":[{"team_id":"team_1","client_id":"` + clientID + `","company":"Acme"}]}`))
 		case "/cli/keys/fetch":
-			w.Write([]byte(`{"client_id":"` + clientID + `","secrets":{"sandbox":["` + secret + `"],"production":["` + secret + `"]}}`))
+			_, _ = w.Write([]byte(`{"client_id":"` + clientID + `","secrets":{"sandbox":["` + secret + `"],"production":["` + secret + `"]}}`))
 		}
 	}))
 }

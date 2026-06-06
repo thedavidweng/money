@@ -72,20 +72,20 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, 
 			if state.json {
 				env := contracts.NewError(cliErr.command, cliErr.code, cliErr.message, cliErr.category, cliErr.retryable)
 				if writeErr := contracts.WriteJSON(stdout, env); writeErr != nil {
-					fmt.Fprintln(stderr, writeErr)
+					_, _ = fmt.Fprintln(stderr, writeErr)
 				}
 			} else {
-				fmt.Fprintln(stderr, cliErr.message)
+				_, _ = fmt.Fprintln(stderr, cliErr.message)
 			}
 			return cliErr.exitCode
 		}
 		if state.json {
 			env := contracts.NewError(commandName(root), "COMMAND_FAILED", err.Error(), contracts.CategoryInternal, false)
 			if writeErr := contracts.WriteJSON(stdout, env); writeErr != nil {
-				fmt.Fprintln(stderr, writeErr)
+				_, _ = fmt.Fprintln(stderr, writeErr)
 			}
 		} else {
-			fmt.Fprintln(stderr, err)
+			_, _ = fmt.Fprintln(stderr, err)
 		}
 		return 1
 	}
@@ -140,7 +140,7 @@ link financial institutions and sync transactions locally.
 				env.Meta.Demo = state.demo
 				return contracts.WriteJSON(stdout, env)
 			}
-			fmt.Fprintf(stdout, "money %s (commit %s)\n", Version, Commit)
+			_, _ = fmt.Fprintf(stdout, "money %s (commit %s)\n", Version, Commit)
 			return nil
 		},
 	}
@@ -374,9 +374,9 @@ func newFeedbackCommand(state *runtimeState, stdout io.Writer) *cobra.Command {
 				env := contracts.NewSuccess("feedback", map[string]string{"url": url})
 				return contracts.WriteJSON(stdout, env)
 			}
-			fmt.Fprintf(stdout, "Opening %s\n", url)
+			_, _ = fmt.Fprintf(stdout, "Opening %s\n", url)
 			if err := openBrowser(url); err != nil {
-				fmt.Fprintf(stdout, "Could not open browser automatically. Visit %s\n", url)
+				_, _ = fmt.Fprintf(stdout, "Could not open browser automatically. Visit %s\n", url)
 			}
 			return nil
 		},
@@ -593,7 +593,7 @@ func newCreateManualCommand(ctx context.Context, state *runtimeState, stdout io.
 				env.Meta.Demo = state.demo
 				return contracts.WriteJSON(stdout, env)
 			}
-			fmt.Fprintf(stdout, "Created %s with balance %s %s\n", account.DisplayName, colorAmount(stdout, account.CurrentBalance), account.Currency)
+			_, _ = fmt.Fprintf(stdout, "Created %s with balance %s %s\n", account.DisplayName, colorAmount(stdout, account.CurrentBalance), account.Currency)
 			return nil
 		},
 	}
@@ -927,7 +927,7 @@ func newItemsCommand(ctx context.Context, state *runtimeState, stdout io.Writer)
 				env.Meta.Demo = state.demo
 				return contracts.WriteJSON(stdout, env)
 			}
-			fmt.Fprintf(stdout, "Renamed %s to %s\n", args[0], args[1])
+			_, _ = fmt.Fprintf(stdout, "Renamed %s to %s\n", args[0], args[1])
 			return nil
 		},
 	}
@@ -964,7 +964,7 @@ func newItemsCommand(ctx context.Context, state *runtimeState, stdout io.Writer)
 				env.Meta.Demo = state.demo
 				return contracts.WriteJSON(stdout, env)
 			}
-			fmt.Fprintf(stdout, "Removed %s\n", args[0])
+			_, _ = fmt.Fprintf(stdout, "Removed %s\n", args[0])
 			return nil
 		},
 	})
@@ -1061,7 +1061,7 @@ func newImportCommand(ctx context.Context, state *runtimeState, stdout io.Writer
 						env.Meta.Demo = state.demo
 						return contracts.WriteJSON(stdout, env)
 					}
-					fmt.Fprintf(stdout, "Would import %s from %s (batch %s)\n", sourceName, args[0], batchID)
+					_, _ = fmt.Fprintf(stdout, "Would import %s from %s (batch %s)\n", sourceName, args[0], batchID)
 					return nil
 				}
 				activeStore, err := requireStore(state)
@@ -1072,7 +1072,7 @@ func newImportCommand(ctx context.Context, state *runtimeState, stdout io.Writer
 				if err != nil {
 					return err
 				}
-				defer f.Close()
+				defer func() { _ = f.Close() }()
 				result, err := source.Import(ctx, activeStore, batchID, f)
 				if err != nil {
 					var importErr importsource.ImportError
@@ -1093,12 +1093,12 @@ func newImportCommand(ctx context.Context, state *runtimeState, stdout io.Writer
 					env.Meta.Demo = state.demo
 					return contracts.WriteJSON(stdout, env)
 				}
-				fmt.Fprintf(stdout, "Imported %d accounts and %d transactions from %s.\n", result.AccountsImported, result.TransactionsImported, args[0])
+				_, _ = fmt.Fprintf(stdout, "Imported %d accounts and %d transactions from %s.\n", result.AccountsImported, result.TransactionsImported, args[0])
 				if result.DuplicatesSkipped > 0 {
-					fmt.Fprintf(stdout, "Skipped %d duplicate rows.\n", result.DuplicatesSkipped)
+					_, _ = fmt.Fprintf(stdout, "Skipped %d duplicate rows.\n", result.DuplicatesSkipped)
 				}
 				if len(result.PossibleDuplicates) > 0 {
-					fmt.Fprintf(stdout, "Possible duplicates across sources: %d\n", len(result.PossibleDuplicates))
+					_, _ = fmt.Fprintf(stdout, "Possible duplicates across sources: %d\n", len(result.PossibleDuplicates))
 				}
 				return nil
 			},
@@ -1169,7 +1169,7 @@ func newNetWorthCommand(ctx context.Context, state *runtimeState, stdout io.Writ
 				return err
 			}
 			if !state.json {
-				fmt.Fprintf(stdout, "Net worth: %s %s\n", colorAmount(stdout, nw.Total), nw.Currency)
+				_, _ = fmt.Fprintf(stdout, "Net worth: %s %s\n", colorAmount(stdout, nw.Total), nw.Currency)
 				return nil
 			}
 			env := contracts.NewSuccess("net_worth", map[string]any{"net_worth": nw})
@@ -1346,12 +1346,12 @@ func runPlaidLoginLive(ctx context.Context, state *runtimeState, stdout io.Write
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stderr, "Plaid Dashboard OAuth URL: %s\n", authURL)
+	_, _ = fmt.Fprintf(stderr, "Plaid Dashboard OAuth URL: %s\n", authURL)
 	if !opts.NoOpen && !state.json {
 		if state.stdin == nil {
 			return fmt.Errorf("stdin is required before opening a browser")
 		}
-		fmt.Fprintln(stderr, "Press Enter to open the browser.")
+		_, _ = fmt.Fprintln(stderr, "Press Enter to open the browser.")
 		if _, err := bufio.NewReader(state.stdin).ReadString('\n'); err != nil {
 			return err
 		}
@@ -1460,14 +1460,14 @@ func writePlaidLoginResult(state *runtimeState, stdout io.Writer, result plaidlo
 	if state.json {
 		return contracts.WriteJSON(stdout, contracts.NewSuccess(commandName, result))
 	}
-	fmt.Fprintf(stdout, "Plaid Dashboard login complete for team %s.\n", result.TeamID)
+	_, _ = fmt.Fprintf(stdout, "Plaid Dashboard login complete for team %s.\n", result.TeamID)
 	switch result.CredentialAction {
 	case "preserved_existing":
-		fmt.Fprintf(stdout, "Plaid %s credentials already exist; preserved (use --force to overwrite).\n", result.Environment)
+		_, _ = fmt.Fprintf(stdout, "Plaid %s credentials already exist; preserved (use --force to overwrite).\n", result.Environment)
 	default:
-		fmt.Fprintf(stdout, "Plaid %s credentials written to %s.\n", result.Environment, result.EnvPath)
+		_, _ = fmt.Fprintf(stdout, "Plaid %s credentials written to %s.\n", result.Environment, result.EnvPath)
 	}
-	fmt.Fprintf(stdout, "Next: %s\n", result.NextCommand)
+	_, _ = fmt.Fprintf(stdout, "Next: %s\n", result.NextCommand)
 	return nil
 }
 
@@ -1576,11 +1576,11 @@ func newPlaidLogoutCommand(state *runtimeState, stdout io.Writer, commandName st
 				return contracts.WriteJSON(stdout, contracts.NewSuccess(commandName, data))
 			}
 			if removed {
-				fmt.Fprintf(stdout, "Plaid Dashboard auth removed from %s.\n", authPath)
+				_, _ = fmt.Fprintf(stdout, "Plaid Dashboard auth removed from %s.\n", authPath)
 			} else {
-				fmt.Fprintf(stdout, "Plaid Dashboard auth was not present at %s.\n", authPath)
+				_, _ = fmt.Fprintf(stdout, "Plaid Dashboard auth was not present at %s.\n", authPath)
 			}
-			fmt.Fprintf(stdout, "API keys remain in %s. To remove them, edit the file or run money providers configure plaid with new values.\n", meta.EnvPath)
+			_, _ = fmt.Fprintf(stdout, "API keys remain in %s. To remove them, edit the file or run money providers configure plaid with new values.\n", meta.EnvPath)
 			return nil
 		},
 	}
@@ -1608,9 +1608,9 @@ func supportedProviderAvailability(providerName string, diagnostics []providers.
 }
 
 func writeProviderAvailability(stdout io.Writer, rows []providerAvailabilityRow) {
-	fmt.Fprintln(stdout, "provider\tstatus\tcode\tguidance")
+	_, _ = fmt.Fprintln(stdout, "provider\tstatus\tcode\tguidance")
 	for _, row := range rows {
-		fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\n", row.Provider, row.Status, row.Code, row.Guidance)
+		_, _ = fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\n", row.Provider, row.Status, row.Code, row.Guidance)
 	}
 }
 

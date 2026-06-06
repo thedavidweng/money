@@ -106,7 +106,7 @@ func newBudgetsCreateCommand(ctx context.Context, state *runtimeState, stdout io
 					env.Meta.Demo = state.demo
 					return contracts.WriteJSON(stdout, env)
 				}
-				fmt.Fprintf(stdout, "Would create budget %q (%s, %s to %s)\n", budget.Name, budget.Period, budget.StartDate, budget.EndDate)
+				_, _ = fmt.Fprintf(stdout, "Would create budget %q (%s, %s to %s)\n", budget.Name, budget.Period, budget.StartDate, budget.EndDate)
 				return nil
 			}
 			activeStore, err := requireStore(state)
@@ -122,7 +122,7 @@ func newBudgetsCreateCommand(ctx context.Context, state *runtimeState, stdout io
 				env.Meta.Demo = state.demo
 				return contracts.WriteJSON(stdout, env)
 			}
-			fmt.Fprintf(stdout, "Created budget %s (%s)\n", created.Name, created.ID)
+			_, _ = fmt.Fprintf(stdout, "Created budget %s (%s)\n", created.Name, created.ID)
 			return nil
 		},
 	}
@@ -169,12 +169,12 @@ func newBudgetsGetCommand(ctx context.Context, state *runtimeState, stdout io.Wr
 				return err
 			}
 			if !state.json {
-				fmt.Fprintf(stdout, "Budget: %s (%s)\n", budget.Name, budget.ID)
-				fmt.Fprintf(stdout, "Period: %s\n", budget.Period)
-				fmt.Fprintf(stdout, "Range: %s to %s\n", budget.StartDate, budget.EndDate)
-				fmt.Fprintf(stdout, "Currency: %s\n", budget.Currency)
+				_, _ = fmt.Fprintf(stdout, "Budget: %s (%s)\n", budget.Name, budget.ID)
+				_, _ = fmt.Fprintf(stdout, "Period: %s\n", budget.Period)
+				_, _ = fmt.Fprintf(stdout, "Range: %s to %s\n", budget.StartDate, budget.EndDate)
+				_, _ = fmt.Fprintf(stdout, "Currency: %s\n", budget.Currency)
 				if len(budget.Categories) > 0 {
-					fmt.Fprintln(stdout, "Categories:")
+					_, _ = fmt.Fprintln(stdout, "Categories:")
 					table := tablewriter.NewWriter(stdout)
 					table.SetHeader([]string{"NAME", "LIMIT", "CATEGORY ID"})
 					table.SetBorder(false)
@@ -229,7 +229,7 @@ func newBudgetsDeleteCommand(ctx context.Context, state *runtimeState, stdout io
 				env.Meta.Demo = state.demo
 				return contracts.WriteJSON(stdout, env)
 			}
-			fmt.Fprintf(stdout, "Deleted budget %s\n", args[0])
+			_, _ = fmt.Fprintf(stdout, "Deleted budget %s\n", args[0])
 			return nil
 		},
 	}
@@ -284,7 +284,7 @@ func newBudgetCategoriesCreateCommand(ctx context.Context, state *runtimeState, 
 					env.Meta.Demo = state.demo
 					return contracts.WriteJSON(stdout, env)
 				}
-				fmt.Fprintf(stdout, "Would create budget category %q with limit %s %s\n", bc.Name, core.FormatMinorUnits(bc.LimitMinorUnits, bc.Currency), bc.Currency)
+				_, _ = fmt.Fprintf(stdout, "Would create budget category %q with limit %s %s\n", bc.Name, core.FormatMinorUnits(bc.LimitMinorUnits, bc.Currency), bc.Currency)
 				return nil
 			}
 			activeStore, err := requireStore(state)
@@ -300,7 +300,7 @@ func newBudgetCategoriesCreateCommand(ctx context.Context, state *runtimeState, 
 				env.Meta.Demo = state.demo
 				return contracts.WriteJSON(stdout, env)
 			}
-			fmt.Fprintf(stdout, "Created budget category %s (%s)\n", created.Name, created.ID)
+			_, _ = fmt.Fprintf(stdout, "Created budget category %s (%s)\n", created.Name, created.ID)
 			return nil
 		},
 	}
@@ -349,7 +349,7 @@ func newBudgetCategoriesDeleteCommand(ctx context.Context, state *runtimeState, 
 				env.Meta.Demo = state.demo
 				return contracts.WriteJSON(stdout, env)
 			}
-			fmt.Fprintf(stdout, "Deleted budget category %s\n", args[0])
+			_, _ = fmt.Fprintf(stdout, "Deleted budget category %s\n", args[0])
 			return nil
 		},
 	}

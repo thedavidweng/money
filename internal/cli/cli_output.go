@@ -17,7 +17,7 @@ func writeManualPlan(stdout io.Writer, state *runtimeState, plan manualAccountPl
 		env.Meta.Demo = state.demo
 		return contracts.WriteJSON(stdout, env)
 	}
-	fmt.Fprintf(stdout, "Would create %s with balance %s %s\n", plan.AccountName, colorAmount(stdout, plan.SignedBalance), plan.Currency)
+	_, _ = fmt.Fprintf(stdout, "Would create %s with balance %s %s\n", plan.AccountName, colorAmount(stdout, plan.SignedBalance), plan.Currency)
 	return nil
 }
 
@@ -59,41 +59,41 @@ func writeTransactionsPage(stdout io.Writer, state *runtimeState, command string
 		table.Render()
 		if verbose {
 			for _, tx := range transactions {
-				fmt.Fprintln(stdout)
-				fmt.Fprintf(stdout, "  ID: %s\n", tx.ID)
-				fmt.Fprintf(stdout, "  Account ID: %s\n", tx.AccountID)
+				_, _ = fmt.Fprintln(stdout)
+				_, _ = fmt.Fprintf(stdout, "  ID: %s\n", tx.ID)
+				_, _ = fmt.Fprintf(stdout, "  Account ID: %s\n", tx.AccountID)
 				if tx.AuthorizedDate != nil {
-					fmt.Fprintf(stdout, "  Authorized Date: %s\n", *tx.AuthorizedDate)
+					_, _ = fmt.Fprintf(stdout, "  Authorized Date: %s\n", *tx.AuthorizedDate)
 				}
 				if tx.ProviderCategory != nil {
-					fmt.Fprintf(stdout, "  Provider Category: %s\n", *tx.ProviderCategory)
+					_, _ = fmt.Fprintf(stdout, "  Provider Category: %s\n", *tx.ProviderCategory)
 				}
 				if tx.ProviderSubcategory != nil {
-					fmt.Fprintf(stdout, "  Provider Subcategory: %s\n", *tx.ProviderSubcategory)
+					_, _ = fmt.Fprintf(stdout, "  Provider Subcategory: %s\n", *tx.ProviderSubcategory)
 				}
 				if tx.Note != nil {
-					fmt.Fprintf(stdout, "  Note: %s\n", *tx.Note)
+					_, _ = fmt.Fprintf(stdout, "  Note: %s\n", *tx.Note)
 				}
 				if len(tx.Tags) > 0 {
 					tagNames := make([]string, 0, len(tx.Tags))
 					for _, tag := range tx.Tags {
 						tagNames = append(tagNames, tag.Name)
 					}
-					fmt.Fprintf(stdout, "  Tags: %s\n", strings.Join(tagNames, ", "))
+					_, _ = fmt.Fprintf(stdout, "  Tags: %s\n", strings.Join(tagNames, ", "))
 				}
 				if tx.Source.Provider != nil {
-					fmt.Fprintf(stdout, "  Source Provider: %s\n", *tx.Source.Provider)
+					_, _ = fmt.Fprintf(stdout, "  Source Provider: %s\n", *tx.Source.Provider)
 				}
 				if tx.Source.ProviderItemID != nil {
-					fmt.Fprintf(stdout, "  Source Provider Item ID: %s\n", *tx.Source.ProviderItemID)
+					_, _ = fmt.Fprintf(stdout, "  Source Provider Item ID: %s\n", *tx.Source.ProviderItemID)
 				}
 				if tx.Source.ProviderAccountID != nil {
-					fmt.Fprintf(stdout, "  Source Provider Account ID: %s\n", *tx.Source.ProviderAccountID)
+					_, _ = fmt.Fprintf(stdout, "  Source Provider Account ID: %s\n", *tx.Source.ProviderAccountID)
 				}
 				if tx.Source.ProviderTransactionID != nil {
-					fmt.Fprintf(stdout, "  Source Provider Transaction ID: %s\n", *tx.Source.ProviderTransactionID)
+					_, _ = fmt.Fprintf(stdout, "  Source Provider Transaction ID: %s\n", *tx.Source.ProviderTransactionID)
 				}
-				fmt.Fprintf(stdout, "  Last Changed: %s\n", tx.LastChangedAt)
+				_, _ = fmt.Fprintf(stdout, "  Last Changed: %s\n", tx.LastChangedAt)
 			}
 		}
 		return nil

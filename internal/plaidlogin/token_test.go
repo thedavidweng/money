@@ -24,7 +24,7 @@ func TestExchangeCodeUsesPKCEFormBody(t *testing.T) {
 		assertForm(t, r.PostForm, "redirect_uri", "http://127.0.0.1:49152/oauth/callback")
 		assertForm(t, r.PostForm, "client_id", ClientID)
 		assertForm(t, r.PostForm, "code_verifier", "verifier")
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"access_token":  "access-token",
 			"refresh_token": "refresh-token",
 			"expires_in":    3600,
@@ -52,7 +52,7 @@ func TestExchangeCodeUsesPKCEFormBody(t *testing.T) {
 
 func TestRefreshTokenClassifiesMalformedResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"access_token":"new"}`))
+		_, _ = w.Write([]byte(`{"access_token":"new"}`))
 	}))
 	defer server.Close()
 

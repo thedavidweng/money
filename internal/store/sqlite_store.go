@@ -46,7 +46,7 @@ func OpenEncrypted(ctx context.Context, path string, key []byte) (*SQLiteStore, 
 	db.SetMaxOpenConns(1)
 	store := &SQLiteStore{db: db}
 	if err := store.runMigrations(ctx); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 	return store, nil
@@ -61,11 +61,11 @@ func OpenDemo(ctx context.Context) (*SQLiteStore, error) {
 
 	store := &SQLiteStore{db: db}
 	if err := store.runMigrations(ctx); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 	if err := store.SeedDemo(ctx); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 	return store, nil
@@ -150,7 +150,7 @@ func (s *SQLiteStore) migrateProviderItemAlias(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("check provider_items columns: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var cid int
 		var name, typ string
@@ -184,7 +184,7 @@ ORDER BY a.hidden ASC, a.type ASC, a.name ASC, a.id ASC`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	accounts := []core.Account{}
 	for rows.Next() {
@@ -331,7 +331,7 @@ LIMIT ? OFFSET ?`, args...)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	transactions := []core.Transaction{}
 	for rows.Next() {
@@ -379,7 +379,7 @@ func (s *SQLiteStore) ListCategories(ctx context.Context) ([]core.Category, erro
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	categories := []core.Category{}
 	for rows.Next() {
 		var category core.Category
@@ -398,7 +398,7 @@ func (s *SQLiteStore) ListTags(ctx context.Context) ([]core.Tag, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	tags := []core.Tag{}
 	for rows.Next() {
 		var tag core.Tag
@@ -427,7 +427,7 @@ ORDER BY period ASC`, groupFormat, from, to, currency)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var periods []core.CashflowPeriod
 	for rows.Next() {
 		var p core.CashflowPeriod
@@ -456,7 +456,7 @@ GROUP BY currency`)
 	if err != nil {
 		return core.NetWorth{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var nw core.NetWorth
 	for rows.Next() {
 		var currency string
@@ -486,7 +486,7 @@ ORDER BY r.next_date ASC, r.merchant_name ASC, r.id ASC`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	recurringItems := []core.Recurring{}
 	for rows.Next() {
 		var item core.Recurring
@@ -512,7 +512,7 @@ ORDER BY h.institution_value DESC, h.id ASC`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items := []core.InvestmentHolding{}
 	for rows.Next() {
 		var h core.InvestmentHolding
@@ -536,7 +536,7 @@ ORDER BY name ASC, id ASC`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items := []core.InvestmentSecurity{}
 	for rows.Next() {
 		var sec core.InvestmentSecurity
@@ -568,7 +568,7 @@ ORDER BY current_balance DESC, name ASC, id ASC`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items := []core.Liability{}
 	for rows.Next() {
 		var l core.Liability
@@ -602,7 +602,7 @@ ORDER BY start_date DESC, name ASC, id ASC`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	budgets := []core.Budget{}
 	for rows.Next() {
 		var b core.Budget
@@ -693,7 +693,7 @@ ORDER BY name ASC, id ASC`, budgetID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items := []core.BudgetCategory{}
 	for rows.Next() {
 		var bc core.BudgetCategory
@@ -748,7 +748,7 @@ ORDER BY priority DESC, created_at ASC`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var rules []core.Rule
 	for rows.Next() {
 		var r core.Rule
@@ -825,7 +825,7 @@ WHERE removed = 0`)
 	if err != nil {
 		return core.ApplyRulesResult{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var transactions []txRow
 	for rows.Next() {
 		var t txRow
@@ -858,7 +858,7 @@ WHERE removed = 0`)
 	if err != nil {
 		return core.ApplyRulesResult{}, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	for _, m := range matches {
 		if err := applyRuleActionTx(ctx, tx, m.TxID, m.Rule); err != nil {
@@ -940,7 +940,7 @@ ORDER BY tags.name ASC, tags.id ASC`, transactionID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	tags := []core.Tag{}
 	for rows.Next() {
 		var tag core.Tag
@@ -1055,7 +1055,7 @@ LIMIT 5`,
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var ids []string
 	for rows.Next() {
 		var id string
