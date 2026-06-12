@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/thedavidweng/money/internal/paths"
 )
 
 func TestLoadResolvesExplicitEnvReferencesFromCompanionEnv(t *testing.T) {
@@ -73,11 +75,11 @@ func TestLoadDoesNotReadCwdEnvWithoutExplicitConfigReference(t *testing.T) {
 }
 
 func TestDefaultConfigPathReturnsDefaultForEmptyAndDefaultProfile(t *testing.T) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Skip("cannot determine home dir:", err)
+	base := paths.DataDir()
+	if base == "" {
+		t.Skip("cannot determine data dir")
 	}
-	defaultPath := filepath.Join(home, ".money", "config.yaml")
+	defaultPath := filepath.Join(base, "config.yaml")
 	if p := DefaultConfigPath(""); p != defaultPath {
 		t.Fatalf("DefaultConfigPath(\"\") = %q, want %q", p, defaultPath)
 	}
@@ -87,11 +89,11 @@ func TestDefaultConfigPathReturnsDefaultForEmptyAndDefaultProfile(t *testing.T) 
 }
 
 func TestDefaultConfigPathReturnsProfilePathForCustomProfile(t *testing.T) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Skip("cannot determine home dir:", err)
+	base := paths.DataDir()
+	if base == "" {
+		t.Skip("cannot determine data dir")
 	}
-	want := filepath.Join(home, ".money", "profiles", "work", "config.yaml")
+	want := filepath.Join(base, "profiles", "work", "config.yaml")
 	if p := DefaultConfigPath("work"); p != want {
 		t.Fatalf("DefaultConfigPath(\"work\") = %q, want %q", p, want)
 	}
