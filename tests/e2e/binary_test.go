@@ -53,12 +53,13 @@ func findProjectRoot() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	for dir := pwd; dir != "/" && dir != "."; dir = filepath.Dir(dir) {
+	for dir := pwd; dir != filepath.Dir(dir); dir = filepath.Dir(dir) {
 		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
 			return dir, nil
 		}
 	}
-	return filepath.Join(os.Getenv("HOME"), "Development", "money"), nil
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, "Development", "money"), nil
 }
 
 // ─── Execution helper ───
@@ -86,8 +87,10 @@ func recordCommand(args []string) {
 func run(t *testing.T, bin string, args ...string) (stdout string, exitCode int) {
 	t.Helper()
 	cmd := exec.Command(bin, args...)
+	home := t.TempDir()
 	cmd.Env = []string{
-		"HOME=" + t.TempDir(),
+		"HOME=" + home,
+		"USERPROFILE=" + home, // Windows uses USERPROFILE for home directory
 		"PATH=/usr/bin:/bin:/usr/local/bin",
 		"TERM=dumb",
 		"NO_COLOR=1",

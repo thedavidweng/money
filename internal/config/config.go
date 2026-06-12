@@ -11,6 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/thedavidweng/money/internal/contracts"
+	"github.com/thedavidweng/money/internal/paths"
 )
 
 type Options struct {
@@ -110,14 +111,14 @@ func DefaultConfigPath(profile string) string {
 	if err := validateProfile(profile); err != nil {
 		return ""
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
+	base := paths.DataDir()
+	if base == "" {
 		return ""
 	}
 	if profile != "" && profile != "default" {
-		return filepath.Join(home, ".money", "profiles", profile, "config.yaml")
+		return filepath.Join(base, "profiles", profile, "config.yaml")
 	}
-	return filepath.Join(home, ".money", "config.yaml")
+	return filepath.Join(base, "config.yaml")
 }
 
 func Load(options Options) (Config, error) {
