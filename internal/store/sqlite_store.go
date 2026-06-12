@@ -152,14 +152,11 @@ func (s *SQLiteStore) migrateRules(ctx context.Context) error {
 }
 
 func (s *SQLiteStore) migratePerformanceIndexes(ctx context.Context) error {
-	var count int
-	if err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_transactions_cashflow'`).Scan(&count); err != nil {
-		return fmt.Errorf("check performance_indexes migration state: %w", err)
-	}
-	if count == 0 {
-		if _, err := s.db.ExecContext(ctx, performanceIndexesMigration); err != nil {
-			return fmt.Errorf("run performance_indexes migration: %w", err)
-		}
+	// Always execute — the SQL uses CREATE INDEX IF NOT EXISTS so repeated
+	// runs are safe, and this avoids partial-failure scenarios where one
+	// index is created but the other is not.
+	if _, err := s.db.ExecContext(ctx, performanceIndexesMigration); err != nil {
+		return fmt.Errorf("run performance_indexes migration: %w", err)
 	}
 	return nil
 }
@@ -835,7 +832,8 @@ func (s *SQLiteStore) ApplyRules(ctx context.Context) (core.ApplyRulesResult, er
 	// Build SQL conditions and CASE WHEN arms for each rule.
 	// Rules are already sorted by priority DESC from ListRules, so the
 	// CASE WHEN arms are in priority order (first match wins).
-	var args []any
+	var caseArgs []any
+	var whereArgs []any
 	var conditions []string
 	var caseClauses []string
 	allowedFields := map[string]string{
@@ -860,8 +858,10 @@ func (s *SQLiteStore) ApplyRules(ctx context.Context) (core.ApplyRulesResult, er
 			continue
 		}
 		// The same cond (with ?) appears in both the CASE WHEN and the WHERE
-		// clause, so we need two copies of the argument for positional binding.
-		args = append(args, val, val)
+		// clause. CASE WHEN placeholders come first in the SQL, then WHERE
+		// placeholders, so we collect args separately and concatenate after.
+		caseArgs = append(caseArgs, val)
+		whereArgs = append(whereArgs, val)
 		conditions = append(conditions, "("+cond+")")
 		caseClauses = append(caseClauses, fmt.Sprintf("WHEN %s THEN %d", cond, i))
 	}
@@ -880,7 +880,7 @@ WHERE t.removed = 0 AND (%s)
 ORDER BY rule_idx ASC
 `, caseExpr, whereClause)
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	rows, err := s.db.QueryContext(ctx, query, append(caseArgs, whereArgs...)...)
 	if err != nil {
 		return core.ApplyRulesResult{}, err
 	}

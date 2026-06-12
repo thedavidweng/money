@@ -775,3 +775,113 @@ func TestSQLiteStoreApplyRulesUsesLocalCategorySource(t *testing.T) {
 		t.Fatalf("provider category = %v, want Food & Drink", txs[0].ProviderCategory)
 	}
 }
+
+func TestSQLiteStoreApplyRulesSQLMatchingMultipleRules(t *testing.T) {
+	ctx := context.Background()
+	db, err := OpenDemo(ctx)
+	if err != nil {
+		t.Fatalf("open demo: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	// Seed a provider item + account.
+	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
+		Institution: LinkedInstitution{ID: "inst_multi", Name: "Multi Bank", Provider: "plaid", ProviderInstitutionID: "ins_multi"},
+		Item: LinkedItem{
+			ID: "pi_multi", Provider: "plaid", InstitutionID: "inst_multi",
+			ProviderExternalItemID: "item_multi", EncryptedAccessToken: []byte("tok"),
+			Status: "active", Products: []string{"transactions"},
+		},
+	}); err != nil {
+		t.Fatalf("store linked item: %v", err)
+	}
+	if err := db.UpsertAccount(ctx, core.FinancialAccount{
+		ProviderItemID: "pi_multi", ProviderAccountID: "acc_multi",
+		Name: "Checking", Type: "depository", Currency: "USD",
+	}); err != nil {
+		t.Fatalf("upsert account: %v", err)
+	}
+
+	// Insert 10 Amazon, 10 Starbucks, 10 other transactions.
+	merchants := []string{"Amazon Market", "Starbucks Coffee", "Walmart Store"}
+	names := []string{"AMAZON.COM ORDER", "STARBUCKS #123", "WALMART SUPERCENTER"}
+	for i := 0; i < 30; i++ {
+		idx := i % 3
+		if err := db.UpsertTransaction(ctx, core.ProviderTransaction{
+			ProviderItemID:        "pi_multi",
+			ProviderTransactionID: fmt.Sprintf("tx_multi_%d", i),
+			ProviderAccountID:     "acc_multi",
+			Date:                  "2026-05-01",
+			AmountMinorUnits:      -1000 - int64(i),
+			Name:                  names[idx],
+			MerchantName:          merchants[idx],
+			Currency:              "USD",
+		}); err != nil {
+			t.Fatalf("upsert tx %d: %v", i, err)
+		}
+	}
+
+	categories, err := db.ListCategories(ctx)
+	if err != nil {
+		t.Fatalf("list categories: %v", err)
+	}
+	if len(categories) < 2 {
+		t.Skip("need at least 2 categories")
+	}
+	catA := categories[0].ID
+	catB := categories[1].ID
+
+	// Create two rules: amazon → catA, starbucks → catB.
+	if _, err := db.CreateRule(ctx, core.Rule{
+		Name:           "Amazon → catA",
+		ConditionField: "merchant_name",
+		ConditionOp:    "contains",
+		ConditionValue: "amazon",
+		ActionType:     "set_category",
+		ActionValue:    catA,
+		Priority:       10,
+		Enabled:        true,
+	}); err != nil {
+		t.Fatalf("create rule 1: %v", err)
+	}
+	if _, err := db.CreateRule(ctx, core.Rule{
+		Name:           "Starbucks → catB",
+		ConditionField: "merchant_name",
+		ConditionOp:    "contains",
+		ConditionValue: "starbucks",
+		ActionType:     "set_category",
+		ActionValue:    catB,
+		Priority:       5,
+		Enabled:        true,
+	}); err != nil {
+		t.Fatalf("create rule 2: %v", err)
+	}
+
+	result, err := db.ApplyRules(ctx)
+	if err != nil {
+		t.Fatalf("apply rules: %v", err)
+	}
+	if result.TransactionsUpdated != 20 {
+		t.Fatalf("transactions updated = %d, want 20 (10 amazon + 10 starbucks)", result.TransactionsUpdated)
+	}
+
+	// Verify each merchant got the correct category.
+	allTxs, err := db.ListTransactions(ctx, TransactionListQuery{Limit: 100})
+	if err != nil {
+		t.Fatalf("list transactions: %v", err)
+	}
+
+	for _, tx := range allTxs {
+		isAmazon := strings.Contains(strings.ToLower(tx.MerchantName), "amazon")
+		isStarbucks := strings.Contains(strings.ToLower(tx.MerchantName), "starbucks")
+		if tx.CategorySource != "local" {
+			continue
+		}
+		if isAmazon && tx.CategoryID != nil && *tx.CategoryID != catA {
+			t.Fatalf("amazon tx %s got category %s, want %s", tx.ID, *tx.CategoryID, catA)
+		}
+		if isStarbucks && tx.CategoryID != nil && *tx.CategoryID != catB {
+			t.Fatalf("starbucks tx %s got category %s, want %s", tx.ID, *tx.CategoryID, catB)
+		}
+	}
+}
