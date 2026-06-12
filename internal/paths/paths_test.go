@@ -146,4 +146,3 @@ func TestDataDirReturnsEmptyWhenHomeUnavailable(t *testing.T) {
 		t.Fatalf("DataDir() = %q, want empty string when home dir is unavailable", got)
 	}
 }
-
