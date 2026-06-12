@@ -38,13 +38,42 @@ ON CONFLICT(provider_item_id, provider_account_id) DO UPDATE SET
 	return err
 }
 
+// sqlExecer is the common interface satisfied by both *sql.DB and *sql.Tx.
+type sqlExecer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
 func (s *SQLiteStore) UpsertTransaction(ctx context.Context, transaction core.ProviderTransaction) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	id, err := s.localTransactionIDForProviderTransaction(ctx, transaction.ProviderItemID, transaction.ProviderTransactionID)
+	return upsertTransactionExec(ctx, s.db, transaction)
+}
+
+// UpsertTransactions inserts or updates multiple transactions in a single SQL transaction.
+func (s *SQLiteStore) UpsertTransactions(ctx context.Context, transactions []core.ProviderTransaction) error {
+	if len(transactions) == 0 {
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	accountID, err := s.existingAccountIDForProviderAccount(ctx, transaction.ProviderItemID, transaction.ProviderAccountID)
+	defer func() { _ = tx.Rollback() }()
+	for _, txn := range transactions {
+		if err := upsertTransactionExec(ctx, tx, txn); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// upsertTransactionExec contains the core upsert logic shared by UpsertTransaction and UpsertTransactions.
+func upsertTransactionExec(ctx context.Context, exec sqlExecer, transaction core.ProviderTransaction) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	id, err := localTransactionIDForProviderTransaction(ctx, exec, transaction.ProviderItemID, transaction.ProviderTransactionID)
+	if err != nil {
+		return err
+	}
+	accountID, err := existingAccountIDForProviderAccount(ctx, exec, transaction.ProviderItemID, transaction.ProviderAccountID)
 	if err != nil {
 		return err
 	}
@@ -54,7 +83,7 @@ func (s *SQLiteStore) UpsertTransaction(ctx context.Context, transaction core.Pr
 		categorySource = "provider"
 		categoryName = sql.NullString{String: *transaction.ProviderCategory, Valid: true}
 	}
-	_, err = s.db.ExecContext(ctx, `
+	_, err = exec.ExecContext(ctx, `
 INSERT INTO transactions (
   id, account_id, provider_item_id, provider_transaction_id, provider_account_id,
   source_kind, date, authorized_date, amount_minor_units, currency, name, merchant_name,
@@ -210,7 +239,11 @@ func (s *SQLiteStore) localAccountIDForProviderAccount(ctx context.Context, prov
 }
 
 func (s *SQLiteStore) existingAccountIDForProviderAccount(ctx context.Context, providerItemID string, providerAccountID string) (string, error) {
-	id, err := s.queryAccountIDForProviderAccount(ctx, providerItemID, providerAccountID)
+	return existingAccountIDForProviderAccount(ctx, s.db, providerItemID, providerAccountID)
+}
+
+func existingAccountIDForProviderAccount(ctx context.Context, exec sqlExecer, providerItemID string, providerAccountID string) (string, error) {
+	id, err := queryAccountIDForProviderAccount(ctx, exec, providerItemID, providerAccountID)
 	if err == sql.ErrNoRows {
 		return "", fmt.Errorf("provider account %q for provider item %q must be synced before dependent records", providerAccountID, providerItemID)
 	}
@@ -218,17 +251,21 @@ func (s *SQLiteStore) existingAccountIDForProviderAccount(ctx context.Context, p
 }
 
 func (s *SQLiteStore) queryAccountIDForProviderAccount(ctx context.Context, providerItemID string, providerAccountID string) (string, error) {
+	return queryAccountIDForProviderAccount(ctx, s.db, providerItemID, providerAccountID)
+}
+
+func queryAccountIDForProviderAccount(ctx context.Context, exec sqlExecer, providerItemID string, providerAccountID string) (string, error) {
 	var id string
-	err := s.db.QueryRowContext(ctx, `
+	err := exec.QueryRowContext(ctx, `
 SELECT id
 FROM accounts
 WHERE provider_item_id = ? AND provider_account_id = ?`, providerItemID, providerAccountID).Scan(&id)
 	return id, err
 }
 
-func (s *SQLiteStore) localTransactionIDForProviderTransaction(ctx context.Context, providerItemID string, providerTransactionID string) (string, error) {
+func localTransactionIDForProviderTransaction(ctx context.Context, exec sqlExecer, providerItemID string, providerTransactionID string) (string, error) {
 	var id string
-	err := s.db.QueryRowContext(ctx, `
+	err := exec.QueryRowContext(ctx, `
 SELECT id
 FROM transactions
 WHERE provider_item_id = ? AND provider_transaction_id = ?`, providerItemID, providerTransactionID).Scan(&id)

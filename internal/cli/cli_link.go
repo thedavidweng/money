@@ -502,4 +502,3 @@ func selectLinkInstitution(institutions []providers.Institution, institutionID s
 	}
 	return institutions[0], nil
 }
-

@@ -28,6 +28,9 @@ go mod download
 ### Build and Test
 
 ```bash
+# Format check (CI will fail if any files are unformatted)
+test -z "$(gofmt -l .)"
+
 # Static analysis
 go vet ./...
 
@@ -41,7 +44,7 @@ go test ./... -cover
 go build ./cmd/money
 ```
 
-CI runs `go vet`, `go test -race`, and `go build` on both `ubuntu-latest` and `macos-latest` for every push and pull request.
+CI runs `gofmt -l`, `go vet`, `go test -race`, and `go build` on both `ubuntu-latest` and `macos-latest` for every push and pull request.
 
 ### Release Workflow
 
