@@ -74,10 +74,7 @@ func TestDataDirDefaultLinux(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("MONEY_HOME", "")
-
-	xdgState := os.Getenv("XDG_STATE_HOME")
 	t.Setenv("XDG_STATE_HOME", "")
-	t.Cleanup(func() { t.Setenv("XDG_STATE_HOME", xdgState) })
 
 	got := DataDir()
 	want := filepath.Join(home, ".local", "state", "money")
@@ -133,24 +130,20 @@ func TestDataDirDefaultDarwin(t *testing.T) {
 	}
 }
 
-func TestDataDirFallsBackToHomeDirWhenUserStateDirFails(t *testing.T) {
-	// If HOME/USERPROFILE is unset, os.UserStateDir may fail.
-	// DataDir should fall back to homeDir-based path.
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("USERPROFILE", home)
+func TestDataDirReturnsEmptyWhenHomeUnavailable(t *testing.T) {
 	t.Setenv("MONEY_HOME", "")
-
-	// Clear XDG/LOCALAPPDATA to force os.UserStateDir to use home-based defaults
+	t.Setenv("HOME", "")
+	t.Setenv("USERPROFILE", "")
 	if runtime.GOOS == "linux" {
-		xdgState := os.Getenv("XDG_STATE_HOME")
 		t.Setenv("XDG_STATE_HOME", "")
-		t.Cleanup(func() { t.Setenv("XDG_STATE_HOME", xdgState) })
+	}
+	if runtime.GOOS == "windows" {
+		t.Setenv("LOCALAPPDATA", "")
 	}
 
 	got := DataDir()
-	if got == "" {
-		t.Fatal("DataDir() returned empty string")
+	if got != "" {
+		t.Fatalf("DataDir() = %q, want empty string when home dir is unavailable", got)
 	}
 }
 

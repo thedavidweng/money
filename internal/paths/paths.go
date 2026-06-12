@@ -3,7 +3,7 @@
 // The canonical data directory is determined in this order:
 //  1. MONEY_HOME environment variable (explicit override)
 //  2. Legacy ~/.money directory (backward compatibility if it exists)
-//  3. Platform-appropriate default via os.UserStateDir()
+//  3. Platform-appropriate default derived from os.UserHomeDir()
 //
 // On Linux this respects XDG_STATE_HOME (default ~/.local/state/money).
 // On macOS it uses ~/Library/Application Support/money.
@@ -42,21 +42,29 @@ func DataDir() string {
 }
 
 // platformDefault returns the XDG/platform-appropriate data directory.
+// Returns "" if home is empty and no platform-specific env var is set,
+// since a CWD-relative path would silently scatter data across the filesystem.
 func platformDefault(home string) string {
-	if home == "" {
-		home = "."
-	}
 	switch runtime.GOOS {
 	case "darwin":
+		if home == "" {
+			return ""
+		}
 		return filepath.Join(home, "Library", "Application Support", appName)
 	case "windows":
 		if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
 			return filepath.Join(localAppData, appName)
 		}
+		if home == "" {
+			return ""
+		}
 		return filepath.Join(home, "AppData", "Local", appName)
 	default: // linux, freebsd, etc.
 		if xdg := os.Getenv("XDG_STATE_HOME"); xdg != "" {
 			return filepath.Join(xdg, appName)
+		}
+		if home == "" {
+			return ""
 		}
 		return filepath.Join(home, ".local", "state", appName)
 	}
