@@ -348,8 +348,8 @@ func TestRunPlaidLinkFlowReturnsCLIErrorOnCancel(t *testing.T) {
 		return fakeLinkSessionServer{
 			url: "http://127.0.0.1:4000",
 			callback: providers.LinkCallback{
-				State:  state,
-				Status: "cancel",
+				State:    state,
+				Status:   "cancel",
 				Metadata: providers.LinkMetadata{LinkSessionID: "sess-cancel"},
 			},
 		}, nil
@@ -396,9 +396,9 @@ func TestRunPlaidLinkFlowReturnsCLIErrorOnLinkError(t *testing.T) {
 		return fakeLinkSessionServer{
 			url: "http://127.0.0.1:4000",
 			callback: providers.LinkCallback{
-				State:  state,
-				Status: "error",
-				Error:  providers.LinkError{Type: "INSTITUTION_ERROR", Code: "INSUFFICIENT_CREDENTIALS", Message: "user entered invalid credentials"},
+				State:    state,
+				Status:   "error",
+				Error:    providers.LinkError{Type: "INSTITUTION_ERROR", Code: "INSUFFICIENT_CREDENTIALS", Message: "user entered invalid credentials"},
 				Metadata: providers.LinkMetadata{RequestID: "req-123", LinkSessionID: "sess-456"},
 			},
 		}, nil

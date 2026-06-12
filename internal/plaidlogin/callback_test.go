@@ -43,10 +43,10 @@ func TestCallbackHandlerAcceptsValidCodeOnce(t *testing.T) {
 
 func TestCallbackHandlerRejectsOAuthErrorMissingCodeWrongStateAndWrongMethod(t *testing.T) {
 	tests := []struct {
-		name       string
-		method     string
-		target     string
-		status     int
+		name        string
+		method      string
+		target      string
+		status      int
 		wantWaitErr bool // true if Wait should return immediately with an error
 	}{
 		{name: "oauth error", method: http.MethodGet, target: "/oauth/callback?error=access_denied&state=state-ok", status: http.StatusBadRequest, wantWaitErr: true},

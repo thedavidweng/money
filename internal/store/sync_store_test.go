@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -276,5 +277,163 @@ VALUES ('sync_stuck', 'plaid', 'pi_demo_plaid', '2026-05-10T10:00:00Z', 'ok')`);
 	}
 	if finishedAt == "" {
 		t.Fatal("expected finished_at to be set")
+	}
+}
+
+func TestSQLiteStoreBatchUpsertTransactions(t *testing.T) {
+	ctx := context.Background()
+	db, err := OpenDemo(ctx)
+	if err != nil {
+		t.Fatalf("open demo: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	// Set up a linked provider item and account to own our transactions.
+	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
+		Institution: LinkedInstitution{ID: "inst_batch", Name: "Batch Bank", Provider: "plaid", ProviderInstitutionID: "ins_batch"},
+		Item: LinkedItem{
+			ID:                     "pi_batch",
+			Provider:               "plaid",
+			InstitutionID:          "inst_batch",
+			ProviderExternalItemID: "item_batch",
+			EncryptedAccessToken:   []byte("token"),
+			Status:                 "active",
+			Products:               []string{"transactions"},
+		},
+	}); err != nil {
+		t.Fatalf("store linked item: %v", err)
+	}
+
+	if err := db.UpsertAccount(ctx, core.FinancialAccount{
+		ProviderItemID:           "pi_batch",
+		ProviderAccountID:        "acc_batch",
+		Name:                     "Batch Checking",
+		Type:                     "depository",
+		Subtype:                  "checking",
+		CurrentBalanceMinorUnits: 50000,
+		Currency:                 "USD",
+	}); err != nil {
+		t.Fatalf("upsert account: %v", err)
+	}
+
+	// Build 10 transactions for the initial batch insert.
+	category := "Shopping"
+	makeTransactions := func(names []string, amounts []int64) []core.ProviderTransaction {
+		txns := make([]core.ProviderTransaction, len(names))
+		for i, name := range names {
+			txns[i] = core.ProviderTransaction{
+				ProviderItemID:        "pi_batch",
+				ProviderTransactionID: fmt.Sprintf("tx_batch_%d", i),
+				ProviderAccountID:     "acc_batch",
+				Date:                  "2026-06-01",
+				AmountMinorUnits:      amounts[i],
+				Name:                  name,
+				MerchantName:          name,
+				ProviderCategory:      &category,
+				Currency:              "USD",
+			}
+		}
+		return txns
+	}
+
+	names := make([]string, 10)
+	amounts := make([]int64, 10)
+	for i := 0; i < 10; i++ {
+		names[i] = fmt.Sprintf("BatchTxn %d", i)
+		amounts[i] = int64(-(i + 1) * 100)
+	}
+
+	batch := makeTransactions(names, amounts)
+	if err := db.UpsertTransactions(ctx, batch); err != nil {
+		t.Fatalf("batch upsert 10 transactions: %v", err)
+	}
+
+	// Verify all 10 were inserted.
+	results, err := db.SearchTransactions(ctx, "BatchTxn", 50)
+	if err != nil {
+		t.Fatalf("search transactions: %v", err)
+	}
+	if len(results) != 10 {
+		t.Fatalf("after initial batch upsert: got %d transactions, want 10", len(results))
+	}
+
+	// Build a map from name to result for easy lookup.
+	resultByName := make(map[string]core.Transaction, len(results))
+	for _, r := range results {
+		resultByName[r.Name] = r
+	}
+	for i := 0; i < 10; i++ {
+		name := fmt.Sprintf("BatchTxn %d", i)
+		r, ok := resultByName[name]
+		if !ok {
+			t.Fatalf("missing transaction %q after initial batch upsert", name)
+		}
+		if r.AmountMinorUnits != amounts[i] {
+			t.Fatalf("transaction %q amount = %d, want %d", name, r.AmountMinorUnits, amounts[i])
+		}
+	}
+
+	// Now call UpsertTransactions again: modify txns 0-4, leave 5-9 unchanged.
+	modNames := make([]string, 10)
+	modAmounts := make([]int64, 10)
+	for i := 0; i < 10; i++ {
+		if i < 5 {
+			modNames[i] = fmt.Sprintf("BatchTxn UPDATED %d", i)
+			modAmounts[i] = int64(-(i + 1) * 200)
+		} else {
+			modNames[i] = names[i]
+			modAmounts[i] = amounts[i]
+		}
+	}
+
+	secondBatch := makeTransactions(modNames, modAmounts)
+	if err := db.UpsertTransactions(ctx, secondBatch); err != nil {
+		t.Fatalf("batch upsert second call: %v", err)
+	}
+
+	// Verify all 10 are still present (5 updated + 5 unchanged).
+	results2, err := db.SearchTransactions(ctx, "BatchTxn", 50)
+	if err != nil {
+		t.Fatalf("search transactions after second upsert: %v", err)
+	}
+	if len(results2) != 10 {
+		t.Fatalf("after second batch upsert: got %d transactions, want 10", len(results2))
+	}
+
+	resultByName2 := make(map[string]core.Transaction, len(results2))
+	for _, r := range results2 {
+		resultByName2[r.Name] = r
+	}
+
+	// Check the 5 updated transactions (0-4).
+	for i := 0; i < 5; i++ {
+		name := fmt.Sprintf("BatchTxn UPDATED %d", i)
+		r, ok := resultByName2[name]
+		if !ok {
+			t.Fatalf("missing updated transaction %q after second batch upsert", name)
+		}
+		if r.AmountMinorUnits != modAmounts[i] {
+			t.Fatalf("updated transaction %q amount = %d, want %d", name, r.AmountMinorUnits, modAmounts[i])
+		}
+	}
+
+	// Check the 5 unchanged transactions (5-9).
+	for i := 5; i < 10; i++ {
+		name := fmt.Sprintf("BatchTxn %d", i)
+		r, ok := resultByName2[name]
+		if !ok {
+			t.Fatalf("missing unchanged transaction %q after second batch upsert", name)
+		}
+		if r.AmountMinorUnits != amounts[i] {
+			t.Fatalf("unchanged transaction %q amount = %d, want %d", name, r.AmountMinorUnits, amounts[i])
+		}
+	}
+
+	// Ensure the old names for txns 0-4 are gone (they were updated to "BatchTxn UPDATED N").
+	for i := 0; i < 5; i++ {
+		oldName := fmt.Sprintf("BatchTxn %d", i)
+		if _, ok := resultByName2[oldName]; ok {
+			t.Fatalf("old transaction %q should have been updated, but still present", oldName)
+		}
 	}
 }

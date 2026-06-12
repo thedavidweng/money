@@ -105,7 +105,7 @@ If this is your first time, run:
 This creates your config, encryption key, and database. After setup, you can
 link financial institutions and sync transactions locally.
 `,
-		Version:       fmt.Sprintf("%s (commit %s)", Version, Commit),
+		Version: fmt.Sprintf("%s (commit %s)", Version, Commit),
 		Example: `  money setup
   money link "Chase"
   money sync
@@ -473,8 +473,8 @@ func newAccountsCommand(ctx context.Context, state *runtimeState, stdout io.Writ
 		Example: "  money accounts list\n  money accounts list --verbose --json\n  money accounts create-manual --name Savings --type depository --balance 1000.00 --currency USD --confirm",
 	}
 	listCmd := &cobra.Command{
-		Use:   "list",
-		Short: "List accounts",
+		Use:     "list",
+		Short:   "List accounts",
 		Example: "  money accounts list\n  money accounts list --verbose\n  money accounts list --json",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			activeStore, err := requireStore(state)
@@ -625,7 +625,7 @@ func newTransactionsCommand(ctx context.Context, state *runtimeState, stdout io.
 		Use:     "search <query>",
 		Short:   "Search transactions",
 		Example: "  money transactions search \"whole foods\"\n  money transactions search uber --limit 10",
-		Args:  cobra.ExactArgs(1),
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			activeStore, err := requireStore(state)
 			if err != nil {
@@ -727,8 +727,8 @@ func newCategoriesCommand(ctx context.Context, state *runtimeState, stdout io.Wr
 		Example: "  money categories list\n  money categories list --verbose --json",
 	}
 	listCmd := &cobra.Command{
-		Use:   "list",
-		Short: "List categories",
+		Use:     "list",
+		Short:   "List categories",
 		Example: "  money categories list\n  money categories list --verbose",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			activeStore, err := requireStore(state)
@@ -1038,16 +1038,16 @@ func newImportCommand(ctx context.Context, state *runtimeState, stdout io.Writer
 			Short: "Import accounts and transactions from " + sourceName,
 			Args:  cobra.ExactArgs(1),
 			RunE: func(cmd *cobra.Command, args []string) error {
-			if state.json && !dryRun && !confirm {
-				return cliError{
-					command:   "import." + sourceName,
-					code:      "CONFIRMATION_REQUIRED",
-					message:   "JSON import writes require --dry-run or --confirm",
-					category:  contracts.CategoryValidation,
-					retryable: false,
-					exitCode:  2,
+				if state.json && !dryRun && !confirm {
+					return cliError{
+						command:   "import." + sourceName,
+						code:      "CONFIRMATION_REQUIRED",
+						message:   "JSON import writes require --dry-run or --confirm",
+						category:  contracts.CategoryValidation,
+						retryable: false,
+						exitCode:  2,
+					}
 				}
-			}
 				if batchID == "" {
 					batchID = time.Now().UTC().Format("20060102T150405Z")
 				}
@@ -1586,7 +1586,6 @@ func newPlaidLogoutCommand(state *runtimeState, stdout io.Writer, commandName st
 	}
 	return cmd
 }
-
 
 type providerAvailabilityRow struct {
 	Provider string

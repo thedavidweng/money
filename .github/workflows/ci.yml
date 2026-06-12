@@ -20,6 +20,7 @@ jobs:
           go-version-file: 'go.mod'
           cache: true
 
+      - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test ./... -race
       - run: go build ./...

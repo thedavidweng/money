@@ -81,6 +81,9 @@ var budgetsMigration string
 //go:embed migrations/0004_rules.sql
 var rulesMigration string
 
+//go:embed migrations/0005_performance_indexes.sql
+var performanceIndexesMigration string
+
 func (s *SQLiteStore) runMigrations(ctx context.Context) error {
 	var count int
 	if err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'institutions'`).Scan(&count); err != nil {
@@ -101,6 +104,9 @@ func (s *SQLiteStore) runMigrations(ctx context.Context) error {
 		return err
 	}
 	if err := s.migrateRules(ctx); err != nil {
+		return err
+	}
+	if err := s.migratePerformanceIndexes(ctx); err != nil {
 		return err
 	}
 	return nil
@@ -141,6 +147,16 @@ func (s *SQLiteStore) migrateRules(ctx context.Context) error {
 		if _, err := s.db.ExecContext(ctx, rulesMigration); err != nil {
 			return fmt.Errorf("run rules migration: %w", err)
 		}
+	}
+	return nil
+}
+
+func (s *SQLiteStore) migratePerformanceIndexes(ctx context.Context) error {
+	// Always execute — the SQL uses CREATE INDEX IF NOT EXISTS so repeated
+	// runs are safe, and this avoids partial-failure scenarios where one
+	// index is created but the other is not.
+	if _, err := s.db.ExecContext(ctx, performanceIndexesMigration); err != nil {
+		return fmt.Errorf("run performance_indexes migration: %w", err)
 	}
 	return nil
 }
@@ -804,11 +820,6 @@ func (s *SQLiteStore) DeleteRule(ctx context.Context, id string) error {
 	return err
 }
 
-type ruleMatch struct {
-	TxID string
-	Rule core.Rule
-}
-
 func (s *SQLiteStore) ApplyRules(ctx context.Context) (core.ApplyRulesResult, error) {
 	rules, err := s.ListRules(ctx)
 	if err != nil {
@@ -818,36 +829,84 @@ func (s *SQLiteStore) ApplyRules(ctx context.Context) (core.ApplyRulesResult, er
 		return core.ApplyRulesResult{}, nil
 	}
 
-	rows, err := s.db.QueryContext(ctx, `
-SELECT id, name, merchant_name, amount_minor_units, category_id
-FROM transactions
-WHERE removed = 0`)
+	// Build SQL conditions and CASE WHEN arms for each rule.
+	// Rules are already sorted by priority DESC from ListRules, so the
+	// CASE WHEN arms are in priority order (first match wins).
+	var caseArgs []any
+	var whereArgs []any
+	var conditions []string
+	var caseClauses []string
+	allowedFields := map[string]string{
+		"merchant_name": "t.merchant_name",
+		"name":          "t.name",
+	}
+	for i, rule := range rules {
+		col, ok := allowedFields[rule.ConditionField]
+		if !ok {
+			continue
+		}
+		var cond string
+		var val string
+		switch rule.ConditionOp {
+		case "contains":
+			val = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(rule.ConditionValue)
+			cond = fmt.Sprintf("LOWER(%s) LIKE '%%' || LOWER(?) || '%%' ESCAPE '\\'", col)
+		case "equals":
+			val = rule.ConditionValue
+			cond = fmt.Sprintf("LOWER(%s) = LOWER(?)", col)
+		default:
+			continue
+		}
+		// The same cond (with ?) appears in both the CASE WHEN and the WHERE
+		// clause. CASE WHEN placeholders come first in the SQL, then WHERE
+		// placeholders, so we collect args separately and concatenate after.
+		caseArgs = append(caseArgs, val)
+		whereArgs = append(whereArgs, val)
+		conditions = append(conditions, "("+cond+")")
+		caseClauses = append(caseClauses, fmt.Sprintf("WHEN %s THEN %d", cond, i))
+	}
+
+	if len(conditions) == 0 {
+		return core.ApplyRulesResult{}, nil
+	}
+
+	caseExpr := "CASE " + strings.Join(caseClauses, " ") + " END"
+	whereClause := strings.Join(conditions, " OR ")
+
+	query := fmt.Sprintf(`
+SELECT t.id, %s AS rule_idx
+FROM transactions t
+WHERE t.removed = 0 AND (%s)
+ORDER BY rule_idx ASC
+`, caseExpr, whereClause)
+
+	rows, err := s.db.QueryContext(ctx, query, append(caseArgs, whereArgs...)...)
 	if err != nil {
 		return core.ApplyRulesResult{}, err
 	}
 	defer func() { _ = rows.Close() }()
-	var transactions []txRow
+
+	// Collect matches: first occurrence of each txID wins (highest priority).
+	type txRuleKey struct {
+		txID   string
+		ruleID int
+	}
+	var matches []txRuleKey
+	seen := make(map[string]bool)
 	for rows.Next() {
-		var t txRow
-		if err := rows.Scan(&t.id, &t.name, &t.merchantName, &t.amountMinor, &t.categoryID); err != nil {
+		var txID string
+		var ruleIdx int
+		if err := rows.Scan(&txID, &ruleIdx); err != nil {
 			return core.ApplyRulesResult{}, err
 		}
-		transactions = append(transactions, t)
+		if seen[txID] {
+			continue
+		}
+		seen[txID] = true
+		matches = append(matches, txRuleKey{txID: txID, ruleID: ruleIdx})
 	}
 	if err := rows.Err(); err != nil {
 		return core.ApplyRulesResult{}, err
-	}
-
-	// Collect all matches in memory first.
-	var matches []ruleMatch
-	for _, tx := range transactions {
-		for _, rule := range rules {
-			if !ruleMatches(tx, rule) {
-				continue
-			}
-			matches = append(matches, ruleMatch{TxID: tx.id, Rule: rule})
-			break // highest-priority match wins
-		}
 	}
 	if len(matches) == 0 {
 		return core.ApplyRulesResult{}, nil
@@ -861,7 +920,7 @@ WHERE removed = 0`)
 	defer func() { _ = tx.Rollback() }()
 
 	for _, m := range matches {
-		if err := applyRuleActionTx(ctx, tx, m.TxID, m.Rule); err != nil {
+		if err := applyRuleActionTx(ctx, tx, m.txID, rules[m.ruleID]); err != nil {
 			return core.ApplyRulesResult{}, err
 		}
 	}
@@ -869,35 +928,6 @@ WHERE removed = 0`)
 		return core.ApplyRulesResult{}, err
 	}
 	return core.ApplyRulesResult{TransactionsUpdated: len(matches)}, nil
-}
-
-type txRow struct {
-	id           string
-	name         string
-	merchantName string
-	amountMinor  int64
-	categoryID   sql.NullString
-}
-
-func ruleMatches(tx txRow, rule core.Rule) bool {
-	var fieldValue string
-	switch rule.ConditionField {
-	case "merchant_name":
-		fieldValue = tx.merchantName
-	case "name":
-		fieldValue = tx.name
-	default:
-		return false
-	}
-
-	switch rule.ConditionOp {
-	case "contains":
-		return strings.Contains(strings.ToLower(fieldValue), strings.ToLower(rule.ConditionValue))
-	case "equals":
-		return strings.EqualFold(fieldValue, rule.ConditionValue)
-	default:
-		return false
-	}
 }
 
 func applyRuleActionTx(ctx context.Context, tx *sql.Tx, txID string, rule core.Rule) error {
@@ -916,40 +946,55 @@ func applyRuleActionTx(ctx context.Context, tx *sql.Tx, txID string, rule core.R
 }
 
 func (s *SQLiteStore) hydrateTransactionTags(ctx context.Context, transactions []core.Transaction) error {
+	if len(transactions) == 0 {
+		return nil
+	}
+
+	ids := make([]interface{}, len(transactions))
+	placeholders := make([]string, len(transactions))
 	for i := range transactions {
-		tags, err := s.tagsForTransaction(ctx, transactions[i].ID)
-		if err != nil {
+		ids[i] = transactions[i].ID
+		placeholders[i] = "?"
+	}
+
+	query := fmt.Sprintf(`
+SELECT tt.transaction_id, t.id, t.name, t.updated_at
+FROM tags t
+JOIN transaction_tags tt ON tt.tag_id = t.id
+WHERE tt.transaction_id IN (%s)
+ORDER BY t.name ASC, t.id ASC`, strings.Join(placeholders, ","))
+
+	rows, err := s.db.QueryContext(ctx, query, ids...)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+
+	tagsByTxID := make(map[string][]core.Tag)
+	for rows.Next() {
+		var txID string
+		var tag core.Tag
+		if err := rows.Scan(&txID, &tag.ID, &tag.Name, &tag.UpdatedAt); err != nil {
 			return err
 		}
+		tagsByTxID[txID] = append(tagsByTxID[txID], tag)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for i := range transactions {
+		tags := tagsByTxID[transactions[i].ID]
+		if tags == nil {
+			tags = []core.Tag{}
+		}
 		transactions[i].Tags = tags
-		transactions[i].TagIDs = []string{}
-		for _, tag := range tags {
-			transactions[i].TagIDs = append(transactions[i].TagIDs, tag.ID)
+		transactions[i].TagIDs = make([]string, len(tags))
+		for j, tag := range tags {
+			transactions[i].TagIDs[j] = tag.ID
 		}
 	}
 	return nil
-}
-
-func (s *SQLiteStore) tagsForTransaction(ctx context.Context, transactionID string) ([]core.Tag, error) {
-	rows, err := s.db.QueryContext(ctx, `
-SELECT tags.id, tags.name, tags.updated_at
-FROM tags
-JOIN transaction_tags ON transaction_tags.tag_id = tags.id
-WHERE transaction_tags.transaction_id = ?
-ORDER BY tags.name ASC, tags.id ASC`, transactionID)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-	tags := []core.Tag{}
-	for rows.Next() {
-		var tag core.Tag
-		if err := rows.Scan(&tag.ID, &tag.Name, &tag.UpdatedAt); err != nil {
-			return nil, err
-		}
-		tags = append(tags, tag)
-	}
-	return tags, rows.Err()
 }
 
 func nullableMoney(value sql.NullInt64, currency string) (*int64, *string) {

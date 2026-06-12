@@ -14,10 +14,12 @@ import (
 
 // MonarchImporter reads Monarch JSON exports and maps them to canonical records.
 // Expected JSON shape:
-//   {
-//     "accounts": [...],
-//     "transactions": [...]
-//   }
+//
+//	{
+//	  "accounts": [...],
+//	  "transactions": [...]
+//	}
+//
 // Each account has: id, name, type, subtype, balance, currency.
 // Each transaction has: id, account_id, date, amount, name, merchant_name, category, pending.
 type MonarchImporter struct{}

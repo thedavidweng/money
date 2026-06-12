@@ -10,17 +10,17 @@ import (
 // so that provider adapters can use them without importing core directly.
 // The store package imports core directly — it no longer imports providers.
 type (
-	Institution          = core.Institution
-	ProviderItem         = core.ProviderItem
-	FinancialAccount     = core.FinancialAccount
-	Transaction          = core.ProviderTransaction
-	Recurring            = core.ProviderRecurring
-	SyncRun              = core.SyncRun
-	SyncResult           = core.SyncResult
-	InvestmentHolding    = core.InvestmentHolding
-	InvestmentSecurity   = core.InvestmentSecurity
-	Liability            = core.Liability
-	SyncSink             = core.SyncSink
+	Institution        = core.Institution
+	ProviderItem       = core.ProviderItem
+	FinancialAccount   = core.FinancialAccount
+	Transaction        = core.ProviderTransaction
+	Recurring          = core.ProviderRecurring
+	SyncRun            = core.SyncRun
+	SyncResult         = core.SyncResult
+	InvestmentHolding  = core.InvestmentHolding
+	InvestmentSecurity = core.InvestmentSecurity
+	Liability          = core.Liability
+	SyncSink           = core.SyncSink
 )
 
 type Provider interface {
