@@ -892,6 +892,18 @@ func newItemsCommand(ctx context.Context, state *runtimeState, stdout io.Writer)
 			if err != nil {
 				return err
 			}
+			if !state.json {
+				alias := item.Alias
+				if alias == "" {
+					alias = "-"
+				}
+				table := tablewriter.NewWriter(stdout)
+				table.SetHeader([]string{"ID", "PROVIDER", "INSTITUTION", "ALIAS", "STATUS", "PRODUCTS"})
+				table.SetBorder(false)
+				table.Append([]string{item.ID, item.Provider, item.InstitutionID, alias, item.Status, strings.Join(item.Products, ",")})
+				table.Render()
+				return nil
+			}
 			env := contracts.NewSuccess("items.get", map[string]any{"item": item})
 			env.Meta.Demo = state.demo
 			return contracts.WriteJSON(stdout, env)
