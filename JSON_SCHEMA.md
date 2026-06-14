@@ -108,7 +108,7 @@ Provider errors are classified as:
 | 2 | Invalid command arguments |
 | 3 | Authentication or provider authorization required |
 | 4 | Read-only violation |
-| 5 | Network failure |
+
 | 6 | Provider/API/schema/feature failure |
 | 7 | Validation failure |
 | 10 | Confirmation required |

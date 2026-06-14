@@ -71,6 +71,15 @@ Read local account data.
 money accounts list --json
 ```
 
+## accounts create-manual
+
+Create a local manual account (not linked to a provider).
+
+```bash
+money accounts create-manual --name Savings --type depository --balance 5000.00 --currency USD --confirm
+money accounts create-manual --name "Credit Card" --type credit --balance 500.00 --dry-run
+```
+
 ## transactions
 
 Read and manage local transaction data.
@@ -217,6 +226,15 @@ money rules list --json
 money rules create --name "Mark Uber" --condition-field merchant_name --condition-op contains --condition-value uber --action-type set_category --action-value transport --confirm
 money rules apply
 money rules delete <id>
+```
+
+## budgets categories
+
+Manage budget categories.
+
+```bash
+money budgets categories create --budget-id <id> --name Groceries --limit 50000 --confirm
+money budgets categories delete <id>
 ```
 
 ## import
