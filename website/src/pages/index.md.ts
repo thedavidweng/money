@@ -23,7 +23,7 @@ Pull accounts and transactions from providers you configure, store them in encry
 ## Quick start
 
 \`\`\`
-brew install thedavidweng/tap/money
+brew install --cask thedavidweng/tap/money
 
 # Try with sample data (no credentials needed)
 money demo accounts list --json

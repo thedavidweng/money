@@ -39,7 +39,7 @@ Existing personal finance tools either lock data behind a paid SaaS, embed opini
 ### Step 1: Install
 
 \`\`\`
-brew install thedavidweng/tap/money
+brew install --cask thedavidweng/tap/money
 \`\`\`
 
 Or via Go:

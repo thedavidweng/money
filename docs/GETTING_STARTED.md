@@ -2,6 +2,22 @@
 
 ## Install
 
+### macOS / Linux (install script)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/thedavidweng/money/main/install.sh | sh
+```
+
+The installer detects Homebrew automatically and uses the cask when available. Otherwise it downloads the release binary to `~/.local/bin`.
+
+### Windows PowerShell
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/thedavidweng/money/main/install.ps1 | iex"
+```
+
+The latest release must include a Windows archive for this installer to complete. If it does not, the script fails explicitly and points you to `go install`.
+
 ### macOS / Linux (Homebrew Cask)
 
 ```bash
@@ -31,7 +47,7 @@ Make sure `$GOPATH/bin` (usually `$HOME/go/bin`) is in your `PATH`.
 
 ### Pre-built binaries
 
-Download the latest release for your platform from [GitHub Releases](https://github.com/thedavidweng/money/releases), unzip the archive, and move the `money` binary to a directory in your `PATH`.
+Download the latest release for your platform from [GitHub Releases](https://github.com/thedavidweng/money/releases), extract the archive, and move the `money` binary to a directory in your `PATH`.
 
 ---
 

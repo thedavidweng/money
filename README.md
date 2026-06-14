@@ -34,27 +34,38 @@ Existing personal finance tools either lock data behind a paid SaaS, embed opini
 
 ## Getting Started
 
-👉 **New to money?** Read the full [Getting Started guide](docs/GETTING_STARTED.md) for step-by-step installation, setup, and pricing details.
+New to `money`? Read the full [Getting Started guide](docs/GETTING_STARTED.md) for step-by-step setup and pricing details.
 
 ### Quick Start
 
 ```bash
-# Install via Homebrew Cask (macOS/Linux)
-brew install --cask thedavidweng/tap/money
+# macOS/Linux
+curl -fsSL https://raw.githubusercontent.com/thedavidweng/money/main/install.sh | sh
 
-# Or install via Go (macOS/Linux/cross-platform)
-go install github.com/thedavidweng/money/cmd/money@latest
-
-# Initialize configuration and encrypted database (interactive)
 money setup
-
-# Link your bank and sync data
 money link
 money sync
-
-# Query your local data
 money accounts list --json
 money transactions search "Costco" --json
+```
+
+The installer detects Homebrew automatically and uses the cask when available. Otherwise it downloads the release binary to `~/.local/bin`.
+
+<details>
+<summary>Other installation methods</summary>
+
+**Windows PowerShell:**
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/thedavidweng/money/main/install.ps1 | iex"
+```
+
+The latest release must include a Windows archive for this installer to complete. If it does not, the script fails explicitly and points you to `go install`.
+
+**Homebrew Cask (macOS/Linux):**
+
+```bash
+brew install --cask thedavidweng/tap/money
 ```
 
 If you installed an older Homebrew formula release, migrate to the cask:
@@ -66,7 +77,15 @@ brew install --cask thedavidweng/tap/money
 money version
 ```
 
-Your local `~/.money` config, secrets, and database are not removed by uninstalling the old formula.
+**Go:**
+
+```bash
+go install github.com/thedavidweng/money/cmd/money@latest
+```
+
+**Manual download:** grab the archive for your platform from the [latest GitHub Release](https://github.com/thedavidweng/money/releases/latest), extract it, and place the `money` binary on your `PATH`.
+
+</details>
 
 Try it without real credentials:
 
@@ -75,70 +94,20 @@ money demo accounts list --json
 money demo transactions search "coffee" --json
 ```
 
-## Commands
+### Uninstall
 
-```text
-# Getting Started
-money setup                         Initialize configuration and encrypted database
-money doctor                        Check configuration and system health (--fix, --dry-run)
-money demo <command>                Run against non-persistent sample data
+```bash
+# Homebrew Cask
+brew uninstall --cask thedavidweng/tap/money
 
-# Data Queries
-money accounts list                 List financial accounts
-money accounts create-manual        Create a local manual account
-money transactions list             List transactions with filters
-money transactions search           Search transactions by text
-money tx                            Alias for transactions
-money categories list               List transaction categories
-money tags list                     List transaction tags
-money recurring list                List recurring transactions
-money investments holdings          List investment holdings
-money investments securities        List investment securities
-money liabilities list              List liabilities
-money items list                    List linked provider items
-money items get <id>                Get a linked provider item
-money items rename <id> <name>      Rename a provider item alias
-money items remove <id>             Remove a linked provider item with cascade delete
-money import <source> <file>        Import data from external sources (source: monarch, csv)
-money cashflow                      Show cashflow summary by period
-money net-worth                     Show net worth breakdown
+# install.sh
+curl -fsSL https://raw.githubusercontent.com/thedavidweng/money/main/install.sh | sh -s uninstall
 
-# Budgets & Rules
-money budgets list                  List budgets
-money budgets create                Create a budget
-money budgets get <id>              Get budget details with categories
-money budgets delete <id>           Delete a budget
-money budgets categories create     Add a category to a budget
-money budgets categories delete     Remove a category from a budget
-money rules list                    List transaction rules
-money rules create                  Create a transaction rule
-money rules delete <id>             Delete a transaction rule
-money rules apply                   Apply rules to transactions
-
-# Provider Management
-money link                          Link a financial institution
-money providers configure <provider> Configure provider credentials
-money plaid login                    Sign in to Plaid Dashboard and fetch API keys
-money plaid logout                   Remove Plaid Dashboard auth; keep API keys
-money plaid sandbox link             Create and store a Plaid Sandbox Provider Item
-money providers plaid link          Link a Plaid Provider Item
-money providers bridge link         Link a Bridge Provider Item
-money sync                          Sync linked provider data (supports --start-date/--end-date)
-
-# Utilities
-money feedback                      Open the project GitHub issues page
-money version                       Print version
+# Go
+rm "$(go env GOPATH)/bin/money"
 ```
 
-### Global Flags
-
-```text
---config string            config file path
---profile string           configuration profile (default "default")
--j, --json                 write a JSON envelope to stdout
-```
-
-Read commands and provisional sync diagnostics support `--json` for machine-readable output. Manual write operations require `--dry-run` or `--confirm`.
+Your local `~/.money` config, secrets, and database are not removed by uninstalling.
 
 ## Architecture
 
@@ -173,6 +142,7 @@ Read commands use local data only. Sync is the explicit boundary where outbound 
 | Document | Purpose |
 |----------|---------|
 | [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) | Install, setup, and pricing guide |
+| [`docs/COMMANDS.md`](docs/COMMANDS.md) | Command inventory and global flags |
 | [`docs/PRD.md`](docs/PRD.md) | Product requirements |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Module boundaries and data flow |
 | [`docs/CONTRACTS.md`](docs/CONTRACTS.md) | Current CLI JSON contracts |

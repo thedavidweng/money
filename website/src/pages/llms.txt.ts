@@ -28,7 +28,7 @@ It does not embed AI chat, model providers, hosted billing, telemetry, or a requ
 
 ## Quick start
 
-- Install: brew install thedavidweng/tap/money
+- Install: brew install --cask thedavidweng/tap/money
 - Go install: go install github.com/thedavidweng/money/cmd/money@latest
 - Demo: money demo accounts list --json
 - Setup: money setup

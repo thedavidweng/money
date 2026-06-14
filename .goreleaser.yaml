@@ -21,6 +21,9 @@ universal_binaries:
 archives:
   - formats: [tar.gz]
     name_template: "money_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
 
 checksum:
   name_template: "checksums.txt"
@@ -66,10 +69,9 @@ release:
   header: |
     ## Installation
 
-    **Homebrew (macOS):**
+    **Homebrew Cask (macOS/Linux):**
     ```
-    brew tap thedavidweng/tap
-    brew install money
+    brew install --cask thedavidweng/tap/money
     ```
 
     **Go:**
