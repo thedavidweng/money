@@ -202,6 +202,12 @@ npm run build  # output in website/dist
 - [**Actual Budget**](https://github.com/actualbudget/actual) — local-first budgeting philosophy and automation API patterns.
 - [**Maybe Finance**](https://github.com/maybe-finance/maybe) — personal finance domain modeling and product vocabulary.
 
+
+## Infrastructure
+
+- **CI/CD:** [cli-workflow-template](https://github.com/thedavidweng/cli-workflow-template) — reusable GitHub Actions workflows
+- **Docs:** [site](https://github.com/thedavidweng/site) — landing page and documentation
+
 ## License
 
 [Apache 2.0](LICENSE)
