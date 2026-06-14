@@ -13,7 +13,6 @@ The current schema version is `0.1`.
     "command": "transactions.list",
     "schema_version": "0.1",
     "generated_at": "2026-05-10T00:00:00Z",
-    "demo": false,
     "pagination": {
       "limit": 50,
       "offset": 0,
@@ -108,7 +107,6 @@ Provider errors are classified as:
 | 2 | Invalid command arguments |
 | 3 | Authentication or provider authorization required |
 | 4 | Read-only violation |
-
 | 6 | Provider/API/schema/feature failure |
 | 7 | Validation failure |
 | 10 | Confirmation required |
