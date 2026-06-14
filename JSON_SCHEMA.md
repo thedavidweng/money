@@ -56,7 +56,7 @@ The current schema version is `0.1`.
       "code": "SYNC_PARTIAL_FAILURE",
       "message": "One or more provider items failed to sync",
       "category": "api",
-      "retryable": false
+      "retryable": true
     }
   ]
 }
@@ -95,7 +95,7 @@ Provider errors are classified as:
 | `DASHBOARD_TOKEN_REFRESH_FAILED` | auth | false | 3 | Refresh token expired |
 | `READ_ONLY_VIOLATION` | safety | false | 4 | Mutation blocked by read-only mode |
 | `CONFIRMATION_REQUIRED` | safety | false | 10 | Destructive op without `--confirm` |
-| `SYNC_PARTIAL_FAILURE` | api | false | 6 | Some provider items failed |
+| `SYNC_PARTIAL_FAILURE` | api | true | 6 | Some provider items failed |
 | `CONFIG_WRITE_FAILED` | config | false | 1 | Config/env file write failure |
 | `DB_BACKUP_FAILED` | safety | false | 1 | Pre-repair DB backup failure |
 
