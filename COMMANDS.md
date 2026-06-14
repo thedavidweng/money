@@ -205,7 +205,7 @@ Manage budgets.
 money budgets list --json
 money budgets create --name Groceries --period monthly --start-date 2024-01-01 --end-date 2024-12-31 --confirm
 money budgets get <id> --json
-money budgets delete <id> --confirm
+money budgets delete <id>
 ```
 
 ## rules
