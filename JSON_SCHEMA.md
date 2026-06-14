@@ -46,8 +46,7 @@ The current schema version is `0.1`.
   "meta": {
     "command": "sync",
     "schema_version": "0.1",
-    "generated_at": "2026-05-10T00:00:00Z",
-    "demo": false
+    "generated_at": "2026-05-10T00:00:00Z"
   },
   "warnings": [],
   "errors": [
@@ -93,7 +92,8 @@ Provider errors are classified as:
 | `API_KEYS_FETCH_REQUIRED` | auth | true | 3 | Dashboard auth exists but API keys need fetching |
 | `DASHBOARD_TOKEN_REFRESH_FAILED` | auth | false | 3 | Refresh token expired |
 | `READ_ONLY_VIOLATION` | safety | false | 4 | Mutation blocked by read-only mode |
-| `CONFIRMATION_REQUIRED` | safety | false | 10 | Destructive op without `--confirm` |
+| `CONFIRMATION_REQUIRED` | validation | false | 2 | JSON write without `--confirm` or `--dry-run` |
+| `CONFIRMATION_REQUIRED` | safety | false | 10 | Destructive op without `--confirm` (via requireConfirm) |
 | `SYNC_PARTIAL_FAILURE` | api | true | 6 | Some provider items failed |
 | `CONFIG_WRITE_FAILED` | config | false | 1 | Config/env file write failure |
 | `DB_BACKUP_FAILED` | safety | false | 1 | Pre-repair DB backup failure |
