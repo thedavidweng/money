@@ -43,7 +43,7 @@ The current schema version is `0.1`.
 ```json
 {
   "ok": false,
-  "data": null,
+  "data": { ... },  // omitted when empty (omitempty)
   "meta": {
     "command": "sync",
     "schema_version": "0.1",
