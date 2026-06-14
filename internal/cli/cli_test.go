@@ -176,6 +176,27 @@ func TestDemoReadCommandsReturnObjectWrappedJSONCollections(t *testing.T) {
 	}
 }
 
+func TestDemoItemsGetHumanModeDoesNotEmitJSONEnvelope(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	exitCode := Run(context.Background(), []string{"demo", "items", "get", "pi_demo_plaid"}, nil, &stdout, &stderr)
+
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, stderr = %s", exitCode, stderr.String())
+	}
+	if strings.TrimSpace(stderr.String()) != "" {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	if json.Valid(stdout.Bytes()) {
+		t.Fatalf("stdout is JSON, want human-readable output:\n%s", stdout.String())
+	}
+	for _, want := range []string{"pi_demo_plaid", "plaid", "inst_demo_chase", "active", "transactions"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("stdout missing %q:\n%s", want, stdout.String())
+		}
+	}
+}
+
 func TestDemoTransactionsListJSONSupportsFiltersAndPaginationMetadata(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	exitCode := Run(context.Background(), []string{
