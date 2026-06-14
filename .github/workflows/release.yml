@@ -5,59 +5,7 @@ on:
     tags:
       - 'v*'
 
-permissions:
-  contents: write
-  id-token: write  # Required for Sigstore keyless signing via OIDC
-
 jobs:
-  goreleaser:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Configure Git
-        run: |
-          git config --global init.defaultBranch main
-          git config --global advice.detachedHead false
-
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: 'go.mod'
-
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v4.1.2
-
-      - name: Install Syft
-        uses: anchore/sbom-action/download-syft@v0
-
-      - name: Run tests
-        run: go test ./... -race
-
-      - name: Verify Homebrew tap token
-        env:
-          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
-        run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo "::error title=Missing HOMEBREW_TAP_GITHUB_TOKEN::Create a GitHub token that can write contents to thedavidweng/homebrew-tap before running a release."
-            exit 1
-          fi
-
-          can_push="$(gh api repos/thedavidweng/homebrew-tap --jq '.permissions.push')"
-          if [ "$can_push" != "true" ]; then
-            echo "::error title=Invalid HOMEBREW_TAP_GITHUB_TOKEN::The token must have write access to thedavidweng/homebrew-tap. For a fine-grained PAT, select that repository and grant Contents: Read and write."
-            exit 1
-          fi
-
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v7
-        with:
-          distribution: goreleaser
-          version: '~> v2'
-          args: release --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+  release:
+    uses: thedavidweng/cli-workflow-template/.github/workflows/go-release.yml@main
+    secrets: inherit

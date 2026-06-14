@@ -7,20 +7,5 @@ on:
     branches: [main]
 
 jobs:
-  test:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: 'go.mod'
-          cache: true
-
-      - run: test -z "$(gofmt -l .)"
-      - run: go vet ./...
-      - run: go test ./... -race
-      - run: go build ./...
+  ci:
+    uses: thedavidweng/cli-workflow-template/.github/workflows/go-ci.yml@main
