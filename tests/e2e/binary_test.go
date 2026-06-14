@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -35,6 +36,9 @@ func buildBinary(t *testing.T) string {
 			return
 		}
 		cachedBin = filepath.Join(dir, "money")
+		if runtime.GOOS == "windows" {
+			cachedBin += ".exe"
+		}
 		cmd := exec.Command("go", "build", "-o", cachedBin, "./cmd/money")
 		cmd.Dir = projectRoot
 		if out, err := cmd.CombinedOutput(); err != nil {

@@ -57,6 +57,11 @@ var runPlaidLoginCLI = runPlaidLoginLive
 
 func Run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 	state := &runtimeState{stdin: stdin, stderr: stderr}
+	defer func() {
+		if closer, ok := state.store.(interface{ Close() error }); ok {
+			_ = closer.Close()
+		}
+	}()
 	root := newRootCommand(ctx, state, stdout, stderr)
 	root.SetArgs(args)
 	root.SetIn(stdin)
