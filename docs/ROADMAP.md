@@ -1,50 +1,31 @@
 # Roadmap
 
-## Phase 0: Bootstrap
+## Shipped
 
-- Create project skeleton.
-- Capture vision, PRD, donor notes, and architecture.
-- Keep donor repositories isolated under `donors/`.
-- Verify the empty CLI builds.
+### Phase 0: Bootstrap (v0.1.0)
 
-## Phase 1: First Contracts
+Project skeleton, vision/PRD/architecture docs, donor isolation, CLI builds.
 
-- Implement `internal/config` using `docs/CONFIG.md`.
-- Implement encrypted SQLite migrations for institutions, provider items, accounts, transactions, categories, tags, recurring items, and sync runs.
-- Keep first migration shape aligned with `docs/SCHEMA.md`.
-- Implement `money accounts list --json`.
-- Implement `money transactions list --json` and `money transactions search <query> --json`, with `tx` aliases.
-- Implement `money categories list --json`, `money tags list --json`, and `money recurring list --json`.
-- Add contract tests for first-milestone read commands.
-- Add deterministic sorting and pagination.
+### Phase 1: First Contracts (v0.1.0)
 
-## Phase 2: Plaid and Bridge Sync
+Config, encrypted SQLite migrations, accounts/transactions/categories/tags/recurring read commands with JSON contracts, deterministic sorting and pagination.
 
-- Add Plaid configuration.
-- Add Plaid Dashboard login as an optional credential-bootstrap path while preserving manual BYOK configuration.
-- Add Bridge configuration.
-- Add explicit provider link/sync commands.
-- Store Plaid and Bridge item, account, and transaction data in canonical tables.
-- Add provider fixture tests.
+### Phase 2: Plaid and Bridge Sync (v0.2.0)
 
-## Phase 3: Monarch Migration
+Plaid and Bridge configuration, link/sync commands, provider item/account/transaction storage, fixture tests.
 
-- Add Monarch Import Source.
+## Planned
+
+### Phase 3: Monarch Migration
+
+- Monarch import source.
 - Map Monarch accounts and transactions into canonical records.
-- Preserve agent-facing command semantics from `monarchmoney-cli`.
 
-## Phase 4: Finance Primitives
+### Phase 4: Finance Primitives
 
-- Budgets.
-- Categories.
-- Rules.
-- Cashflow.
-- Spending summaries.
-- Recurring bills.
-- Net worth.
+- Budgets, categories, rules, cashflow, spending summaries, recurring bills, net worth.
 
-## Phase 5: Additional Local Primitives
+### Phase 5: Additional Providers and Imports
 
-- Additional providers such as MX and Finicity.
-- Additional Import Sources such as CSV and Apple Card export.
-- Additional command contracts for local automation.
+- MX, Finicity provider adapters.
+- CSV and Apple Card export import sources.

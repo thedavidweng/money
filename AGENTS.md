@@ -6,15 +6,15 @@
 
 ### Issue tracker
 
-GitHub Issues. See `docs/agents/issue-tracker.md`.
+GitHub Issues.
 
 ### Triage labels
 
-needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. See `docs/agents/triage-labels.md`.
+needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix.
 
 ### Domain docs
 
-`CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
+`CONTEXT.md` + `docs/adr/` at repo root.
 
 ### Donor policy
 
