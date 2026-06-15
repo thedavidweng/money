@@ -3,6 +3,7 @@ package syncer
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/thedavidweng/money/internal/providers"
@@ -268,7 +269,7 @@ func hasProduct(products []string, target string) bool {
 }
 
 func recordSyncRun(ctx context.Context, target store.Store, itemResult ItemResult, started string) {
-	_ = target.RecordSyncRun(ctx, providers.SyncRun{
+	if err := target.RecordSyncRun(ctx, providers.SyncRun{
 		Provider:             itemResult.Provider,
 		ProviderItemID:       itemResult.ProviderItemID,
 		StartedAt:            started,
@@ -281,5 +282,7 @@ func recordSyncRun(ctx context.Context, target store.Store, itemResult ItemResul
 		RecurringStreamsSeen: itemResult.RecurringStreamsSeen,
 		ErrorCode:            itemResult.ErrorCode,
 		ErrorMessage:         itemResult.ErrorMessage,
-	})
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to record sync run: %v\n", err)
+	}
 }

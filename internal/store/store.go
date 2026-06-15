@@ -1,3 +1,6 @@
+// Package store defines the persistence interface and provides an encrypted
+// SQLite implementation for accounts, transactions, budgets, rules, and
+// provider-linked data.
 package store
 
 import (
