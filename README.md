@@ -13,6 +13,7 @@
   <a href="https://github.com/thedavidweng/money/releases"><img src="https://img.shields.io/github/v/release/thedavidweng/money?style=flat-square" alt="Release"></a>
   <a href="https://github.com/thedavidweng/money/blob/main/LICENSE"><img src="https://img.shields.io/github/license/thedavidweng/money?style=flat-square" alt="License"></a>
   <img src="https://img.shields.io/badge/go-%3E%3D1.26-blue?style=flat-square" alt="Go">
+  <a href="https://goreportcard.com/report/github.com/thedavidweng/money"><img src="https://goreportcard.com/badge/github.com/thedavidweng/money?style=flat-square" alt="Go Report"></a>
 </p>
 
 ---
