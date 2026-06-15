@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/thedavidweng/money/actions"><img src="https://img.shields.io/github/actions/workflow/status/thedavidweng/money/ci.yml?branch=main&style=flat-square" alt="CI"></a>
+  <a href="https://github.com/thedavidweng/money/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/thedavidweng/money/ci.yml?branch=main&style=flat-square&label=ci" alt="CI"></a>
   <a href="https://github.com/thedavidweng/money/releases"><img src="https://img.shields.io/github/v/release/thedavidweng/money?style=flat-square" alt="Release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/thedavidweng/money?style=flat-square" alt="License"></a>
+  <a href="https://github.com/thedavidweng/money/blob/main/LICENSE"><img src="https://img.shields.io/github/license/thedavidweng/money?style=flat-square" alt="License"></a>
   <img src="https://img.shields.io/badge/go-%3E%3D1.26-blue?style=flat-square" alt="Go">
 </p>
 
