@@ -1,3 +1,6 @@
+// Package providers defines the interface for financial data providers and
+// ships a Plaid adapter. Provider adapters sync institutions, accounts,
+// transactions, holdings, and liabilities into the local store.
 package providers
 
 import (

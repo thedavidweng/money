@@ -1,0 +1,19 @@
+version: "2"
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - gosimple
+    - gofmt
+  exclusions:
+    presets:
+      - std-error-handling
+    paths:
+      - third_party
+      - vendor
+      - testdata
+      - website

@@ -1,3 +1,6 @@
+// Package core defines the domain types shared across store, CLI, and
+// provider layers: accounts, transactions, categories, budgets, rules,
+// and money formatting helpers.
 package core
 
 import (
