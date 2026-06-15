@@ -43,33 +43,49 @@ func BenchmarkSearchTransactions(b *testing.B) {
 
 func BenchmarkApplyRules(b *testing.B) {
 	ctx := context.Background()
-	db, err := OpenDemo(ctx)
+
+	// Pre-flight: verify demo has categories so we can seed rules.
+	probe, err := OpenDemo(ctx)
 	if err != nil {
 		b.Fatalf("open demo: %v", err)
 	}
-	defer func() { _ = db.Close() }()
-
-	categories, err := db.ListCategories(ctx)
+	categories, err := probe.ListCategories(ctx)
 	if err != nil || len(categories) == 0 {
+		_ = probe.Close()
 		b.Skip("demo has no categories")
 	}
 	catID := categories[0].ID
-
-	rules := []core.Rule{
-		{Name: "bench-coffee", ConditionField: "merchant_name", ConditionOp: "contains", ConditionValue: "Blue Bottle", ActionType: "set_category", ActionValue: catID, Priority: 10, Enabled: true},
-		{Name: "bench-rent", ConditionField: "merchant_name", ConditionOp: "contains", ConditionValue: "Rent", ActionType: "set_category", ActionValue: catID, Priority: 9, Enabled: true},
-		{Name: "bench-grocery", ConditionField: "merchant_name", ConditionOp: "contains", ConditionValue: "Grocery", ActionType: "set_category", ActionValue: catID, Priority: 8, Enabled: true},
-	}
-	for _, r := range rules {
-		if _, err := db.CreateRule(ctx, r); err != nil {
-			b.Fatalf("create rule: %v", err)
-		}
-	}
+	_ = probe.Close()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		// Re-open demo DB each iteration so ApplyRules sees un-categorized
+		// transactions every time, measuring fresh-rule application rather
+		// than steady-state idempotent updates.
+		b.StopTimer()
+		db, err := OpenDemo(ctx)
+		if err != nil {
+			b.Fatalf("open demo: %v", err)
+		}
+		for _, r := range []core.Rule{
+			{Name: "bench-coffee", ConditionField: "merchant_name", ConditionOp: "contains", ConditionValue: "Blue Bottle", ActionType: "set_category", ActionValue: catID, Priority: 10, Enabled: true},
+			{Name: "bench-rent", ConditionField: "merchant_name", ConditionOp: "contains", ConditionValue: "Rent", ActionType: "set_category", ActionValue: catID, Priority: 9, Enabled: true},
+			{Name: "bench-grocery", ConditionField: "merchant_name", ConditionOp: "contains", ConditionValue: "Grocery", ActionType: "set_category", ActionValue: catID, Priority: 8, Enabled: true},
+		} {
+			if _, err := db.CreateRule(ctx, r); err != nil {
+				_ = db.Close()
+				b.Fatalf("create rule: %v", err)
+			}
+		}
+		b.StartTimer()
+
 		if _, err := db.ApplyRules(ctx); err != nil {
+			_ = db.Close()
 			b.Fatalf("apply rules: %v", err)
 		}
+
+		b.StopTimer()
+		_ = db.Close()
+		b.StartTimer()
 	}
 }

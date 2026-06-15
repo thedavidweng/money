@@ -7,8 +7,6 @@ linters:
     - staticcheck
     - unused
     - misspell
-    - gosimple
-    - gofmt
   exclusions:
     presets:
       - std-error-handling
