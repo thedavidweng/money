@@ -155,14 +155,7 @@ Read commands use local data only. Sync is the explicit boundary where outbound 
 
 ## Website
 
-The project landing page (Astro, static HTML) lives in [`website/`](website/). Published site: **https://thedavidweng.github.io/money/** (enable **GitHub Pages** → GitHub Actions in the repository settings if it is not live yet).
-
-```bash
-cd website
-npm ci
-npm run dev    # local preview
-npm run build  # output in website/dist
-```
+Project docs and landing page: **https://thedavidweng.github.io/site/money/**
 
 ## Acknowledgements
 
