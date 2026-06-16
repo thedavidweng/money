@@ -255,8 +255,8 @@ func TestColorAmountNonTerminalReturnsPlainAmount(t *testing.T) {
 	var buf bytes.Buffer
 
 	tests := []struct {
-		input  string
-		want   string
+		input string
+		want  string
 	}{
 		{"123.45", "123.45"},
 		{"-50.00", "-50.00"},

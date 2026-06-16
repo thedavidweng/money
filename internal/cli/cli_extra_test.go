@@ -295,14 +295,14 @@ func TestDemoAccountsListJSONVerbose(t *testing.T) {
 		OK   bool `json:"ok"`
 		Data struct {
 			Accounts []struct {
-				ID               string `json:"id"`
-				DisplayName      string `json:"display_name"`
-				Type             string `json:"type"`
-				CurrentBalance   string `json:"current_balance"`
+				ID               string  `json:"id"`
+				DisplayName      string  `json:"display_name"`
+				Type             string  `json:"type"`
+				CurrentBalance   string  `json:"current_balance"`
 				AvailableBalance *string `json:"available_balance"`
 				AvailableCredit  *string `json:"available_credit"`
-				Currency         string `json:"currency"`
-				UpdatedAt        string `json:"updated_at"`
+				Currency         string  `json:"currency"`
+				UpdatedAt        string  `json:"updated_at"`
 				Source           struct {
 					Kind     string  `json:"kind"`
 					Provider *string `json:"provider"`

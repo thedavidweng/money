@@ -771,12 +771,12 @@ func TestBudgetCategoriesCreateDryRunJSONReturnsPlan(t *testing.T) {
 	var envelope struct {
 		OK   bool `json:"ok"`
 		Data struct {
-			DryRun bool `json:"dry_run"`
+			DryRun         bool `json:"dry_run"`
 			BudgetCategory struct {
-				Name            string `json:"name"`
-				BudgetID        string `json:"budget_id"`
-				Limit           string `json:"limit"`
-				Currency        string `json:"currency"`
+				Name     string `json:"name"`
+				BudgetID string `json:"budget_id"`
+				Limit    string `json:"limit"`
+				Currency string `json:"currency"`
 			} `json:"budget_category"`
 		} `json:"data"`
 		Meta struct {
@@ -1033,4 +1033,3 @@ func TestBudgetCategoriesCreateMissingFieldsReturnsError(t *testing.T) {
 		t.Fatalf("stderr missing --budget-id hint: %s", stderr.String())
 	}
 }
-

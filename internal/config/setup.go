@@ -74,6 +74,7 @@ func configSkeleton(dbPath string) string {
 	if strings.HasPrefix(dbPath, home) {
 		rel = "~" + strings.TrimPrefix(dbPath, home)
 	}
+	rel = filepath.ToSlash(rel)
 	return fmt.Sprintf(`database:
   path: %s
   encryption_key:
