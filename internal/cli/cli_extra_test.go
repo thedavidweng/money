@@ -368,6 +368,10 @@ func TestFeedbackJSON(t *testing.T) {
 }
 
 func TestFeedbackHumanMode(t *testing.T) {
+	oldOpen := openBrowser
+	t.Cleanup(func() { openBrowser = oldOpen })
+	openBrowser = func(url string) error { return nil }
+
 	var stdout, stderr bytes.Buffer
 	exitCode := Run(context.Background(), []string{"feedback"}, nil, &stdout, &stderr)
 	if exitCode != 0 {
