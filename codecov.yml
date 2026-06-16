@@ -12,6 +12,15 @@ coverage:
   round: down
   range: "60...100"
 
+ignore:
+  - cmd/**                                    # thin entry point, no logic
+  - internal/providers/provider.go            # pure interfaces + type aliases
+  - internal/store/store.go                   # pure Store interface
+  - internal/core/sync_types.go               # pure struct definitions
+  - internal/prompt/fake.go                   # test infrastructure
+  - internal/plaidlogin/errors.go             # trivial error constants + Error()/Unwrap()
+  - internal/cli/cli_completion.go            # cobra shell completion boilerplate
+
 component_management:
   individual_components:
     - component_id: cmd
