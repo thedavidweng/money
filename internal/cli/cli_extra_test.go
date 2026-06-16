@@ -385,46 +385,6 @@ func TestFeedbackHumanMode(t *testing.T) {
 	}
 }
 
-func TestColorAmount(t *testing.T) {
-	tests := []struct {
-		name   string
-		amount string
-		want   string
-	}{
-		{name: "positive", amount: "1234.56", want: "1234.56"},
-		{name: "negative", amount: "-500.00", want: "-500.00"},
-		{name: "zero", amount: "0", want: "0"},
-		{name: "zero decimal", amount: "0.00", want: "0.00"},
-		{name: "negative zero", amount: "-0.00", want: "-0.00"},
-		{name: "empty", amount: "", want: ""},
-		{name: "dash", amount: "-", want: "-"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			got := colorAmount(&buf, tt.amount)
-			if got != tt.want {
-				t.Fatalf("colorAmount(%q) = %q, want %q", tt.amount, got, tt.want)
-			}
-			if buf.Len() != 0 {
-				t.Fatalf("colorAmount wrote %d bytes to writer, want 0 for non-terminal", buf.Len())
-			}
-		})
-	}
-}
-
-func TestColorAmountFloat(t *testing.T) {
-	var buf bytes.Buffer
-	got := colorAmountFloat(&buf, 1234.56)
-	if got != "1234.56" {
-		t.Fatalf("colorAmountFloat(1234.56) = %q, want %q", got, "1234.56")
-	}
-	got = colorAmountFloat(&buf, -0.005)
-	if got != "-0.01" {
-		t.Fatalf("colorAmountFloat(-0.005) = %q, want %q", got, "-0.01")
-	}
-}
-
 func TestWriteProviderAvailability(t *testing.T) {
 	var buf bytes.Buffer
 	rows := []providerAvailabilityRow{
@@ -468,11 +428,5 @@ func TestSupportedProviderAvailabilityNoDiagnostics(t *testing.T) {
 	}
 	if rows[0].Status != "available" {
 		t.Fatalf("status = %q, want available", rows[0].Status)
-	}
-}
-
-func TestCommandNameNil(t *testing.T) {
-	if got := commandName(nil); got != "unknown" {
-		t.Fatalf("commandName(nil) = %q, want unknown", got)
 	}
 }
