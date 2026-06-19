@@ -40,13 +40,13 @@ jobs:
           INSTALL=$(cat <<'EOF'
 # Installation
 
-\`\`\`bash
+```bash
 # Homebrew (macOS)
 brew install --cask thedavidweng/tap/money
 
 # Go (cross-platform)
 go install github.com/thedavidweng/money/cmd/money@VERSION_PLACEHOLDER
-\`\`\`
+```
 EOF
           )
           INSTALL="${INSTALL/VERSION_PLACEHOLDER/$TAG}"
