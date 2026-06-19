@@ -56,7 +56,7 @@ jobs:
           brew install --cask thedavidweng/tap/money
 
           # Go (cross-platform)
-          go install github.com/thedavidweng/money/./cmd/money@${TAG}
+          go install github.com/thedavidweng/money/cmd/money@${TAG}
           ```"
           FULL_NOTES="${NOTES:-Release $TAG}
 
