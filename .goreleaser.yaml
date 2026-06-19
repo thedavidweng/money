@@ -57,32 +57,6 @@ release:
   github:
     owner: thedavidweng
     name: money
-  header: |
-    ## Installation
-
-    **Homebrew Cask (macOS/Linux):**
-    ```
-    brew install --cask thedavidweng/tap/money
-    ```
-
-    **Go:**
-    ```
-    go install github.com/thedavidweng/money/cmd/money@{{ .Tag }}
-    ```
-
-    **Pre-built binaries:** Download below and verify with `checksums.txt`.
-
-    ## Verify signatures
-
-    This release is signed with [Sigstore](https://sigstore.dev) keyless signing.
-    To verify the checksums file:
-    ```
-    cosign verify-blob \
-      --bundle checksums.txt.sig \
-      --certificate-identity-regexp="https://github.com/thedavidweng/money" \
-      --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-      checksums.txt
-    ```
 
 homebrew_casks:
   - name: money
