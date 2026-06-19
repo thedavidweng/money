@@ -110,4 +110,3 @@ homebrew_casks:
           if OS.mac?
             system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/money"]
           end
-          generate_completions_from_executable(bin/"money", "completion")
