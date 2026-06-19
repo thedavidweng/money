@@ -50,19 +50,10 @@ sboms:
       - "${artifact}.spdx.json"
 
 changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
-      - "^ci:"
-      - "^chore:"
-      - "^style:"
-      - "^refactor:"
-      - Merge pull request
-      - Merge branch
+  disable: true
 
 release:
+  mode: append
   github:
     owner: thedavidweng
     name: money
