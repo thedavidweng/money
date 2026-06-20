@@ -22,6 +22,7 @@ Thanks for your interest in contributing to `money`.
 ```bash
 git clone https://github.com/thedavidweng/money.git
 cd money
+mise install  # install tools pinned in mise.toml
 go mod download
 ```
 
