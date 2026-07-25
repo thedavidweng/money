@@ -25,7 +25,10 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
       - name: Create GitHub Release
-        if: ${{ steps.rp.outputs.release_created == 'true' }}
+        # release_created is still set to true with skip-github-release: true
+        # (the action creates the tag but skips the GitHub release API call).
+        # Also check tag_name as a guard against future behavior changes.
+        if: ${{ steps.rp.outputs.release_created == 'true' && steps.rp.outputs.tag_name != '' }}
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           TAG: ${{ steps.rp.outputs.tag_name }}
@@ -37,22 +40,17 @@ jobs:
           if [ -f CHANGELOG.md ]; then
             NOTES=$(awk "/^## \[${ESCAPED_VERSION}\]/{found=1; next} /^## \[/{if(found) exit} found{print}" CHANGELOG.md || true)
           fi
-          INSTALL=$(cat <<'EOF'
-# Installation
-
-```bash
-# Homebrew (macOS)
-brew install --cask thedavidweng/tap/money
-
-# Go (cross-platform)
-go install github.com/thedavidweng/money/cmd/money@VERSION_PLACEHOLDER
-```
-EOF
-          )
-          INSTALL="${INSTALL/VERSION_PLACEHOLDER/$TAG}"
-          FULL_NOTES="${NOTES:-Release $TAG}
-
-${INSTALL}"
+          INSTALL=$(printf '%s\n' \
+            '# Installation' \
+            '' \
+            '```bash' \
+            '# Homebrew (macOS)' \
+            'brew install --cask thedavidweng/tap/money' \
+            '' \
+            '# Go (cross-platform)' \
+            "go install github.com/thedavidweng/money/cmd/money@${TAG}" \
+            '```')
+          FULL_NOTES=$(printf '%s\n\n%s' "${NOTES:-Release $TAG}" "$INSTALL")
           if gh release view "$TAG" &>/dev/null; then
             gh release edit "$TAG" --notes "${FULL_NOTES}"
           else
