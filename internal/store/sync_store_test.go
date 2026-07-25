@@ -17,7 +17,7 @@ func TestSQLiteStoreSyncSinkUpsertsAccountsTransactionsAndRemovedState(t *testin
 	}
 	defer func() { _ = db.Close() }()
 
-	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_sync", Name: "Sync Bank", Provider: "plaid", ProviderInstitutionID: "ins_sync"},
 		Item: LinkedItem{
 			ID:                     "pi_sync",
@@ -32,7 +32,7 @@ func TestSQLiteStoreSyncSinkUpsertsAccountsTransactionsAndRemovedState(t *testin
 		t.Fatalf("store linked item: %v", err)
 	}
 
-	if err := db.UpsertAccount(ctx, core.FinancialAccount{
+	if err := db.UpsertAccount(ctx, &core.FinancialAccount{
 		ProviderItemID:           "pi_sync",
 		ProviderAccountID:        "acc_provider",
 		Name:                     "Checking",
@@ -51,7 +51,7 @@ func TestSQLiteStoreSyncSinkUpsertsAccountsTransactionsAndRemovedState(t *testin
 		t.Fatalf("synced account id = %q, want local acc_ id", localAccountID)
 	}
 	category := "Food"
-	if err := db.UpsertTransaction(ctx, core.ProviderTransaction{
+	if err := db.UpsertTransaction(ctx, &core.ProviderTransaction{
 		ProviderItemID:        "pi_sync",
 		ProviderTransactionID: "tx_provider",
 		ProviderAccountID:     "acc_provider",
@@ -78,14 +78,14 @@ func TestSQLiteStoreSyncSinkUpsertsAccountsTransactionsAndRemovedState(t *testin
 		t.Fatalf("mark removed: %v", err)
 	}
 
-	removed, err := db.ListTransactions(ctx, TransactionListQuery{RemovedMode: RemovedOnly, Limit: 10})
+	removed, err := db.ListTransactions(ctx, &TransactionListQuery{RemovedMode: RemovedOnly, Limit: 10})
 	if err != nil {
 		t.Fatalf("list removed: %v", err)
 	}
 	if len(removed) != 2 {
 		t.Fatalf("removed transactions = %d, want demo removed plus synced removed", len(removed))
 	}
-	if err := db.UpsertTransaction(ctx, core.ProviderTransaction{
+	if err := db.UpsertTransaction(ctx, &core.ProviderTransaction{
 		ProviderItemID:        "pi_sync",
 		ProviderTransactionID: "tx_provider",
 		ProviderAccountID:     "acc_provider",
@@ -114,7 +114,7 @@ func TestSQLiteStoreRecordsSyncRunCounts(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	if err := db.RecordSyncRun(ctx, core.SyncRun{
+	if err := db.RecordSyncRun(ctx, &core.SyncRun{
 		Provider:             "plaid",
 		ProviderItemID:       "pi_demo_plaid",
 		StartedAt:            "2026-05-10T10:00:00Z",
@@ -190,7 +190,7 @@ func TestSQLiteStoreLatestSyncRunsReturnsMostRecentPerProviderItem(t *testing.T)
 	defer func() { _ = db.Close() }()
 
 	// Record two runs for the same provider item — latest should win.
-	if err := db.RecordSyncRun(ctx, core.SyncRun{
+	if err := db.RecordSyncRun(ctx, &core.SyncRun{
 		Provider:       "plaid",
 		ProviderItemID: "pi_demo_plaid",
 		StartedAt:      "2026-05-10T10:00:00Z",
@@ -199,7 +199,7 @@ func TestSQLiteStoreLatestSyncRunsReturnsMostRecentPerProviderItem(t *testing.T)
 	}); err != nil {
 		t.Fatalf("record first sync run: %v", err)
 	}
-	if err := db.RecordSyncRun(ctx, core.SyncRun{
+	if err := db.RecordSyncRun(ctx, &core.SyncRun{
 		Provider:       "plaid",
 		ProviderItemID: "pi_demo_plaid",
 		StartedAt:      "2026-05-11T10:00:00Z",
@@ -249,7 +249,7 @@ VALUES ('sync_stuck', 'plaid', 'pi_demo_plaid', '2026-05-10T10:00:00Z', 'ok')`);
 	}
 
 	// Record a completed run.
-	if err := db.RecordSyncRun(ctx, core.SyncRun{
+	if err := db.RecordSyncRun(ctx, &core.SyncRun{
 		Provider:       "plaid",
 		ProviderItemID: "pi_demo_plaid",
 		StartedAt:      "2026-05-11T10:00:00Z",
@@ -289,7 +289,7 @@ func TestSQLiteStoreBatchUpsertTransactions(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Set up a linked provider item and account to own our transactions.
-	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_batch", Name: "Batch Bank", Provider: "plaid", ProviderInstitutionID: "ins_batch"},
 		Item: LinkedItem{
 			ID:                     "pi_batch",
@@ -304,7 +304,7 @@ func TestSQLiteStoreBatchUpsertTransactions(t *testing.T) {
 		t.Fatalf("store linked item: %v", err)
 	}
 
-	if err := db.UpsertAccount(ctx, core.FinancialAccount{
+	if err := db.UpsertAccount(ctx, &core.FinancialAccount{
 		ProviderItemID:           "pi_batch",
 		ProviderAccountID:        "acc_batch",
 		Name:                     "Batch Checking",

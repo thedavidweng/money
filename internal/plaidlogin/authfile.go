@@ -32,7 +32,7 @@ func ReadAuthFile(path string) (Auth, error) {
 	return auth, nil
 }
 
-func WriteAuthFile(path string, auth Auth) error {
+func WriteAuthFile(path string, auth *Auth) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func LoadFreshAuth(ctx context.Context, path string, cfg TokenClientConfig) (Aut
 	}
 	refreshed.TeamID = auth.TeamID
 	refreshed.ClientID = auth.ClientID
-	if err := WriteAuthFile(path, refreshed); err != nil {
+	if err := WriteAuthFile(path, &refreshed); err != nil {
 		return Auth{}, err
 	}
 	return refreshed, nil

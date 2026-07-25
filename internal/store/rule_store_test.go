@@ -18,7 +18,7 @@ func TestSQLiteStoreRuleEngineAppliesCategoryByMerchantContains(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Store a linked item and a transaction with a known merchant.
-	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_rule", Name: "Rule Bank", Provider: "plaid", ProviderInstitutionID: "ins_rule"},
 		Item: LinkedItem{
 			ID:                     "pi_rule",
@@ -32,7 +32,7 @@ func TestSQLiteStoreRuleEngineAppliesCategoryByMerchantContains(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("store linked item: %v", err)
 	}
-	if err := db.UpsertAccount(ctx, core.FinancialAccount{
+	if err := db.UpsertAccount(ctx, &core.FinancialAccount{
 		ProviderItemID:    "pi_rule",
 		ProviderAccountID: "acc_rule",
 		Name:              "Checking",
@@ -41,7 +41,7 @@ func TestSQLiteStoreRuleEngineAppliesCategoryByMerchantContains(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("upsert account: %v", err)
 	}
-	if err := db.UpsertTransaction(ctx, core.ProviderTransaction{
+	if err := db.UpsertTransaction(ctx, &core.ProviderTransaction{
 		ProviderItemID:        "pi_rule",
 		ProviderTransactionID: "tx_starbucks",
 		ProviderAccountID:     "acc_rule",
@@ -53,7 +53,7 @@ func TestSQLiteStoreRuleEngineAppliesCategoryByMerchantContains(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("upsert transaction: %v", err)
 	}
-	if err := db.UpsertTransaction(ctx, core.ProviderTransaction{
+	if err := db.UpsertTransaction(ctx, &core.ProviderTransaction{
 		ProviderItemID:        "pi_rule",
 		ProviderTransactionID: "tx_grocery",
 		ProviderAccountID:     "acc_rule",
@@ -77,7 +77,7 @@ func TestSQLiteStoreRuleEngineAppliesCategoryByMerchantContains(t *testing.T) {
 	coffeeCatID := categories[0].ID
 
 	// Create a rule: merchant_name contains "starbucks" → set category.
-	_, err = db.CreateRule(ctx, core.Rule{
+	_, err = db.CreateRule(ctx, &core.Rule{
 		Name:           "Starbucks → Coffee",
 		ConditionField: "merchant_name",
 		ConditionOp:    "contains",
@@ -136,7 +136,7 @@ func TestSQLiteStoreRuleEnginePriorityHighestWins(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_pri", Name: "Pri Bank", Provider: "plaid", ProviderInstitutionID: "ins_pri"},
 		Item: LinkedItem{
 			ID: "pi_pri", Provider: "plaid", InstitutionID: "inst_pri",
@@ -146,13 +146,13 @@ func TestSQLiteStoreRuleEnginePriorityHighestWins(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("store linked item: %v", err)
 	}
-	if err := db.UpsertAccount(ctx, core.FinancialAccount{
+	if err := db.UpsertAccount(ctx, &core.FinancialAccount{
 		ProviderItemID: "pi_pri", ProviderAccountID: "acc_pri",
 		Name: "Checking", Type: "depository", Currency: "USD",
 	}); err != nil {
 		t.Fatalf("upsert account: %v", err)
 	}
-	if err := db.UpsertTransaction(ctx, core.ProviderTransaction{
+	if err := db.UpsertTransaction(ctx, &core.ProviderTransaction{
 		ProviderItemID: "pi_pri", ProviderTransactionID: "tx_pri",
 		ProviderAccountID: "acc_pri", Date: "2026-05-01",
 		AmountMinorUnits: -1000, Name: "UBER EATS", MerchantName: "Uber Eats", Currency: "USD",
@@ -167,7 +167,7 @@ func TestSQLiteStoreRuleEnginePriorityHighestWins(t *testing.T) {
 	catA, catB := categories[0].ID, categories[1].ID
 
 	// Low priority rule: name contains "uber" → catA.
-	_, err = db.CreateRule(ctx, core.Rule{
+	_, err = db.CreateRule(ctx, &core.Rule{
 		Name: "Uber low", ConditionField: "name", ConditionOp: "contains",
 		ConditionValue: "uber", ActionType: "set_category", ActionValue: catA,
 		Priority: 1, Enabled: true,
@@ -176,7 +176,7 @@ func TestSQLiteStoreRuleEnginePriorityHighestWins(t *testing.T) {
 		t.Fatalf("create low rule: %v", err)
 	}
 	// High priority rule: merchant_name contains "uber eats" → catB.
-	_, err = db.CreateRule(ctx, core.Rule{
+	_, err = db.CreateRule(ctx, &core.Rule{
 		Name: "Uber Eats high", ConditionField: "merchant_name", ConditionOp: "contains",
 		ConditionValue: "uber eats", ActionType: "set_category", ActionValue: catB,
 		Priority: 100, Enabled: true,
@@ -214,7 +214,7 @@ func TestSQLiteStoreRuleEngineSetNoteAction(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_note", Name: "Note Bank", Provider: "plaid", ProviderInstitutionID: "ins_note"},
 		Item: LinkedItem{
 			ID: "pi_note", Provider: "plaid", InstitutionID: "inst_note",
@@ -224,13 +224,13 @@ func TestSQLiteStoreRuleEngineSetNoteAction(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("store linked item: %v", err)
 	}
-	if err := db.UpsertAccount(ctx, core.FinancialAccount{
+	if err := db.UpsertAccount(ctx, &core.FinancialAccount{
 		ProviderItemID: "pi_note", ProviderAccountID: "acc_note",
 		Name: "Checking", Type: "depository", Currency: "USD",
 	}); err != nil {
 		t.Fatalf("upsert account: %v", err)
 	}
-	if err := db.UpsertTransaction(ctx, core.ProviderTransaction{
+	if err := db.UpsertTransaction(ctx, &core.ProviderTransaction{
 		ProviderItemID: "pi_note", ProviderTransactionID: "tx_note",
 		ProviderAccountID: "acc_note", Date: "2026-05-01",
 		AmountMinorUnits: -2500, Name: "AMAZON MARKETPLACE", MerchantName: "Amazon", Currency: "USD",
@@ -238,7 +238,7 @@ func TestSQLiteStoreRuleEngineSetNoteAction(t *testing.T) {
 		t.Fatalf("upsert transaction: %v", err)
 	}
 
-	_, err = db.CreateRule(ctx, core.Rule{
+	_, err = db.CreateRule(ctx, &core.Rule{
 		Name: "Amazon note", ConditionField: "merchant_name", ConditionOp: "equals",
 		ConditionValue: "Amazon", ActionType: "set_note", ActionValue: "online shopping",
 		Priority: 5, Enabled: true,
@@ -274,7 +274,7 @@ func TestSQLiteStoreRuleEngineDisabledRulesSkipped(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_dis", Name: "Dis Bank", Provider: "plaid", ProviderInstitutionID: "ins_dis"},
 		Item: LinkedItem{
 			ID: "pi_dis", Provider: "plaid", InstitutionID: "inst_dis",
@@ -284,13 +284,13 @@ func TestSQLiteStoreRuleEngineDisabledRulesSkipped(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("store linked item: %v", err)
 	}
-	if err := db.UpsertAccount(ctx, core.FinancialAccount{
+	if err := db.UpsertAccount(ctx, &core.FinancialAccount{
 		ProviderItemID: "pi_dis", ProviderAccountID: "acc_dis",
 		Name: "Checking", Type: "depository", Currency: "USD",
 	}); err != nil {
 		t.Fatalf("upsert account: %v", err)
 	}
-	if err := db.UpsertTransaction(ctx, core.ProviderTransaction{
+	if err := db.UpsertTransaction(ctx, &core.ProviderTransaction{
 		ProviderItemID: "pi_dis", ProviderTransactionID: "tx_dis",
 		ProviderAccountID: "acc_dis", Date: "2026-05-01",
 		AmountMinorUnits: -1500, Name: "NETFLIX", MerchantName: "Netflix", Currency: "USD",
@@ -304,7 +304,7 @@ func TestSQLiteStoreRuleEngineDisabledRulesSkipped(t *testing.T) {
 	}
 
 	// Create a disabled rule.
-	_, err = db.CreateRule(ctx, core.Rule{
+	_, err = db.CreateRule(ctx, &core.Rule{
 		Name: "Netflix disabled", ConditionField: "merchant_name", ConditionOp: "equals",
 		ConditionValue: "Netflix", ActionType: "set_category", ActionValue: categories[0].ID,
 		Priority: 5, Enabled: false,
@@ -330,7 +330,7 @@ func TestSQLiteStoreRuleCRUDAndListOnlyEnabled(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	r1, err := db.CreateRule(ctx, core.Rule{
+	r1, err := db.CreateRule(ctx, &core.Rule{
 		Name: "Rule A", ConditionField: "name", ConditionOp: "contains",
 		ConditionValue: "test", ActionType: "set_note", ActionValue: "a",
 		Priority: 1, Enabled: true,
@@ -338,7 +338,7 @@ func TestSQLiteStoreRuleCRUDAndListOnlyEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create rule 1: %v", err)
 	}
-	r2, err := db.CreateRule(ctx, core.Rule{
+	r2, err := db.CreateRule(ctx, &core.Rule{
 		Name: "Rule B", ConditionField: "name", ConditionOp: "contains",
 		ConditionValue: "test", ActionType: "set_note", ActionValue: "b",
 		Priority: 2, Enabled: false,
@@ -368,7 +368,7 @@ func TestSQLiteStoreRuleCRUDAndListOnlyEnabled(t *testing.T) {
 	}
 
 	// Update rule.
-	_, err = db.UpdateRule(ctx, core.Rule{
+	_, err = db.UpdateRule(ctx, &core.Rule{
 		ID: r1.ID, Name: "Rule A updated", ConditionField: "name", ConditionOp: "equals",
 		ConditionValue: "test", ActionType: "set_note", ActionValue: "updated",
 		Priority: 10, Enabled: true,
@@ -404,7 +404,7 @@ func TestSQLiteStoreApplyRulesMatchesCaseInsensitive(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_ci", Name: "CI Bank", Provider: "plaid", ProviderInstitutionID: "ins_ci"},
 		Item: LinkedItem{
 			ID: "pi_ci", Provider: "plaid", InstitutionID: "inst_ci",
@@ -414,13 +414,13 @@ func TestSQLiteStoreApplyRulesMatchesCaseInsensitive(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("store linked item: %v", err)
 	}
-	if err := db.UpsertAccount(ctx, core.FinancialAccount{
+	if err := db.UpsertAccount(ctx, &core.FinancialAccount{
 		ProviderItemID: "pi_ci", ProviderAccountID: "acc_ci",
 		Name: "Checking", Type: "depository", Currency: "USD",
 	}); err != nil {
 		t.Fatalf("upsert account: %v", err)
 	}
-	if err := db.UpsertTransaction(ctx, core.ProviderTransaction{
+	if err := db.UpsertTransaction(ctx, &core.ProviderTransaction{
 		ProviderItemID: "pi_ci", ProviderTransactionID: "tx_ci",
 		ProviderAccountID: "acc_ci", Date: "2026-05-01",
 		AmountMinorUnits: -800, Name: "Spotify Premium", MerchantName: "Spotify", Currency: "USD",
@@ -434,7 +434,7 @@ func TestSQLiteStoreApplyRulesMatchesCaseInsensitive(t *testing.T) {
 	}
 
 	// Rule with lowercase, transaction has mixed case.
-	_, err = db.CreateRule(ctx, core.Rule{
+	_, err = db.CreateRule(ctx, &core.Rule{
 		Name: "Spotify rule", ConditionField: "merchant_name", ConditionOp: "contains",
 		ConditionValue: "spotify", ActionType: "set_category", ActionValue: categories[0].ID,
 		Priority: 5, Enabled: true,
@@ -460,7 +460,7 @@ func TestSQLiteStoreApplyRulesReappliesOnSubsequentRuns(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_idem", Name: "Idem Bank", Provider: "plaid", ProviderInstitutionID: "ins_idem"},
 		Item: LinkedItem{
 			ID: "pi_idem", Provider: "plaid", InstitutionID: "inst_idem",
@@ -470,13 +470,13 @@ func TestSQLiteStoreApplyRulesReappliesOnSubsequentRuns(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("store linked item: %v", err)
 	}
-	if err := db.UpsertAccount(ctx, core.FinancialAccount{
+	if err := db.UpsertAccount(ctx, &core.FinancialAccount{
 		ProviderItemID: "pi_idem", ProviderAccountID: "acc_idem",
 		Name: "Checking", Type: "depository", Currency: "USD",
 	}); err != nil {
 		t.Fatalf("upsert account: %v", err)
 	}
-	if err := db.UpsertTransaction(ctx, core.ProviderTransaction{
+	if err := db.UpsertTransaction(ctx, &core.ProviderTransaction{
 		ProviderItemID: "pi_idem", ProviderTransactionID: "tx_idem",
 		ProviderAccountID: "acc_idem", Date: "2026-05-01",
 		AmountMinorUnits: -1200, Name: "LYFT RIDE", MerchantName: "Lyft", Currency: "USD",
@@ -489,7 +489,7 @@ func TestSQLiteStoreApplyRulesReappliesOnSubsequentRuns(t *testing.T) {
 		t.Skip("demo has no categories")
 	}
 
-	_, err = db.CreateRule(ctx, core.Rule{
+	_, err = db.CreateRule(ctx, &core.Rule{
 		Name: "Lyft rule", ConditionField: "merchant_name", ConditionOp: "equals",
 		ConditionValue: "Lyft", ActionType: "set_category", ActionValue: categories[0].ID,
 		Priority: 5, Enabled: true,
@@ -533,7 +533,7 @@ func TestSQLiteStoreApplyRulesSQLMatchingWithBulkData(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Seed a linked provider item + account.
-	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_bulk", Name: "Bulk Bank", Provider: "plaid", ProviderInstitutionID: "ins_bulk"},
 		Item: LinkedItem{
 			ID: "pi_bulk", Provider: "plaid", InstitutionID: "inst_bulk",
@@ -543,7 +543,7 @@ func TestSQLiteStoreApplyRulesSQLMatchingWithBulkData(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("store linked item: %v", err)
 	}
-	if err := db.UpsertAccount(ctx, core.FinancialAccount{
+	if err := db.UpsertAccount(ctx, &core.FinancialAccount{
 		ProviderItemID: "pi_bulk", ProviderAccountID: "acc_bulk",
 		Name: "Checking", Type: "depository", Currency: "USD",
 	}); err != nil {
@@ -583,7 +583,7 @@ func TestSQLiteStoreApplyRulesSQLMatchingWithBulkData(t *testing.T) {
 	}
 
 	for i := 0; i < 50; i++ {
-		if err := db.UpsertTransaction(ctx, core.ProviderTransaction{
+		if err := db.UpsertTransaction(ctx, &core.ProviderTransaction{
 			ProviderItemID:        "pi_bulk",
 			ProviderTransactionID: fmt.Sprintf("tx_amazon_%d", i),
 			ProviderAccountID:     "acc_bulk",
@@ -625,7 +625,7 @@ func TestSQLiteStoreApplyRulesSQLMatchingWithBulkData(t *testing.T) {
 	}
 
 	for i := 0; i < 50; i++ {
-		if err := db.UpsertTransaction(ctx, core.ProviderTransaction{
+		if err := db.UpsertTransaction(ctx, &core.ProviderTransaction{
 			ProviderItemID:        "pi_bulk",
 			ProviderTransactionID: fmt.Sprintf("tx_other_%d", i),
 			ProviderAccountID:     "acc_bulk",
@@ -650,7 +650,7 @@ func TestSQLiteStoreApplyRulesSQLMatchingWithBulkData(t *testing.T) {
 	catID := categories[0].ID
 
 	// Create a rule: merchant_name contains "amazon" → set_category.
-	_, err = db.CreateRule(ctx, core.Rule{
+	_, err = db.CreateRule(ctx, &core.Rule{
 		Name:           "Amazon → Shopping",
 		ConditionField: "merchant_name",
 		ConditionOp:    "contains",
@@ -674,7 +674,7 @@ func TestSQLiteStoreApplyRulesSQLMatchingWithBulkData(t *testing.T) {
 	}
 
 	// Verify via ListTransactions that exactly 50 Amazon transactions have category_source == "local".
-	allTxs, err := db.ListTransactions(ctx, TransactionListQuery{
+	allTxs, err := db.ListTransactions(ctx, &TransactionListQuery{
 		Limit: 300,
 	})
 	if err != nil {
@@ -711,7 +711,7 @@ func TestSQLiteStoreApplyRulesUsesLocalCategorySource(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_cs", Name: "CS Bank", Provider: "plaid", ProviderInstitutionID: "ins_cs"},
 		Item: LinkedItem{
 			ID: "pi_cs", Provider: "plaid", InstitutionID: "inst_cs",
@@ -721,14 +721,14 @@ func TestSQLiteStoreApplyRulesUsesLocalCategorySource(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("store linked item: %v", err)
 	}
-	if err := db.UpsertAccount(ctx, core.FinancialAccount{
+	if err := db.UpsertAccount(ctx, &core.FinancialAccount{
 		ProviderItemID: "pi_cs", ProviderAccountID: "acc_cs",
 		Name: "Checking", Type: "depository", Currency: "USD",
 	}); err != nil {
 		t.Fatalf("upsert account: %v", err)
 	}
 	providerCat := "Food & Drink"
-	if err := db.UpsertTransaction(ctx, core.ProviderTransaction{
+	if err := db.UpsertTransaction(ctx, &core.ProviderTransaction{
 		ProviderItemID: "pi_cs", ProviderTransactionID: "tx_cs",
 		ProviderAccountID: "acc_cs", Date: "2026-05-01",
 		AmountMinorUnits: -900, Name: "CHIPOTLE", MerchantName: "Chipotle",
@@ -742,7 +742,7 @@ func TestSQLiteStoreApplyRulesUsesLocalCategorySource(t *testing.T) {
 		t.Skip("demo has no categories")
 	}
 
-	_, err = db.CreateRule(ctx, core.Rule{
+	_, err = db.CreateRule(ctx, &core.Rule{
 		Name: "Chipotle", ConditionField: "merchant_name", ConditionOp: "contains",
 		ConditionValue: "chipotle", ActionType: "set_category", ActionValue: categories[0].ID,
 		Priority: 5, Enabled: true,
@@ -785,7 +785,7 @@ func TestSQLiteStoreApplyRulesSQLMatchingMultipleRules(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Seed a provider item + account.
-	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_multi", Name: "Multi Bank", Provider: "plaid", ProviderInstitutionID: "ins_multi"},
 		Item: LinkedItem{
 			ID: "pi_multi", Provider: "plaid", InstitutionID: "inst_multi",
@@ -795,7 +795,7 @@ func TestSQLiteStoreApplyRulesSQLMatchingMultipleRules(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("store linked item: %v", err)
 	}
-	if err := db.UpsertAccount(ctx, core.FinancialAccount{
+	if err := db.UpsertAccount(ctx, &core.FinancialAccount{
 		ProviderItemID: "pi_multi", ProviderAccountID: "acc_multi",
 		Name: "Checking", Type: "depository", Currency: "USD",
 	}); err != nil {
@@ -807,7 +807,7 @@ func TestSQLiteStoreApplyRulesSQLMatchingMultipleRules(t *testing.T) {
 	names := []string{"AMAZON.COM ORDER", "STARBUCKS #123", "WALMART SUPERCENTER"}
 	for i := 0; i < 30; i++ {
 		idx := i % 3
-		if err := db.UpsertTransaction(ctx, core.ProviderTransaction{
+		if err := db.UpsertTransaction(ctx, &core.ProviderTransaction{
 			ProviderItemID:        "pi_multi",
 			ProviderTransactionID: fmt.Sprintf("tx_multi_%d", i),
 			ProviderAccountID:     "acc_multi",
@@ -832,7 +832,7 @@ func TestSQLiteStoreApplyRulesSQLMatchingMultipleRules(t *testing.T) {
 	catB := categories[1].ID
 
 	// Create two rules: amazon → catA, starbucks → catB.
-	if _, err := db.CreateRule(ctx, core.Rule{
+	if _, err := db.CreateRule(ctx, &core.Rule{
 		Name:           "Amazon → catA",
 		ConditionField: "merchant_name",
 		ConditionOp:    "contains",
@@ -844,7 +844,7 @@ func TestSQLiteStoreApplyRulesSQLMatchingMultipleRules(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("create rule 1: %v", err)
 	}
-	if _, err := db.CreateRule(ctx, core.Rule{
+	if _, err := db.CreateRule(ctx, &core.Rule{
 		Name:           "Starbucks → catB",
 		ConditionField: "merchant_name",
 		ConditionOp:    "contains",
@@ -866,7 +866,7 @@ func TestSQLiteStoreApplyRulesSQLMatchingMultipleRules(t *testing.T) {
 	}
 
 	// Verify each merchant got the correct category.
-	allTxs, err := db.ListTransactions(ctx, TransactionListQuery{Limit: 100})
+	allTxs, err := db.ListTransactions(ctx, &TransactionListQuery{Limit: 100})
 	if err != nil {
 		t.Fatalf("list transactions: %v", err)
 	}

@@ -37,7 +37,7 @@ func TestRunLoginWritesFetchedKeysAndDashboardAuth(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := RunLogin(context.Background(), LoginOptions{
+	result, err := RunLogin(context.Background(), &LoginOptions{
 		ConfigPath:   configPath,
 		Profile:      "default",
 		Environment:  "sandbox",
@@ -79,10 +79,8 @@ func TestRunLoginCanRepairMissingPlaidEnvRefs(t *testing.T) {
 	configPath, _ := writeLoginConfig(t, `
 providers:
   plaid:
-    client_id:
-      env: PLAID_CLIENT_ID
-    secret:
-      env: PLAID_SECRET
+    client_id: "env:PLAID_CLIENT_ID"
+    secret: "env:PLAID_SECRET"
     environment: sandbox
 `)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +94,7 @@ providers:
 		}
 	}))
 	defer server.Close()
-	_, err := RunLogin(context.Background(), LoginOptions{
+	_, err := RunLogin(context.Background(), &LoginOptions{
 		ConfigPath:   configPath,
 		Environment:  "sandbox",
 		CallbackCode: "auth-code",
@@ -116,10 +114,8 @@ func TestRunLoginPreservesExistingSameEnvironmentKeys(t *testing.T) {
 	configPath, envPath := writeLoginConfig(t, `
 providers:
   plaid:
-    client_id:
-      env: PLAID_CLIENT_ID
-    secret:
-      env: PLAID_SECRET
+    client_id: "env:PLAID_CLIENT_ID"
+    secret: "env:PLAID_SECRET"
     environment: sandbox
 `)
 	key := base64.RawURLEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
@@ -128,7 +124,7 @@ providers:
 	}
 	server := loginFakeDashboard(t, "existing-client", "existing-secret")
 	defer server.Close()
-	result, err := RunLogin(context.Background(), LoginOptions{
+	result, err := RunLogin(context.Background(), &LoginOptions{
 		ConfigPath:   configPath,
 		Environment:  "sandbox",
 		CallbackCode: "auth-code",
@@ -155,10 +151,8 @@ func TestRunLoginOverwritesRotatedSecretForSameTeamAndEnvironment(t *testing.T) 
 	configPath, envPath := writeLoginConfig(t, `
 providers:
   plaid:
-    client_id:
-      env: PLAID_CLIENT_ID
-    secret:
-      env: PLAID_SECRET
+    client_id: "env:PLAID_CLIENT_ID"
+    secret: "env:PLAID_SECRET"
     environment: sandbox
 `)
 	key := base64.RawURLEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
@@ -167,7 +161,7 @@ providers:
 	}
 	server := loginFakeDashboard(t, "existing-client", "rotated-secret")
 	defer server.Close()
-	result, err := RunLogin(context.Background(), LoginOptions{
+	result, err := RunLogin(context.Background(), &LoginOptions{
 		ConfigPath:   configPath,
 		Environment:  "sandbox",
 		CallbackCode: "auth-code",
@@ -194,10 +188,8 @@ func TestRunLoginRejectsMismatchedTeamCredentialsWithoutForce(t *testing.T) {
 	configPath, envPath := writeLoginConfig(t, `
 providers:
   plaid:
-    client_id:
-      env: PLAID_CLIENT_ID
-    secret:
-      env: PLAID_SECRET
+    client_id: "env:PLAID_CLIENT_ID"
+    secret: "env:PLAID_SECRET"
     environment: sandbox
 `)
 	key := base64.RawURLEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
@@ -206,7 +198,7 @@ providers:
 	}
 	server := loginFakeDashboard(t, "team-b-client", "team-b-secret")
 	defer server.Close()
-	_, err := RunLogin(context.Background(), LoginOptions{
+	_, err := RunLogin(context.Background(), &LoginOptions{
 		ConfigPath:   configPath,
 		Environment:  "sandbox",
 		CallbackCode: "auth-code",
@@ -234,10 +226,8 @@ func TestRunLoginOverwritesMismatchedTeamCredentialsWithForce(t *testing.T) {
 	configPath, envPath := writeLoginConfig(t, `
 providers:
   plaid:
-    client_id:
-      env: PLAID_CLIENT_ID
-    secret:
-      env: PLAID_SECRET
+    client_id: "env:PLAID_CLIENT_ID"
+    secret: "env:PLAID_SECRET"
     environment: sandbox
 `)
 	key := base64.RawURLEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
@@ -246,7 +236,7 @@ providers:
 	}
 	server := loginFakeDashboard(t, "team-b-client", "team-b-secret")
 	defer server.Close()
-	result, err := RunLogin(context.Background(), LoginOptions{
+	result, err := RunLogin(context.Background(), &LoginOptions{
 		ConfigPath:   configPath,
 		Environment:  "sandbox",
 		Force:        true,
@@ -284,7 +274,7 @@ func TestRunLoginPromptsForMultiTeamSelection(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := RunLogin(context.Background(), LoginOptions{
+	result, err := RunLogin(context.Background(), &LoginOptions{
 		ConfigPath:   configPath,
 		Environment:  "sandbox",
 		TeamPrompt:   prompt.NewFake("team_2"),
@@ -316,7 +306,7 @@ func TestRunLoginWritesPlaidOptionsFromFlagsOrDefaults(t *testing.T) {
 	server := loginFakeDashboard(t, "client_1", "sandbox-secret")
 	defer server.Close()
 
-	_, err := RunLogin(context.Background(), LoginOptions{
+	_, err := RunLogin(context.Background(), &LoginOptions{
 		ConfigPath:   configPath,
 		Environment:  "sandbox",
 		Products:     "transactions,liabilities",
@@ -343,7 +333,7 @@ func TestRunLoginWritesPlaidOptionsFromFlagsOrDefaults(t *testing.T) {
 	}
 
 	defaultConfigPath, _ := writeLoginConfig(t, "")
-	_, err = RunLogin(context.Background(), LoginOptions{
+	_, err = RunLogin(context.Background(), &LoginOptions{
 		ConfigPath:   defaultConfigPath,
 		Environment:  "sandbox",
 		CallbackCode: "auth-code",
@@ -371,10 +361,8 @@ func TestRunLoginRequiresForceForEnvironmentSwitch(t *testing.T) {
 	configPath, envPath := writeLoginConfig(t, `
 providers:
   plaid:
-    client_id:
-      env: PLAID_CLIENT_ID
-    secret:
-      env: PLAID_SECRET
+    client_id: "env:PLAID_CLIENT_ID"
+    secret: "env:PLAID_SECRET"
     environment: sandbox
 `)
 	key := base64.RawURLEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
@@ -383,7 +371,7 @@ providers:
 	}
 	server := loginFakeDashboard(t, "fetched-client", "prod-secret")
 	defer server.Close()
-	_, err := RunLogin(context.Background(), LoginOptions{
+	_, err := RunLogin(context.Background(), &LoginOptions{
 		ConfigPath:   configPath,
 		Environment:  "production",
 		CallbackCode: "auth-code",
@@ -437,7 +425,7 @@ func TestRunLoginDoesNotWritePartialCredentialsWhenDashboardStepsFail(t *testing
 			configPath, envPath := writeLoginConfig(t, "")
 			server := httptest.NewServer(handler)
 			defer server.Close()
-			_, err := RunLogin(context.Background(), LoginOptions{
+			_, err := RunLogin(context.Background(), &LoginOptions{
 				ConfigPath:   configPath,
 				Environment:  "sandbox",
 				CallbackCode: "auth-code",
@@ -465,7 +453,7 @@ func TestRunLoginDoesNotWritePartialCredentialsWhenDashboardStepsFail(t *testing
 	}
 }
 
-func loginFakeDashboard(t *testing.T, clientID string, secret string) *httptest.Server {
+func loginFakeDashboard(t *testing.T, clientID, secret string) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -491,8 +479,7 @@ func writeLoginConfig(t *testing.T, providersYAML string) (configPath, envPath s
 	if err := os.WriteFile(configPath, []byte(`
 database:
   path: ./money.db
-  encryption_key:
-    env: MONEY_DB_ENCRYPTION_KEY
+  encryption_key: "env:MONEY_DB_ENCRYPTION_KEY"
 `+providersYAML), 0o600); err != nil {
 		t.Fatal(err)
 	}

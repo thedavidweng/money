@@ -40,7 +40,7 @@ type ProviderItemQuery struct {
 	ProviderItemID string
 }
 
-func (s *SQLiteStore) StoreLinkedProviderItem(ctx context.Context, linked LinkedProviderItem) error {
+func (s *SQLiteStore) StoreLinkedProviderItem(ctx context.Context, linked *LinkedProviderItem) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	products, err := json.Marshal(linked.Item.Products)
 	if err != nil {
@@ -159,7 +159,7 @@ ON CONFLICT(provider, provider_institution_id) DO UPDATE SET
 	return err
 }
 
-func (s *SQLiteStore) UpdateProviderItemName(ctx context.Context, id string, name string) error {
+func (s *SQLiteStore) UpdateProviderItemName(ctx context.Context, id, name string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.ExecContext(ctx, `
 UPDATE provider_items
@@ -203,7 +203,7 @@ func (s *SQLiteStore) RemoveProviderItem(ctx context.Context, id string) error {
 	return tx.Commit()
 }
 
-func (s *SQLiteStore) UpsertProviderItem(ctx context.Context, item core.ProviderItem) error {
+func (s *SQLiteStore) UpsertProviderItem(ctx context.Context, item *core.ProviderItem) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	products, err := json.Marshal(item.Products)
 	if err != nil {

@@ -15,13 +15,13 @@ type LinkResult struct {
 	InstitutionID  string `json:"institution_id"`
 }
 
-func CompleteProviderLink(ctx context.Context, target store.Store, provider providers.Provider, session providers.LinkSession, callback providers.LinkCallback) (LinkResult, error) {
+func CompleteProviderLink(ctx context.Context, target store.Store, provider providers.Provider, session *providers.LinkSession, callback *providers.LinkCallback) (LinkResult, error) {
 	switch callback.Status {
 	case "", "success":
 	case "cancel":
 		return LinkResult{}, LinkCanceledError{LinkSessionID: callback.Metadata.LinkSessionID}
 	case "error":
-		return LinkResult{}, LinkFlowError{
+		return LinkResult{}, &LinkFlowError{
 			Type:          callback.Error.Type,
 			Code:          callback.Error.Code,
 			Message:       callback.Error.Message,
@@ -35,7 +35,7 @@ func CompleteProviderLink(ctx context.Context, target store.Store, provider prov
 	if err != nil {
 		return LinkResult{}, err
 	}
-	if err := target.StoreLinkedProviderItem(ctx, store.LinkedProviderItem{
+	if err := target.StoreLinkedProviderItem(ctx, &store.LinkedProviderItem{
 		Institution: store.LinkedInstitution{
 			ID:                    linked.Institution.ID,
 			Name:                  linked.Institution.Name,
@@ -82,7 +82,7 @@ type LinkFlowError struct {
 	LinkSessionID string
 }
 
-func (e LinkFlowError) Error() string {
+func (e *LinkFlowError) Error() string {
 	message := e.Message
 	if message == "" {
 		message = "Plaid Link returned an error"

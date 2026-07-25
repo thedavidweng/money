@@ -18,14 +18,11 @@ func TestLoadResolvesExplicitEnvReferencesFromCompanionEnv(t *testing.T) {
 	if err := os.WriteFile(configPath, []byte(`
 database:
   path: ./money.db
-  encryption_key:
-    env: MONEY_DB_ENCRYPTION_KEY
+  encryption_key: "env:MONEY_DB_ENCRYPTION_KEY"
 providers:
   plaid:
-    client_id:
-      env: PLAID_CLIENT_ID
-    secret:
-      env: PLAID_SECRET
+    client_id: "env:PLAID_CLIENT_ID"
+    secret: "env:PLAID_SECRET"
     environment: sandbox
     products: [transactions]
     country_codes: [US]
@@ -131,14 +128,11 @@ func TestLoadResolvesBridgeExplicitEnvReferences(t *testing.T) {
 	if err := os.WriteFile(configPath, []byte(`
 database:
   path: ./money.db
-  encryption_key:
-    env: MONEY_DB_ENCRYPTION_KEY
+  encryption_key: "env:MONEY_DB_ENCRYPTION_KEY"
 providers:
   bridge:
-    client_id:
-      env: BRIDGE_CLIENT_ID
-    client_secret:
-      env: BRIDGE_CLIENT_SECRET
+    client_id: "env:BRIDGE_CLIENT_ID"
+    client_secret: "env:BRIDGE_CLIENT_SECRET"
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}

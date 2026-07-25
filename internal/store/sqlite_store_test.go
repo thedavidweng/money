@@ -24,7 +24,7 @@ func TestDemoStoreSeedsDeterministicFeatureCoverage(t *testing.T) {
 		t.Fatalf("accounts length = %d, want provider/manual/import examples", len(accounts))
 	}
 
-	transactions, err := db.ListTransactions(ctx, TransactionListQuery{RemovedMode: RemovedExclude, Limit: 50})
+	transactions, err := db.ListTransactions(ctx, &TransactionListQuery{RemovedMode: RemovedExclude, Limit: 50})
 	if err != nil {
 		t.Fatalf("list transactions: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestDemoStoreSeedsDeterministicFeatureCoverage(t *testing.T) {
 		t.Fatalf("demo coverage pending=%v review=%v tags=%v note=%v recurring=%v", sawPending, sawReview, sawTags, sawNote, sawRecurring)
 	}
 
-	removed, err := db.ListTransactions(ctx, TransactionListQuery{RemovedMode: RemovedOnly, Limit: 50})
+	removed, err := db.ListTransactions(ctx, &TransactionListQuery{RemovedMode: RemovedOnly, Limit: 50})
 	if err != nil {
 		t.Fatalf("list removed transactions: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestSQLiteStoreListTransactionsHydratesTags(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	transactions, err := db.ListTransactions(ctx, TransactionListQuery{RemovedMode: RemovedExclude, Limit: 50})
+	transactions, err := db.ListTransactions(ctx, &TransactionListQuery{RemovedMode: RemovedExclude, Limit: 50})
 	if err != nil {
 		t.Fatalf("list transactions: %v", err)
 	}

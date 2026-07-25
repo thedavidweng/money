@@ -14,7 +14,7 @@ func TestListTransactionsRemovedModes(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// RemovedOnly: only the removed transaction.
-	removed, err := db.ListTransactions(ctx, TransactionListQuery{RemovedMode: RemovedOnly, Limit: 100})
+	removed, err := db.ListTransactions(ctx, &TransactionListQuery{RemovedMode: RemovedOnly, Limit: 100})
 	if err != nil {
 		t.Fatalf("removed only: %v", err)
 	}
@@ -23,7 +23,7 @@ func TestListTransactionsRemovedModes(t *testing.T) {
 	}
 
 	// RemovedInclude: all 5 transactions.
-	all, err := db.ListTransactions(ctx, TransactionListQuery{RemovedMode: RemovedInclude, Limit: 100})
+	all, err := db.ListTransactions(ctx, &TransactionListQuery{RemovedMode: RemovedInclude, Limit: 100})
 	if err != nil {
 		t.Fatalf("removed include: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestListTransactionsFilterByAccountAndCategory(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Filter by checking account — has coffee, rent (removed excluded by default).
-	checking, err := db.ListTransactions(ctx, TransactionListQuery{AccountID: "acc_demo_checking", Limit: 100})
+	checking, err := db.ListTransactions(ctx, &TransactionListQuery{AccountID: "acc_demo_checking", Limit: 100})
 	if err != nil {
 		t.Fatalf("checking: %v", err)
 	}
@@ -55,7 +55,7 @@ func TestListTransactionsFilterByAccountAndCategory(t *testing.T) {
 	}
 
 	// Filter by cash account — only the manual adjustment.
-	cash, err := db.ListTransactions(ctx, TransactionListQuery{AccountID: "acc_demo_cash", Limit: 100})
+	cash, err := db.ListTransactions(ctx, &TransactionListQuery{AccountID: "acc_demo_cash", Limit: 100})
 	if err != nil {
 		t.Fatalf("cash: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestListTransactionsFilterByAccountAndCategory(t *testing.T) {
 	}
 
 	// Filter by category — cat_demo_food is used by tx_demo_import_grocery.
-	food, err := db.ListTransactions(ctx, TransactionListQuery{CategoryID: "cat_demo_food", Limit: 100})
+	food, err := db.ListTransactions(ctx, &TransactionListQuery{CategoryID: "cat_demo_food", Limit: 100})
 	if err != nil {
 		t.Fatalf("food: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestListTransactionsFilterByPendingAndNeedsReview(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	pendingTrue := true
-	pending, err := db.ListTransactions(ctx, TransactionListQuery{Pending: &pendingTrue, Limit: 100})
+	pending, err := db.ListTransactions(ctx, &TransactionListQuery{Pending: &pendingTrue, Limit: 100})
 	if err != nil {
 		t.Fatalf("pending: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestListTransactionsFilterByPendingAndNeedsReview(t *testing.T) {
 	}
 
 	reviewTrue := true
-	review, err := db.ListTransactions(ctx, TransactionListQuery{NeedsReview: &reviewTrue, Limit: 100})
+	review, err := db.ListTransactions(ctx, &TransactionListQuery{NeedsReview: &reviewTrue, Limit: 100})
 	if err != nil {
 		t.Fatalf("review: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestListTransactionsFilterByPendingAndNeedsReview(t *testing.T) {
 	}
 
 	pendingFalse := false
-	notPending, err := db.ListTransactions(ctx, TransactionListQuery{Pending: &pendingFalse, Limit: 100})
+	notPending, err := db.ListTransactions(ctx, &TransactionListQuery{Pending: &pendingFalse, Limit: 100})
 	if err != nil {
 		t.Fatalf("not pending: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestListTransactionsFilterByTagAndDateRange(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Tag filter — tag_demo_travel is attached to tx_demo_coffee only.
-	tagged, err := db.ListTransactions(ctx, TransactionListQuery{TagID: "tag_demo_travel", Limit: 100})
+	tagged, err := db.ListTransactions(ctx, &TransactionListQuery{TagID: "tag_demo_travel", Limit: 100})
 	if err != nil {
 		t.Fatalf("tagged: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestListTransactionsFilterByTagAndDateRange(t *testing.T) {
 	}
 
 	// Date range — May only (3 non-removed: coffee 05-10, rent 05-01, cash_adjustment 04-15 excluded).
-	may, err := db.ListTransactions(ctx, TransactionListQuery{DateFrom: "2026-05-01", DateTo: "2026-05-31", Limit: 100})
+	may, err := db.ListTransactions(ctx, &TransactionListQuery{DateFrom: "2026-05-01", DateTo: "2026-05-31", Limit: 100})
 	if err != nil {
 		t.Fatalf("may: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestListTransactionsFilterByTagAndDateRange(t *testing.T) {
 	}
 
 	// Date from only — everything from April 29 onward.
-	fromApril, err := db.ListTransactions(ctx, TransactionListQuery{DateFrom: "2026-04-29", Limit: 100})
+	fromApril, err := db.ListTransactions(ctx, &TransactionListQuery{DateFrom: "2026-04-29", Limit: 100})
 	if err != nil {
 		t.Fatalf("from april: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestListTransactionsFilterByMerchantAndRecurring(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Merchant LIKE filter — partial match on merchant_name or name.
-	coffee, err := db.ListTransactions(ctx, TransactionListQuery{Merchant: "Blue Bottle", Limit: 100})
+	coffee, err := db.ListTransactions(ctx, &TransactionListQuery{Merchant: "Blue Bottle", Limit: 100})
 	if err != nil {
 		t.Fatalf("merchant: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestListTransactionsFilterByMerchantAndRecurring(t *testing.T) {
 	}
 
 	// Case-insensitive partial match on name.
-	rent, err := db.ListTransactions(ctx, TransactionListQuery{Merchant: "rent", Limit: 100})
+	rent, err := db.ListTransactions(ctx, &TransactionListQuery{Merchant: "rent", Limit: 100})
 	if err != nil {
 		t.Fatalf("rent: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestListTransactionsFilterByMerchantAndRecurring(t *testing.T) {
 
 	// Recurring filter — tx_demo_rent has recurring_id set.
 	recurringTrue := true
-	recurring, err := db.ListTransactions(ctx, TransactionListQuery{Recurring: &recurringTrue, Limit: 100})
+	recurring, err := db.ListTransactions(ctx, &TransactionListQuery{Recurring: &recurringTrue, Limit: 100})
 	if err != nil {
 		t.Fatalf("recurring: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestListTransactionsFilterByMerchantAndRecurring(t *testing.T) {
 	}
 
 	recurringFalse := false
-	nonRecurring, err := db.ListTransactions(ctx, TransactionListQuery{Recurring: &recurringFalse, Limit: 100})
+	nonRecurring, err := db.ListTransactions(ctx, &TransactionListQuery{Recurring: &recurringFalse, Limit: 100})
 	if err != nil {
 		t.Fatalf("non-recurring: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestListTransactionsPagination(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Get all 4 non-removed transactions.
-	all, err := db.ListTransactions(ctx, TransactionListQuery{Limit: 100})
+	all, err := db.ListTransactions(ctx, &TransactionListQuery{Limit: 100})
 	if err != nil {
 		t.Fatalf("all: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestListTransactionsPagination(t *testing.T) {
 	}
 
 	// Page 1: limit 2.
-	page1, err := db.ListTransactions(ctx, TransactionListQuery{Limit: 2})
+	page1, err := db.ListTransactions(ctx, &TransactionListQuery{Limit: 2})
 	if err != nil {
 		t.Fatalf("page1: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestListTransactionsPagination(t *testing.T) {
 	}
 
 	// Page 2: limit 2, offset 2.
-	page2, err := db.ListTransactions(ctx, TransactionListQuery{Limit: 2, Offset: 2})
+	page2, err := db.ListTransactions(ctx, &TransactionListQuery{Limit: 2, Offset: 2})
 	if err != nil {
 		t.Fatalf("page2: %v", err)
 	}
@@ -236,7 +236,7 @@ func TestListTransactionsPagination(t *testing.T) {
 	}
 
 	// Page 3: beyond data.
-	page3, err := db.ListTransactions(ctx, TransactionListQuery{Limit: 2, Offset: 4})
+	page3, err := db.ListTransactions(ctx, &TransactionListQuery{Limit: 2, Offset: 4})
 	if err != nil {
 		t.Fatalf("page3: %v", err)
 	}
@@ -255,7 +255,7 @@ func TestListTransactionsCombinedFilters(t *testing.T) {
 
 	// Combine: checking account + pending only → only tx_demo_coffee.
 	pendingTrue := true
-	combined, err := db.ListTransactions(ctx, TransactionListQuery{
+	combined, err := db.ListTransactions(ctx, &TransactionListQuery{
 		AccountID: "acc_demo_checking",
 		Pending:   &pendingTrue,
 		Limit:     100,
@@ -268,7 +268,7 @@ func TestListTransactionsCombinedFilters(t *testing.T) {
 	}
 
 	// Combine: date range + account → checking in May = coffee + rent.
-	mayChecking, err := db.ListTransactions(ctx, TransactionListQuery{
+	mayChecking, err := db.ListTransactions(ctx, &TransactionListQuery{
 		AccountID: "acc_demo_checking",
 		DateFrom:  "2026-05-01",
 		DateTo:    "2026-05-31",
@@ -291,7 +291,7 @@ func TestListTransactionsDefaultLimit(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Limit=0 should default to 50.
-	txDefault, err := db.ListTransactions(ctx, TransactionListQuery{})
+	txDefault, err := db.ListTransactions(ctx, &TransactionListQuery{})
 	if err != nil {
 		t.Fatalf("default: %v", err)
 	}
@@ -309,7 +309,7 @@ func TestListTransactionsHydratesAccountName(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	txs, err := db.ListTransactions(ctx, TransactionListQuery{AccountID: "acc_demo_checking", Limit: 100})
+	txs, err := db.ListTransactions(ctx, &TransactionListQuery{AccountID: "acc_demo_checking", Limit: 100})
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -322,7 +322,7 @@ func TestListTransactionsHydratesAccountName(t *testing.T) {
 	}
 
 	// acc_demo_cash has alias "Wallet" (takes precedence over name).
-	cash, err := db.ListTransactions(ctx, TransactionListQuery{AccountID: "acc_demo_cash", Limit: 100})
+	cash, err := db.ListTransactions(ctx, &TransactionListQuery{AccountID: "acc_demo_cash", Limit: 100})
 	if err != nil {
 		t.Fatalf("cash: %v", err)
 	}
@@ -483,7 +483,7 @@ func TestDemoSeedIsSelfConsistent(t *testing.T) {
 		accountIDs[a.ID] = true
 	}
 
-	txs, err := db.ListTransactions(ctx, TransactionListQuery{RemovedMode: RemovedInclude, Limit: 100})
+	txs, err := db.ListTransactions(ctx, &TransactionListQuery{RemovedMode: RemovedInclude, Limit: 100})
 	if err != nil {
 		t.Fatalf("list all txs: %v", err)
 	}
@@ -558,7 +558,7 @@ func TestListTransactionsExcludesRemovedByDefault(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	txs, err := db.ListTransactions(ctx, TransactionListQuery{Limit: 100})
+	txs, err := db.ListTransactions(ctx, &TransactionListQuery{Limit: 100})
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}

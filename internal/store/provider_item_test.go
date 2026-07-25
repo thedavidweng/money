@@ -16,7 +16,7 @@ func TestSQLiteStoreProviderItemUpdateNameAndRemoveCascade(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Store a linked item with transactions.
-	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_cascade", Name: "Cascade Bank", Provider: "plaid", ProviderInstitutionID: "ins_cascade"},
 		Item: LinkedItem{
 			ID: "pi_cascade", Provider: "plaid", InstitutionID: "inst_cascade",
@@ -26,20 +26,20 @@ func TestSQLiteStoreProviderItemUpdateNameAndRemoveCascade(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("store linked item: %v", err)
 	}
-	if err := db.UpsertAccount(ctx, core.FinancialAccount{
+	if err := db.UpsertAccount(ctx, &core.FinancialAccount{
 		ProviderItemID: "pi_cascade", ProviderAccountID: "acc_cascade",
 		Name: "Checking", Type: "depository", Currency: "USD",
 	}); err != nil {
 		t.Fatalf("upsert account: %v", err)
 	}
-	if err := db.UpsertTransaction(ctx, core.ProviderTransaction{
+	if err := db.UpsertTransaction(ctx, &core.ProviderTransaction{
 		ProviderItemID: "pi_cascade", ProviderTransactionID: "tx_cascade1",
 		ProviderAccountID: "acc_cascade", Date: "2026-05-01",
 		AmountMinorUnits: -1000, Name: "Coffee", MerchantName: "Coffee", Currency: "USD",
 	}); err != nil {
 		t.Fatalf("upsert transaction 1: %v", err)
 	}
-	if err := db.UpsertTransaction(ctx, core.ProviderTransaction{
+	if err := db.UpsertTransaction(ctx, &core.ProviderTransaction{
 		ProviderItemID: "pi_cascade", ProviderTransactionID: "tx_cascade2",
 		ProviderAccountID: "acc_cascade", Date: "2026-05-02",
 		AmountMinorUnits: -2000, Name: "Lunch", MerchantName: "Lunch", Currency: "USD",
@@ -60,7 +60,7 @@ func TestSQLiteStoreProviderItemUpdateNameAndRemoveCascade(t *testing.T) {
 	}
 
 	// Verify transactions exist before removal.
-	txs, err := db.ListTransactions(ctx, TransactionListQuery{AccountID: "", Limit: 100})
+	txs, err := db.ListTransactions(ctx, &TransactionListQuery{AccountID: "", Limit: 100})
 	if err != nil {
 		t.Fatalf("list transactions: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestSQLiteStoreListProviderItemsFilterByProvider(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Demo already has plaid items. Add a bridge item.
-	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_bridge", Name: "Bridge Bank", Provider: "bridge", ProviderInstitutionID: "ins_bridge"},
 		Item: LinkedItem{
 			ID: "pi_bridge", Provider: "bridge", InstitutionID: "inst_bridge",

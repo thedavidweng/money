@@ -49,8 +49,8 @@ func NewPlaidClient(cfg PlaidClientConfig) (PlaidClient, error) {
 	}, nil
 }
 
-func (c PlaidClient) CreateLinkToken(ctx context.Context, request plaid.LinkTokenCreateRequest) (string, error) {
-	response, httpResponse, err := c.APIClient.PlaidApi.LinkTokenCreate(ctx).LinkTokenCreateRequest(request).Execute()
+func (c PlaidClient) CreateLinkToken(ctx context.Context, request *plaid.LinkTokenCreateRequest) (string, error) {
+	response, httpResponse, err := c.APIClient.PlaidApi.LinkTokenCreate(ctx).LinkTokenCreateRequest(*request).Execute()
 	if err != nil {
 		if httpResponse != nil {
 			return "", ProviderAPIError{
@@ -102,8 +102,8 @@ func (c PlaidClient) ExchangePublicToken(ctx context.Context, publicToken string
 	}, nil
 }
 
-func (c PlaidClient) SearchInstitutions(ctx context.Context, request plaid.InstitutionsSearchRequest) ([]plaid.Institution, error) {
-	response, httpResponse, err := c.APIClient.PlaidApi.InstitutionsSearch(ctx).InstitutionsSearchRequest(request).Execute()
+func (c PlaidClient) SearchInstitutions(ctx context.Context, request *plaid.InstitutionsSearchRequest) ([]plaid.Institution, error) {
+	response, httpResponse, err := c.APIClient.PlaidApi.InstitutionsSearch(ctx).InstitutionsSearchRequest(*request).Execute()
 	if err != nil {
 		if httpResponse != nil {
 			return nil, ProviderAPIError{
@@ -135,7 +135,7 @@ func (c PlaidClient) GetAccounts(ctx context.Context, accessToken string) ([]pla
 	return response.GetAccounts(), nil
 }
 
-func (c PlaidClient) SyncTransactions(ctx context.Context, accessToken string, cursor string) (plaid.TransactionsSyncResponse, error) {
+func (c PlaidClient) SyncTransactions(ctx context.Context, accessToken, cursor string) (plaid.TransactionsSyncResponse, error) {
 	request := plaid.NewTransactionsSyncRequest(accessToken)
 	if cursor != "" {
 		request.SetCursor(cursor)
@@ -155,7 +155,7 @@ func (c PlaidClient) SyncTransactions(ctx context.Context, accessToken string, c
 	return response, nil
 }
 
-func (c PlaidClient) GetTransactions(ctx context.Context, accessToken string, startDate string, endDate string) ([]plaid.Transaction, error) {
+func (c PlaidClient) GetTransactions(ctx context.Context, accessToken, startDate, endDate string) ([]plaid.Transaction, error) {
 	request := plaid.NewTransactionsGetRequest(accessToken, startDate, endDate)
 	var all []plaid.Transaction
 	offset := int32(0)
@@ -252,7 +252,7 @@ func NewBridgeClient(cfg BridgeClientConfig) (BridgeClient, error) {
 	}, nil
 }
 
-func (c BridgeClient) NewRequest(ctx context.Context, method string, path string, accessToken string, body []byte) (*http.Request, error) {
+func (c BridgeClient) NewRequest(ctx context.Context, method, path, accessToken string, body []byte) (*http.Request, error) {
 	baseURL, err := url.Parse(strings.TrimRight(c.BaseURL, "/") + "/")
 	if err != nil {
 		return nil, err
@@ -320,7 +320,7 @@ func (c BridgeClient) CreateBridgeAuthToken(ctx context.Context, externalUserID 
 	}, nil
 }
 
-func (c BridgeClient) CreateBridgeConnectSession(ctx context.Context, accessToken string, request BridgeConnectSessionRequest) (BridgeConnectSession, error) {
+func (c BridgeClient) CreateBridgeConnectSession(ctx context.Context, accessToken string, request *BridgeConnectSessionRequest) (BridgeConnectSession, error) {
 	body, err := json.Marshal(request)
 	if err != nil {
 		return BridgeConnectSession{}, err
@@ -369,7 +369,7 @@ func (c BridgeClient) ListBridgeItems(ctx context.Context, accessToken string) (
 	return items, nil
 }
 
-func (c BridgeClient) ListBridgeAccounts(ctx context.Context, accessToken string, itemID string) ([]BridgeAccount, error) {
+func (c BridgeClient) ListBridgeAccounts(ctx context.Context, accessToken, itemID string) ([]BridgeAccount, error) {
 	path := "/aggregation/accounts?limit=500"
 	if itemID != "" {
 		path += "&item_id=" + url.QueryEscape(itemID)
@@ -396,7 +396,8 @@ func (c BridgeClient) ListBridgeAccounts(ctx context.Context, accessToken string
 		return nil, err
 	}
 	accounts := make([]BridgeAccount, 0, len(response.Resources))
-	for _, resource := range response.Resources {
+	for i := range response.Resources {
+		resource := &response.Resources[i]
 		accounts = append(accounts, BridgeAccount{
 			ID:           bridgeStringID(resource.ID),
 			ItemID:       bridgeStringID(resource.ItemID),
@@ -413,7 +414,7 @@ func (c BridgeClient) ListBridgeAccounts(ctx context.Context, accessToken string
 	return accounts, nil
 }
 
-func (c BridgeClient) ListBridgeTransactions(ctx context.Context, accessToken string, since string) ([]BridgeSyncTransaction, error) {
+func (c BridgeClient) ListBridgeTransactions(ctx context.Context, accessToken, since string) ([]BridgeSyncTransaction, error) {
 	path := "/aggregation/transactions?limit=500"
 	if since != "" {
 		path += "&since=" + url.QueryEscape(since)
@@ -440,7 +441,8 @@ func (c BridgeClient) ListBridgeTransactions(ctx context.Context, accessToken st
 		return nil, err
 	}
 	transactions := make([]BridgeSyncTransaction, 0, len(response.Resources))
-	for _, resource := range response.Resources {
+	for i := range response.Resources {
+		resource := &response.Resources[i]
 		description := resource.CleanDescription
 		if description == "" {
 			description = resource.ProviderDescription

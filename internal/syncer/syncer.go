@@ -64,8 +64,8 @@ func Sync(ctx context.Context, target store.Store, registry Registry, options Op
 
 	result := Result{Items: []ItemResult{}, Warnings: []Warning{}}
 	var failed bool
-	for _, linked := range linkedItems {
-		itemResult := syncOne(ctx, target, registry, linked, options.StartDate, options.EndDate)
+	for i := range linkedItems {
+		itemResult := syncOne(ctx, target, registry, &linkedItems[i], options.StartDate, options.EndDate)
 		if itemResult.Status == "error" {
 			failed = true
 		}
@@ -77,7 +77,7 @@ func Sync(ctx context.Context, target store.Store, registry Registry, options Op
 	return result, nil
 }
 
-func syncOne(ctx context.Context, target store.Store, registry Registry, linked store.LinkedItem, startDate string, endDate string) ItemResult {
+func syncOne(ctx context.Context, target store.Store, registry Registry, linked *store.LinkedItem, startDate, endDate string) ItemResult {
 	started := time.Now().UTC().Format(time.RFC3339)
 	itemResult := ItemResult{Provider: linked.Provider, ProviderItemID: linked.ID, Status: "ok"}
 	provider, ok := registry.Get(linked.Provider)
@@ -85,10 +85,10 @@ func syncOne(ctx context.Context, target store.Store, registry Registry, linked 
 		itemResult.Status = "error"
 		itemResult.ErrorCode = "PROVIDER_NOT_REGISTERED"
 		itemResult.ErrorMessage = fmt.Sprintf("provider %q is not registered", linked.Provider)
-		recordSyncRun(ctx, target, itemResult, started)
+		recordSyncRun(ctx, target, &itemResult, started)
 		return itemResult
 	}
-	syncResult, err := provider.Sync(ctx, providers.ProviderItem{
+	syncResult, err := provider.Sync(ctx, &providers.ProviderItem{
 		ID:                     linked.ID,
 		Provider:               linked.Provider,
 		InstitutionID:          linked.InstitutionID,
@@ -104,7 +104,7 @@ func syncOne(ctx context.Context, target store.Store, registry Registry, linked 
 		itemResult.Status = "error"
 		itemResult.ErrorCode = classified.Code
 		itemResult.ErrorMessage = classified.Message
-		recordSyncRun(ctx, target, itemResult, started)
+		recordSyncRun(ctx, target, &itemResult, started)
 		return itemResult
 	}
 	itemResult.AccountsSeen = syncResult.AccountsSeen
@@ -117,7 +117,7 @@ func syncOne(ctx context.Context, target store.Store, registry Registry, linked 
 	// If a date range is specified and the provider supports TransactionQuerier, backfill transactions for that range.
 	if startDate != "" && endDate != "" {
 		if querier, ok := provider.(providers.TransactionQuerier); ok {
-			backfillTxs, err := querier.QueryTransactions(ctx, providers.ProviderItem{
+			backfillTxs, err := querier.QueryTransactions(ctx, &providers.ProviderItem{
 				ID:                     linked.ID,
 				Provider:               linked.Provider,
 				InstitutionID:          linked.InstitutionID,
@@ -133,15 +133,15 @@ func syncOne(ctx context.Context, target store.Store, registry Registry, linked 
 				itemResult.Status = "error"
 				itemResult.ErrorCode = classified.Code
 				itemResult.ErrorMessage = "date-range backfill failed: " + classified.Message
-				recordSyncRun(ctx, target, itemResult, started)
+				recordSyncRun(ctx, target, &itemResult, started)
 				return itemResult
 			}
-			for _, tx := range backfillTxs {
-				if err := target.UpsertTransaction(ctx, tx); err != nil {
+			for i := range backfillTxs {
+				if err := target.UpsertTransaction(ctx, &backfillTxs[i]); err != nil {
 					itemResult.Status = "error"
 					itemResult.ErrorCode = "BACKFILL_TRANSACTION_UPSERT_FAILED"
 					itemResult.ErrorMessage = err.Error()
-					recordSyncRun(ctx, target, itemResult, started)
+					recordSyncRun(ctx, target, &itemResult, started)
 					return itemResult
 				}
 				itemResult.TransactionsAdded++
@@ -167,33 +167,37 @@ func syncOne(ctx context.Context, target store.Store, registry Registry, linked 
 			itemResult.Status = "error"
 			itemResult.ErrorCode = classified.Code
 			itemResult.ErrorMessage = "holdings sync failed: " + classified.Message
-			recordSyncRun(ctx, target, itemResult, started)
+			recordSyncRun(ctx, target, &itemResult, started)
 			return itemResult
 		}
 		if err := target.ClearHoldings(ctx, linked.ID); err != nil {
 			itemResult.Status = "error"
 			itemResult.ErrorCode = "CLEAR_HOLDINGS_FAILED"
 			itemResult.ErrorMessage = err.Error()
-			recordSyncRun(ctx, target, itemResult, started)
+			recordSyncRun(ctx, target, &itemResult, started)
 			return itemResult
 		}
-		for _, sec := range holdings.Securities {
-			if err := target.UpsertSecurity(ctx, sec); err != nil {
-				itemResult.Status = "error"
-				itemResult.ErrorCode = "SECURITY_UPSERT_FAILED"
-				itemResult.ErrorMessage = err.Error()
-				recordSyncRun(ctx, target, itemResult, started)
-				return itemResult
+		for i := range holdings.Securities {
+			err := target.UpsertSecurity(ctx, &holdings.Securities[i])
+			if err == nil {
+				continue
 			}
+			itemResult.Status = "error"
+			itemResult.ErrorCode = "SECURITY_UPSERT_FAILED"
+			itemResult.ErrorMessage = err.Error()
+			recordSyncRun(ctx, target, &itemResult, started)
+			return itemResult
 		}
-		for _, h := range holdings.Holdings {
-			if err := target.UpsertHolding(ctx, linked.ID, h); err != nil {
-				itemResult.Status = "error"
-				itemResult.ErrorCode = "HOLDING_UPSERT_FAILED"
-				itemResult.ErrorMessage = err.Error()
-				recordSyncRun(ctx, target, itemResult, started)
-				return itemResult
+		for i := range holdings.Holdings {
+			err := target.UpsertHolding(ctx, linked.ID, &holdings.Holdings[i])
+			if err == nil {
+				continue
 			}
+			itemResult.Status = "error"
+			itemResult.ErrorCode = "HOLDING_UPSERT_FAILED"
+			itemResult.ErrorMessage = err.Error()
+			recordSyncRun(ctx, target, &itemResult, started)
+			return itemResult
 		}
 	}
 
@@ -215,29 +219,31 @@ func syncOne(ctx context.Context, target store.Store, registry Registry, linked 
 			itemResult.Status = "error"
 			itemResult.ErrorCode = classified.Code
 			itemResult.ErrorMessage = "liabilities sync failed: " + classified.Message
-			recordSyncRun(ctx, target, itemResult, started)
+			recordSyncRun(ctx, target, &itemResult, started)
 			return itemResult
 		}
 		if err := target.ClearLiabilities(ctx, linked.ID); err != nil {
 			itemResult.Status = "error"
 			itemResult.ErrorCode = "CLEAR_LIABILITIES_FAILED"
 			itemResult.ErrorMessage = err.Error()
-			recordSyncRun(ctx, target, itemResult, started)
+			recordSyncRun(ctx, target, &itemResult, started)
 			return itemResult
 		}
-		for _, l := range liabilities.Liabilities {
-			if err := target.UpsertLiability(ctx, linked.ID, l); err != nil {
-				itemResult.Status = "error"
-				itemResult.ErrorCode = "LIABILITY_UPSERT_FAILED"
-				itemResult.ErrorMessage = err.Error()
-				recordSyncRun(ctx, target, itemResult, started)
-				return itemResult
+		for i := range liabilities.Liabilities {
+			err := target.UpsertLiability(ctx, linked.ID, &liabilities.Liabilities[i])
+			if err == nil {
+				continue
 			}
+			itemResult.Status = "error"
+			itemResult.ErrorCode = "LIABILITY_UPSERT_FAILED"
+			itemResult.ErrorMessage = err.Error()
+			recordSyncRun(ctx, target, &itemResult, started)
+			return itemResult
 		}
 	}
 
 	if syncResult.NextTransactionCursor != "" {
-		if err := target.UpsertProviderItem(ctx, providers.ProviderItem{
+		if err := target.UpsertProviderItem(ctx, &providers.ProviderItem{
 			ID:                     linked.ID,
 			Provider:               linked.Provider,
 			InstitutionID:          linked.InstitutionID,
@@ -251,11 +257,11 @@ func syncOne(ctx context.Context, target store.Store, registry Registry, linked 
 			itemResult.Status = "error"
 			itemResult.ErrorCode = "CURSOR_UPDATE_FAILED"
 			itemResult.ErrorMessage = err.Error()
-			recordSyncRun(ctx, target, itemResult, started)
+			recordSyncRun(ctx, target, &itemResult, started)
 			return itemResult
 		}
 	}
-	recordSyncRun(ctx, target, itemResult, started)
+	recordSyncRun(ctx, target, &itemResult, started)
 	return itemResult
 }
 
@@ -268,8 +274,8 @@ func hasProduct(products []string, target string) bool {
 	return false
 }
 
-func recordSyncRun(ctx context.Context, target store.Store, itemResult ItemResult, started string) {
-	if err := target.RecordSyncRun(ctx, providers.SyncRun{
+func recordSyncRun(ctx context.Context, target store.Store, itemResult *ItemResult, started string) {
+	if err := target.RecordSyncRun(ctx, &providers.SyncRun{
 		Provider:             itemResult.Provider,
 		ProviderItemID:       itemResult.ProviderItemID,
 		StartedAt:            started,

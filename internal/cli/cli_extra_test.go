@@ -32,14 +32,13 @@ func TestDemoInvestmentsHoldingsJSON(t *testing.T) {
 			Command string `json:"command"`
 			Demo    bool   `json:"demo"`
 		} `json:"meta"`
-		Warnings []any `json:"warnings"`
-		Errors   []any `json:"errors"`
+		Error any `json:"error"`
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &envelope); err != nil {
 		t.Fatalf("stdout is not JSON envelope: %v\n%s", err, stdout.String())
 	}
 	if !envelope.OK {
-		t.Fatalf("ok = false, errors = %#v", envelope.Errors)
+		t.Fatalf("ok = false, error = %#v", envelope.Error)
 	}
 	if envelope.Meta.Command != "investments.holdings" {
 		t.Fatalf("command = %q, want investments.holdings", envelope.Meta.Command)

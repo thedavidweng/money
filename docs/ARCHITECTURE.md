@@ -212,23 +212,18 @@ After setup finishes writing configuration, it should create or open the encrypt
 ```yaml
 database:
   path: ~/.money/data/money.db
-  encryption_key:
-    env: MONEY_DB_ENCRYPTION_KEY
+  encryption_key: "env:MONEY_DB_ENCRYPTION_KEY"
 
 providers:
   plaid:
-    client_id:
-      env: PLAID_CLIENT_ID
-    secret:
-      env: PLAID_SECRET
+    client_id: "env:PLAID_CLIENT_ID"
+    secret: "env:PLAID_SECRET"
     environment: sandbox
     products: [transactions]
     country_codes: [US]
   bridge:
-    client_id:
-      env: BRIDGE_CLIENT_ID
-    client_secret:
-      env: BRIDGE_CLIENT_SECRET
+    client_id: "env:BRIDGE_CLIENT_ID"
+    client_secret: "env:BRIDGE_CLIENT_SECRET"
 ```
 
 ## Implementation Tooling

@@ -1,7 +1,9 @@
 # JSON Envelope Schema
 
 All commands emit a standard JSON envelope when invoked with `--json`.
-The current schema version is `0.1`.
+The current schema version is `2026-07-25`.
+
+Output is compact by default; pass the global `--pretty` flag for indented JSON.
 
 ## Success Envelope
 
@@ -11,16 +13,16 @@ The current schema version is `0.1`.
   "data": { ... },
   "meta": {
     "command": "transactions.list",
-    "schema_version": "0.1",
-    "generated_at": "2026-05-10T00:00:00Z",
+    "profile": "default",
+    "duration_ms": 12,
+    "schema_version": "2026-07-25",
+    "request_id": "3f8a1c2e-9b4d-4e6a-8f21-0c5d7e2a1b9c",
     "pagination": {
       "limit": 50,
       "offset": 0,
       "has_more": false
     }
-  },
-  "warnings": [],
-  "errors": []
+  }
 }
 ```
 
@@ -28,14 +30,16 @@ The current schema version is `0.1`.
 
 - `ok` — always `true` on success.
 - `data` — command-specific payload. Collections are object-wrapped: `data.accounts`, `data.transactions`, `data.categories`, `data.tags`, `data.recurring`.
+- `error` — omitted on success (see below).
 - `meta` — request metadata (always present).
 - `meta.command` — dot-separated command name.
-- `meta.schema_version` — semver string.
-- `meta.generated_at` — ISO 8601 timestamp.
-- `meta.demo` — `true` when running in demo mode.
+- `meta.profile` — active configuration profile (`default` unless overridden).
+- `meta.duration_ms` — wall-clock time spent handling the invocation, in milliseconds.
+- `meta.schema_version` — envelope schema version as a date string.
+- `meta.request_id` — UUID v4 generated once per invocation.
+- `meta.demo` — `true` when running in demo mode (omitted otherwise).
 - `meta.pagination` — present on list commands (`limit`, `offset`, `has_more`, `total` when available).
-- `warnings` — array of structured warning objects with `code`, `message`, `category`.
-- `errors` — empty array on success.
+- `meta.warnings` — array of structured warning objects (`code`, `message`, `category`); omitted when empty.
 
 ## Error Envelope
 
@@ -43,28 +47,27 @@ The current schema version is `0.1`.
 {
   "ok": false,
   "data": { ... },  // omitted when empty (omitempty)
+  "error": {
+    "code": "SYNC_PARTIAL_FAILURE",
+    "message": "One or more provider items failed to sync",
+    "category": "api",
+    "retryable": true
+  },
   "meta": {
     "command": "sync",
-    "schema_version": "0.1",
-    "generated_at": "2026-05-10T00:00:00Z"
-  },
-  "warnings": [],
-  "errors": [
-    {
-      "code": "SYNC_PARTIAL_FAILURE",
-      "message": "One or more provider items failed to sync",
-      "category": "api",
-      "retryable": true
-    }
-  ]
+    "profile": "default",
+    "duration_ms": 240,
+    "schema_version": "2026-07-25",
+    "request_id": "b1e6c7d4-2a3f-4c8b-9d10-6f2e5a7c3d81"
+  }
 }
 ```
 
 ### Error Fields
 
 - `ok` — always `false` on error.
-- `errors` — array of error objects (supports multi-error envelopes for partial failures).
-- Each error: `code`, `message`, `category`, `retryable`.
+- `error` — a single structured error object. When several errors are aggregated (e.g. multi-item partial failures), the primary error is the object and the remaining errors are carried in `error.details`.
+- Each error: `code`, `message`, `category`, `retryable`, and optional `details` (an array of the same shape).
 
 ## Error Taxonomy
 
@@ -113,6 +116,9 @@ Provider errors are classified as:
 
 ## Schema Versioning
 
-- **Major** — breaking contract changes.
-- **Minor** — additive compatible fields.
-- **Patch** — implementation-only changes (no schema change).
+`schema_version` is a date string. It bumps to the date of the change on any
+breaking change to the envelope shape; additive, backward-compatible fields do
+not bump it. The `2026-07-25` version unified the envelope with the CLI fleet:
+a single `error` object replaced the previous `errors[]` array, warnings moved
+under `meta.warnings`, `meta` gained `profile`, `duration_ms`, and `request_id`,
+and the redundant `meta.generated_at` was dropped.

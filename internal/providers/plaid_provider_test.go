@@ -28,7 +28,7 @@ func TestPlaidProviderCreateLinkSessionCreatesPlaidLinkToken(t *testing.T) {
 		client: client,
 	}
 
-	session, err := provider.CreateLinkSession(context.Background(), LinkRequest{
+	session, err := provider.CreateLinkSession(context.Background(), &LinkRequest{
 		Institution: Institution{ProviderInstitutionID: "ins_123"},
 		RedirectURI: "http://127.0.0.1:4000/callback",
 		State:       "state-123",
@@ -119,7 +119,7 @@ func TestPlaidProviderCreateLinkSessionRequiresExplicitProducts(t *testing.T) {
 		client: &fakePlaidLinkTokenClient{},
 	}
 
-	_, err := provider.CreateLinkSession(context.Background(), LinkRequest{State: "state-123"})
+	_, err := provider.CreateLinkSession(context.Background(), &LinkRequest{State: "state-123"})
 	if err == nil {
 		t.Fatal("expected explicit products error")
 	}
@@ -141,10 +141,10 @@ func TestPlaidProviderExchangeLinkTokenExchangesPublicTokenAndMapsLinkedItem(t *
 		client: client,
 	}
 
-	linked, err := provider.ExchangeLinkToken(context.Background(), LinkSession{
+	linked, err := provider.ExchangeLinkToken(context.Background(), &LinkSession{
 		Provider: "plaid",
 		State:    "state-123",
-	}, LinkCallback{
+	}, &LinkCallback{
 		PublicToken: "public-token",
 		State:       "state-123",
 		Metadata: LinkMetadata{
@@ -219,7 +219,7 @@ func TestPlaidProviderExchangeLinkTokenRejectsStateMismatch(t *testing.T) {
 		client: &fakePlaidLinkTokenClient{},
 	}
 
-	_, err := provider.ExchangeLinkToken(context.Background(), LinkSession{State: "state-123"}, LinkCallback{
+	_, err := provider.ExchangeLinkToken(context.Background(), &LinkSession{State: "state-123"}, &LinkCallback{
 		PublicToken: "public-token",
 		State:       "wrong",
 		Metadata:    LinkMetadata{Institution: LinkInstitutionMetadata{ID: "ins_123", Name: "Bank"}},
@@ -278,7 +278,7 @@ func TestPlaidProviderSyncAccountsThenTransactionsWithCursor(t *testing.T) {
 	}
 	sink := &recordingSyncSink{}
 
-	result, err := provider.Sync(context.Background(), ProviderItem{
+	result, err := provider.Sync(context.Background(), &ProviderItem{
 		ID:                   "pi_1",
 		EncryptedAccessToken: []byte("access-token"),
 		TransactionCursor:    "cursor-old",
@@ -323,8 +323,8 @@ type fakePlaidLinkTokenClient struct {
 	sandboxPublicToken   string
 }
 
-func (c *fakePlaidLinkTokenClient) CreateLinkToken(ctx context.Context, request plaid.LinkTokenCreateRequest) (string, error) {
-	c.request = request
+func (c *fakePlaidLinkTokenClient) CreateLinkToken(ctx context.Context, request *plaid.LinkTokenCreateRequest) (string, error) {
+	c.request = *request
 	return c.linkToken, nil
 }
 
@@ -339,8 +339,8 @@ func (c *fakePlaidLinkTokenClient) ExchangePublicToken(ctx context.Context, publ
 	return c.exchangeResult, nil
 }
 
-func (c *fakePlaidLinkTokenClient) SearchInstitutions(ctx context.Context, request plaid.InstitutionsSearchRequest) ([]plaid.Institution, error) {
-	c.searchRequest = request
+func (c *fakePlaidLinkTokenClient) SearchInstitutions(ctx context.Context, request *plaid.InstitutionsSearchRequest) ([]plaid.Institution, error) {
+	c.searchRequest = *request
 	return c.institutions, nil
 }
 
@@ -349,7 +349,7 @@ func (c *fakePlaidLinkTokenClient) GetAccounts(ctx context.Context, accessToken 
 	return c.accounts, nil
 }
 
-func (c *fakePlaidLinkTokenClient) SyncTransactions(ctx context.Context, accessToken string, cursor string) (plaid.TransactionsSyncResponse, error) {
+func (c *fakePlaidLinkTokenClient) SyncTransactions(ctx context.Context, accessToken, cursor string) (plaid.TransactionsSyncResponse, error) {
 	c.transactionRequests = append(c.transactionRequests, plaidTransactionRequest{accessToken: accessToken, cursor: cursor})
 	index := len(c.transactionRequests) - 1
 	if index >= len(c.transactionPages) {
@@ -358,7 +358,7 @@ func (c *fakePlaidLinkTokenClient) SyncTransactions(ctx context.Context, accessT
 	return c.transactionPages[index], nil
 }
 
-func (c *fakePlaidLinkTokenClient) GetTransactions(ctx context.Context, accessToken string, startDate string, endDate string) ([]plaid.Transaction, error) {
+func (c *fakePlaidLinkTokenClient) GetTransactions(ctx context.Context, accessToken, startDate, endDate string) ([]plaid.Transaction, error) {
 	return nil, nil
 }
 
@@ -384,37 +384,37 @@ type recordingSyncSink struct {
 func (s *recordingSyncSink) UpsertInstitution(ctx context.Context, institution Institution) error {
 	return nil
 }
-func (s *recordingSyncSink) UpsertProviderItem(ctx context.Context, item ProviderItem) error {
+func (s *recordingSyncSink) UpsertProviderItem(ctx context.Context, item *ProviderItem) error {
 	return nil
 }
-func (s *recordingSyncSink) UpsertAccount(ctx context.Context, account FinancialAccount) error {
+func (s *recordingSyncSink) UpsertAccount(ctx context.Context, account *FinancialAccount) error {
 	s.calls = append(s.calls, "account:"+account.ProviderAccountID)
-	s.accounts = append(s.accounts, account)
+	s.accounts = append(s.accounts, *account)
 	return nil
 }
-func (s *recordingSyncSink) UpsertTransaction(ctx context.Context, transaction Transaction) error {
+func (s *recordingSyncSink) UpsertTransaction(ctx context.Context, transaction *Transaction) error {
 	s.calls = append(s.calls, "transaction:"+transaction.ProviderTransactionID)
-	s.transactions = append(s.transactions, transaction)
+	s.transactions = append(s.transactions, *transaction)
 	return nil
 }
-func (s *recordingSyncSink) UpsertRecurring(ctx context.Context, recurring Recurring) error {
+func (s *recordingSyncSink) UpsertRecurring(ctx context.Context, recurring *Recurring) error {
 	return nil
 }
-func (s *recordingSyncSink) MarkTransactionRemoved(ctx context.Context, providerItemID string, providerTransactionID string) error {
+func (s *recordingSyncSink) MarkTransactionRemoved(ctx context.Context, providerItemID, providerTransactionID string) error {
 	s.calls = append(s.calls, "removed:"+providerTransactionID)
 	return nil
 }
-func (s *recordingSyncSink) RecordSyncRun(ctx context.Context, run SyncRun) error { return nil }
-func (s *recordingSyncSink) UpsertSecurity(ctx context.Context, security InvestmentSecurity) error {
+func (s *recordingSyncSink) RecordSyncRun(ctx context.Context, run *SyncRun) error { return nil }
+func (s *recordingSyncSink) UpsertSecurity(ctx context.Context, security *InvestmentSecurity) error {
 	return nil
 }
-func (s *recordingSyncSink) UpsertHolding(ctx context.Context, providerItemID string, holding InvestmentHolding) error {
+func (s *recordingSyncSink) UpsertHolding(ctx context.Context, providerItemID string, holding *InvestmentHolding) error {
 	return nil
 }
 func (s *recordingSyncSink) ClearHoldings(ctx context.Context, providerItemID string) error {
 	return nil
 }
-func (s *recordingSyncSink) UpsertLiability(ctx context.Context, providerItemID string, liability Liability) error {
+func (s *recordingSyncSink) UpsertLiability(ctx context.Context, providerItemID string, liability *Liability) error {
 	return nil
 }
 func (s *recordingSyncSink) ClearLiabilities(ctx context.Context, providerItemID string) error {

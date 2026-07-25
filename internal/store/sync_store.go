@@ -9,7 +9,7 @@ import (
 	"github.com/thedavidweng/money/internal/core"
 )
 
-func (s *SQLiteStore) UpsertAccount(ctx context.Context, account core.FinancialAccount) error {
+func (s *SQLiteStore) UpsertAccount(ctx context.Context, account *core.FinancialAccount) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	id, err := s.localAccountIDForProviderAccount(ctx, account.ProviderItemID, account.ProviderAccountID)
 	if err != nil {
@@ -44,7 +44,7 @@ type sqlExecer interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
-func (s *SQLiteStore) UpsertTransaction(ctx context.Context, transaction core.ProviderTransaction) error {
+func (s *SQLiteStore) UpsertTransaction(ctx context.Context, transaction *core.ProviderTransaction) error {
 	return upsertTransactionExec(ctx, s.db, transaction)
 }
 
@@ -58,8 +58,8 @@ func (s *SQLiteStore) UpsertTransactions(ctx context.Context, transactions []cor
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	for _, txn := range transactions {
-		if err := upsertTransactionExec(ctx, tx, txn); err != nil {
+	for i := range transactions {
+		if err := upsertTransactionExec(ctx, tx, &transactions[i]); err != nil {
 			return err
 		}
 	}
@@ -67,7 +67,7 @@ func (s *SQLiteStore) UpsertTransactions(ctx context.Context, transactions []cor
 }
 
 // upsertTransactionExec contains the core upsert logic shared by UpsertTransaction and UpsertTransactions.
-func upsertTransactionExec(ctx context.Context, exec sqlExecer, transaction core.ProviderTransaction) error {
+func upsertTransactionExec(ctx context.Context, exec sqlExecer, transaction *core.ProviderTransaction) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	id, err := localTransactionIDForProviderTransaction(ctx, exec, transaction.ProviderItemID, transaction.ProviderTransactionID)
 	if err != nil {
@@ -113,7 +113,7 @@ ON CONFLICT(provider_item_id, provider_transaction_id) DO UPDATE SET
 	return err
 }
 
-func (s *SQLiteStore) UpsertRecurring(ctx context.Context, recurring core.ProviderRecurring) error {
+func (s *SQLiteStore) UpsertRecurring(ctx context.Context, recurring *core.ProviderRecurring) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	id, err := s.localRecurringIDForProviderRecurring(ctx, recurring.ProviderItemID, recurring.ProviderRecurringID)
 	if err != nil {
@@ -145,7 +145,7 @@ ON CONFLICT(provider_item_id, provider_recurring_id) DO UPDATE SET
 	return err
 }
 
-func (s *SQLiteStore) MarkTransactionRemoved(ctx context.Context, providerItemID string, providerTransactionID string) error {
+func (s *SQLiteStore) MarkTransactionRemoved(ctx context.Context, providerItemID, providerTransactionID string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.ExecContext(ctx, `
 UPDATE transactions
@@ -155,7 +155,7 @@ WHERE provider_item_id = ? AND provider_transaction_id = ?`,
 	return err
 }
 
-func (s *SQLiteStore) RecordSyncRun(ctx context.Context, run core.SyncRun) error {
+func (s *SQLiteStore) RecordSyncRun(ctx context.Context, run *core.SyncRun) error {
 	id, err := core.NewLocalID("sync_")
 	if err != nil {
 		return err
@@ -227,7 +227,7 @@ ORDER BY sr.provider_item_id`)
 	return runs, rows.Err()
 }
 
-func (s *SQLiteStore) localAccountIDForProviderAccount(ctx context.Context, providerItemID string, providerAccountID string) (string, error) {
+func (s *SQLiteStore) localAccountIDForProviderAccount(ctx context.Context, providerItemID, providerAccountID string) (string, error) {
 	id, err := s.queryAccountIDForProviderAccount(ctx, providerItemID, providerAccountID)
 	if err == nil {
 		return id, nil
@@ -238,11 +238,11 @@ func (s *SQLiteStore) localAccountIDForProviderAccount(ctx context.Context, prov
 	return core.NewLocalID("acc_")
 }
 
-func (s *SQLiteStore) existingAccountIDForProviderAccount(ctx context.Context, providerItemID string, providerAccountID string) (string, error) {
+func (s *SQLiteStore) existingAccountIDForProviderAccount(ctx context.Context, providerItemID, providerAccountID string) (string, error) {
 	return existingAccountIDForProviderAccount(ctx, s.db, providerItemID, providerAccountID)
 }
 
-func existingAccountIDForProviderAccount(ctx context.Context, exec sqlExecer, providerItemID string, providerAccountID string) (string, error) {
+func existingAccountIDForProviderAccount(ctx context.Context, exec sqlExecer, providerItemID, providerAccountID string) (string, error) {
 	id, err := queryAccountIDForProviderAccount(ctx, exec, providerItemID, providerAccountID)
 	if err == sql.ErrNoRows {
 		return "", fmt.Errorf("provider account %q for provider item %q must be synced before dependent records", providerAccountID, providerItemID)
@@ -250,11 +250,11 @@ func existingAccountIDForProviderAccount(ctx context.Context, exec sqlExecer, pr
 	return id, err
 }
 
-func (s *SQLiteStore) queryAccountIDForProviderAccount(ctx context.Context, providerItemID string, providerAccountID string) (string, error) {
+func (s *SQLiteStore) queryAccountIDForProviderAccount(ctx context.Context, providerItemID, providerAccountID string) (string, error) {
 	return queryAccountIDForProviderAccount(ctx, s.db, providerItemID, providerAccountID)
 }
 
-func queryAccountIDForProviderAccount(ctx context.Context, exec sqlExecer, providerItemID string, providerAccountID string) (string, error) {
+func queryAccountIDForProviderAccount(ctx context.Context, exec sqlExecer, providerItemID, providerAccountID string) (string, error) {
 	var id string
 	err := exec.QueryRowContext(ctx, `
 SELECT id
@@ -263,7 +263,7 @@ WHERE provider_item_id = ? AND provider_account_id = ?`, providerItemID, provide
 	return id, err
 }
 
-func localTransactionIDForProviderTransaction(ctx context.Context, exec sqlExecer, providerItemID string, providerTransactionID string) (string, error) {
+func localTransactionIDForProviderTransaction(ctx context.Context, exec sqlExecer, providerItemID, providerTransactionID string) (string, error) {
 	var id string
 	err := exec.QueryRowContext(ctx, `
 SELECT id
@@ -278,7 +278,7 @@ WHERE provider_item_id = ? AND provider_transaction_id = ?`, providerItemID, pro
 	return core.NewLocalID("tx_")
 }
 
-func (s *SQLiteStore) localRecurringIDForProviderRecurring(ctx context.Context, providerItemID string, providerRecurringID string) (string, error) {
+func (s *SQLiteStore) localRecurringIDForProviderRecurring(ctx context.Context, providerItemID, providerRecurringID string) (string, error) {
 	var id string
 	err := s.db.QueryRowContext(ctx, `
 SELECT id
@@ -293,7 +293,7 @@ WHERE provider_item_id = ? AND provider_recurring_id = ?`, providerItemID, provi
 	return core.NewLocalID("rec_")
 }
 
-func (s *SQLiteStore) UpsertSecurity(ctx context.Context, security core.InvestmentSecurity) error {
+func (s *SQLiteStore) UpsertSecurity(ctx context.Context, security *core.InvestmentSecurity) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	id, err := s.localSecurityIDForSecurityID(ctx, security.SecurityID)
 	if err != nil {
@@ -333,7 +333,7 @@ func (s *SQLiteStore) localSecurityIDForSecurityID(ctx context.Context, security
 	return core.NewLocalID("sec_")
 }
 
-func (s *SQLiteStore) UpsertHolding(ctx context.Context, providerItemID string, holding core.InvestmentHolding) error {
+func (s *SQLiteStore) UpsertHolding(ctx context.Context, providerItemID string, holding *core.InvestmentHolding) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	id, err := s.localHoldingID(ctx, providerItemID, holding.AccountID, holding.SecurityID)
 	if err != nil {
@@ -362,7 +362,7 @@ ON CONFLICT(provider_item_id, provider_account_id, security_id) DO UPDATE SET
 	return err
 }
 
-func (s *SQLiteStore) localHoldingID(ctx context.Context, providerItemID string, providerAccountID string, securityID string) (string, error) {
+func (s *SQLiteStore) localHoldingID(ctx context.Context, providerItemID, providerAccountID, securityID string) (string, error) {
 	var id string
 	err := s.db.QueryRowContext(ctx, `
 SELECT id FROM holdings WHERE provider_item_id = ? AND provider_account_id = ? AND security_id = ?`,
@@ -381,7 +381,7 @@ func (s *SQLiteStore) ClearHoldings(ctx context.Context, providerItemID string) 
 	return err
 }
 
-func (s *SQLiteStore) UpsertLiability(ctx context.Context, providerItemID string, liability core.Liability) error {
+func (s *SQLiteStore) UpsertLiability(ctx context.Context, providerItemID string, liability *core.Liability) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	id, err := s.localLiabilityID(ctx, providerItemID, liability.AccountID, liability.Type, liability.Name)
 	if err != nil {
@@ -415,7 +415,7 @@ ON CONFLICT(provider_item_id, provider_account_id, type, name) DO UPDATE SET
 	return err
 }
 
-func (s *SQLiteStore) localLiabilityID(ctx context.Context, providerItemID string, providerAccountID string, liabilityType string, name string) (string, error) {
+func (s *SQLiteStore) localLiabilityID(ctx context.Context, providerItemID, providerAccountID, liabilityType, name string) (string, error) {
 	var id string
 	err := s.db.QueryRowContext(ctx, `
 SELECT id FROM liabilities WHERE provider_item_id = ? AND provider_account_id = ? AND type = ? AND name = ?`,

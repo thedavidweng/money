@@ -25,11 +25,11 @@ func TestProvidersPlaidLinkJSONMissingCredentialsReturnsStableAuthError(t *testi
 	}
 
 	var envelope struct {
-		OK     bool `json:"ok"`
-		Errors []struct {
+		OK    bool `json:"ok"`
+		Error *struct {
 			Code     string `json:"code"`
 			Category string `json:"category"`
-		} `json:"errors"`
+		} `json:"error"`
 		Meta struct {
 			Command string `json:"command"`
 		} `json:"meta"`
@@ -43,8 +43,8 @@ func TestProvidersPlaidLinkJSONMissingCredentialsReturnsStableAuthError(t *testi
 	if envelope.Meta.Command != "providers.plaid.link" {
 		t.Fatalf("command = %q", envelope.Meta.Command)
 	}
-	if len(envelope.Errors) != 1 || envelope.Errors[0].Code != "PROVIDER_CREDENTIALS_MISSING" || envelope.Errors[0].Category != "auth" {
-		t.Fatalf("errors = %#v", envelope.Errors)
+	if envelope.Error == nil || envelope.Error.Code != "PROVIDER_CREDENTIALS_MISSING" || envelope.Error.Category != "auth" {
+		t.Fatalf("error = %#v", envelope.Error)
 	}
 }
 
@@ -62,11 +62,11 @@ func TestProvidersBridgeLinkJSONMissingCredentialsReturnsStableAuthError(t *test
 	}
 
 	var envelope struct {
-		OK     bool `json:"ok"`
-		Errors []struct {
+		OK    bool `json:"ok"`
+		Error *struct {
 			Code     string `json:"code"`
 			Category string `json:"category"`
-		} `json:"errors"`
+		} `json:"error"`
 		Meta struct {
 			Command string `json:"command"`
 		} `json:"meta"`
@@ -80,8 +80,8 @@ func TestProvidersBridgeLinkJSONMissingCredentialsReturnsStableAuthError(t *test
 	if envelope.Meta.Command != "providers.bridge.link" {
 		t.Fatalf("command = %q", envelope.Meta.Command)
 	}
-	if len(envelope.Errors) != 1 || envelope.Errors[0].Code != "PROVIDER_CREDENTIALS_MISSING" || envelope.Errors[0].Category != "auth" {
-		t.Fatalf("errors = %#v", envelope.Errors)
+	if envelope.Error == nil || envelope.Error.Code != "PROVIDER_CREDENTIALS_MISSING" || envelope.Error.Category != "auth" {
+		t.Fatalf("error = %#v", envelope.Error)
 	}
 }
 
@@ -99,12 +99,12 @@ func TestInstitutionLinkJSONMissingCredentialsReportsUnavailableProvider(t *test
 	}
 
 	var envelope struct {
-		OK     bool `json:"ok"`
-		Errors []struct {
+		OK    bool `json:"ok"`
+		Error *struct {
 			Code     string `json:"code"`
 			Category string `json:"category"`
 			Message  string `json:"message"`
-		} `json:"errors"`
+		} `json:"error"`
 		Meta struct {
 			Command string `json:"command"`
 		} `json:"meta"`
@@ -118,11 +118,11 @@ func TestInstitutionLinkJSONMissingCredentialsReportsUnavailableProvider(t *test
 	if envelope.Meta.Command != "link" {
 		t.Fatalf("command = %q", envelope.Meta.Command)
 	}
-	if len(envelope.Errors) != 1 || envelope.Errors[0].Code != "PROVIDER_CREDENTIALS_MISSING" || envelope.Errors[0].Category != "auth" {
-		t.Fatalf("errors = %#v", envelope.Errors)
+	if envelope.Error == nil || envelope.Error.Code != "PROVIDER_CREDENTIALS_MISSING" || envelope.Error.Category != "auth" {
+		t.Fatalf("error = %#v", envelope.Error)
 	}
-	if !strings.Contains(envelope.Errors[0].Message, "unavailable locally") {
-		t.Fatalf("message = %q", envelope.Errors[0].Message)
+	if !strings.Contains(envelope.Error.Message, "unavailable locally") {
+		t.Fatalf("message = %q", envelope.Error.Message)
 	}
 }
 
@@ -135,8 +135,7 @@ func writeTestConfig(t *testing.T) string {
 	if err := os.WriteFile(configPath, []byte(`
 database:
   path: ./money.db
-  encryption_key:
-    env: MONEY_DB_ENCRYPTION_KEY
+  encryption_key: "env:MONEY_DB_ENCRYPTION_KEY"
 providers: {}
 `), 0o600); err != nil {
 		t.Fatal(err)

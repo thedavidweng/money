@@ -27,14 +27,13 @@ func TestDemoBudgetsListJSONReturnsEnvelopeWithEmptyBudgets(t *testing.T) {
 			Command string `json:"command"`
 			Demo    bool   `json:"demo"`
 		} `json:"meta"`
-		Warnings []any `json:"warnings"`
-		Errors   []any `json:"errors"`
+		Error any `json:"error"`
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &envelope); err != nil {
 		t.Fatalf("stdout is not JSON envelope: %v\n%s", err, stdout.String())
 	}
 	if !envelope.OK {
-		t.Fatalf("ok = false, errors = %#v", envelope.Errors)
+		t.Fatalf("ok = false, error = %#v", envelope.Error)
 	}
 	if envelope.Meta.Command != "budgets.list" {
 		t.Fatalf("command = %q, want budgets.list", envelope.Meta.Command)
@@ -932,10 +931,10 @@ func TestBudgetCreateJSONWithoutConfirmationReturnsError(t *testing.T) {
 	}
 
 	var envelope struct {
-		OK     bool `json:"ok"`
-		Errors []struct {
+		OK    bool `json:"ok"`
+		Error *struct {
 			Code string `json:"code"`
-		} `json:"errors"`
+		} `json:"error"`
 		Meta struct {
 			Command string `json:"command"`
 		} `json:"meta"`
@@ -946,8 +945,8 @@ func TestBudgetCreateJSONWithoutConfirmationReturnsError(t *testing.T) {
 	if envelope.OK {
 		t.Fatal("ok = true, want false")
 	}
-	if len(envelope.Errors) != 1 || envelope.Errors[0].Code != "CONFIRMATION_REQUIRED" {
-		t.Fatalf("errors = %#v", envelope.Errors)
+	if envelope.Error == nil || envelope.Error.Code != "CONFIRMATION_REQUIRED" {
+		t.Fatalf("error = %#v", envelope.Error)
 	}
 	if envelope.Meta.Command != "budgets.create" {
 		t.Fatalf("command = %q, want budgets.create", envelope.Meta.Command)
@@ -1003,10 +1002,10 @@ func TestBudgetCategoriesCreateJSONWithoutConfirmationReturnsError(t *testing.T)
 	}
 
 	var envelope struct {
-		OK     bool `json:"ok"`
-		Errors []struct {
+		OK    bool `json:"ok"`
+		Error *struct {
 			Code string `json:"code"`
-		} `json:"errors"`
+		} `json:"error"`
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &envelope); err != nil {
 		t.Fatalf("stdout is not JSON: %v\n%s", err, stdout.String())
@@ -1014,8 +1013,8 @@ func TestBudgetCategoriesCreateJSONWithoutConfirmationReturnsError(t *testing.T)
 	if envelope.OK {
 		t.Fatal("ok = true, want false")
 	}
-	if len(envelope.Errors) != 1 || envelope.Errors[0].Code != "CONFIRMATION_REQUIRED" {
-		t.Fatalf("errors = %#v", envelope.Errors)
+	if envelope.Error == nil || envelope.Error.Code != "CONFIRMATION_REQUIRED" {
+		t.Fatalf("error = %#v", envelope.Error)
 	}
 }
 

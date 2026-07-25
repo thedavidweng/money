@@ -26,10 +26,10 @@ func TestPlaidLoginJSONMissingBaseConfigReturnsStableError(t *testing.T) {
 		t.Fatalf("exit code = %d stdout=%s stderr=%s", exitCode, stdout.String(), stderr.String())
 	}
 	var envelope struct {
-		OK     bool `json:"ok"`
-		Errors []struct {
+		OK    bool `json:"ok"`
+		Error *struct {
 			Code string `json:"code"`
-		} `json:"errors"`
+		} `json:"error"`
 		Meta struct {
 			Command string `json:"command"`
 		} `json:"meta"`
@@ -37,7 +37,7 @@ func TestPlaidLoginJSONMissingBaseConfigReturnsStableError(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &envelope); err != nil {
 		t.Fatalf("stdout is not JSON: %v\n%s", err, stdout.String())
 	}
-	if envelope.OK || envelope.Meta.Command != "plaid.login" || len(envelope.Errors) != 1 || envelope.Errors[0].Code != "BASE_CONFIG_MISSING" {
+	if envelope.OK || envelope.Meta.Command != "plaid.login" || envelope.Error == nil || envelope.Error.Code != "BASE_CONFIG_MISSING" {
 		t.Fatalf("envelope = %#v", envelope)
 	}
 }
@@ -94,12 +94,12 @@ func TestPlaidLoginCommandsUseSharedFakeAndPreserveStderr(t *testing.T) {
 	t.Cleanup(func() { runPlaidLoginCLI = oldRunPlaidLogin })
 
 	var commands []string
-	runPlaidLoginCLI = func(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer, opts plaidLoginCLIOptions) error {
+	runPlaidLoginCLI = func(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer, opts *plaidLoginCLIOptions) error {
 		commands = append(commands, opts.CommandName)
 		if _, err := fmt.Fprintln(stderr, "oauth progress"); err != nil {
 			return err
 		}
-		return writePlaidLoginResult(state, stdout, plaidlogin.LoginResult{
+		return writePlaidLoginResult(state, stdout, &plaidlogin.LoginResult{
 			Provider:          "plaid",
 			TeamID:            "team_1",
 			Environment:       opts.Environment,
@@ -151,12 +151,12 @@ func TestPlaidLoginJSONRequiresForceBeforeOAuthForEnvironmentSwitch(t *testing.T
 		configPath: configPath,
 		profile:    "default",
 		json:       true,
-	}, &stdout, &stderr, plaidLoginCLIOptions{
+	}, &stdout, &stderr, &plaidLoginCLIOptions{
 		CommandName: "plaid.login",
 		NoOpen:      true,
 		Environment: "production",
 	})
-	cliErr, ok := err.(cliError)
+	cliErr, ok := err.(*cliError)
 	if !ok {
 		t.Fatalf("err = %#v", err)
 	}
@@ -174,14 +174,11 @@ func TestPlaidLoginOverwriteValidationFailsClosedOnConfigLoadError(t *testing.T)
 	if err := os.WriteFile(configPath, []byte(`
 database:
   path: ./money.db
-  encryption_key:
-    env: MONEY_DB_ENCRYPTION_KEY
+  encryption_key: "env:MONEY_DB_ENCRYPTION_KEY"
 providers:
   plaid:
-    client_id:
-      env: PLAID_CLIENT_ID
-    secret:
-      env: PLAID_SECRET
+    client_id: "env:PLAID_CLIENT_ID"
+    secret: "env:PLAID_SECRET"
     environment: sandbox
 `), 0o600); err != nil {
 		t.Fatal(err)
@@ -197,7 +194,7 @@ providers:
 		configPath: configPath,
 		profile:    "default",
 		json:       true,
-	}, &stdout, &stderr, plaidLoginCLIOptions{
+	}, &stdout, &stderr, &plaidLoginCLIOptions{
 		CommandName: "plaid.login",
 		NoOpen:      true,
 		Environment: "production",
@@ -219,13 +216,13 @@ func TestPlaidLoginJSONTimeoutReturnsStableError(t *testing.T) {
 		configPath: configPath,
 		profile:    "default",
 		json:       true,
-	}, &stdout, &stderr, plaidLoginCLIOptions{
+	}, &stdout, &stderr, &plaidLoginCLIOptions{
 		CommandName: "plaid.login",
 		NoOpen:      true,
 		Environment: "sandbox",
 		Force:       true,
 	})
-	cliErr, ok := err.(cliError)
+	cliErr, ok := err.(*cliError)
 	if !ok {
 		t.Fatalf("expected cliError, got %#v", err)
 	}
@@ -253,14 +250,11 @@ func TestPlaidLoginOverwriteValidationAllowsMissingPlaidCredentials(t *testing.T
 	if err := os.WriteFile(configPath, []byte(`
 database:
   path: ./money.db
-  encryption_key:
-    env: MONEY_DB_ENCRYPTION_KEY
+  encryption_key: "env:MONEY_DB_ENCRYPTION_KEY"
 providers:
   plaid:
-    client_id:
-      env: PLAID_CLIENT_ID
-    secret:
-      env: PLAID_SECRET
+    client_id: "env:PLAID_CLIENT_ID"
+    secret: "env:PLAID_SECRET"
     environment: sandbox
 `), 0o600); err != nil {
 		t.Fatal(err)
@@ -342,14 +336,11 @@ func writePlaidLoginTestConfig(t *testing.T) (configPath, envPath string) {
 	if err := os.WriteFile(configPath, []byte(`
 database:
   path: ./money.db
-  encryption_key:
-    env: MONEY_DB_ENCRYPTION_KEY
+  encryption_key: "env:MONEY_DB_ENCRYPTION_KEY"
 providers:
   plaid:
-    client_id:
-      env: PLAID_CLIENT_ID
-    secret:
-      env: PLAID_SECRET
+    client_id: "env:PLAID_CLIENT_ID"
+    secret: "env:PLAID_SECRET"
     environment: sandbox
 `), 0o600); err != nil {
 		t.Fatal(err)

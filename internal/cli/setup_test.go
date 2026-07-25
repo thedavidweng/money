@@ -271,7 +271,7 @@ func TestRunSetupWizardSelectPlaidDashboardLogin(t *testing.T) {
 	oldRunPlaidLogin := runPlaidLoginCLI
 	t.Cleanup(func() { runPlaidLoginCLI = oldRunPlaidLogin })
 	var called bool
-	runPlaidLoginCLI = func(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer, opts plaidLoginCLIOptions) error {
+	runPlaidLoginCLI = func(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer, opts *plaidLoginCLIOptions) error {
 		called = true
 		if opts.CommandName != "plaid.login" || opts.Environment != "sandbox" {
 			t.Fatalf("opts = %#v", opts)
@@ -279,7 +279,7 @@ func TestRunSetupWizardSelectPlaidDashboardLogin(t *testing.T) {
 		if _, err := fmt.Fprintln(stderr, "oauth progress"); err != nil {
 			return err
 		}
-		return writePlaidLoginResult(state, stdout, plaidlogin.LoginResult{
+		return writePlaidLoginResult(state, stdout, &plaidlogin.LoginResult{
 			Provider:          "plaid",
 			TeamID:            "team_1",
 			Environment:       "sandbox",
@@ -349,7 +349,7 @@ func TestRunInteractiveProviderConfigureRequiresForceOrHumanConfirmationForExist
 		profile:    "default",
 		json:       true,
 	}, &stdout, "plaid", cmd, nil)
-	cliErr, ok := err.(cliError)
+	cliErr, ok := err.(*cliError)
 	if !ok || cliErr.code != "CONFIRMATION_REQUIRED" || cliErr.exitCode != 10 {
 		t.Fatalf("err = %#v", err)
 	}
@@ -448,7 +448,7 @@ func TestAppendLinksDiagnosticsWithItems(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Demo already has plaid items. Add a bridge item.
-	if err := db.StoreLinkedProviderItem(ctx, store.LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &store.LinkedProviderItem{
 		Institution: store.LinkedInstitution{ID: "inst_bridge", Name: "Bridge Bank", Provider: "bridge", ProviderInstitutionID: "ins_bridge"},
 		Item: store.LinkedItem{
 			ID: "pi_bridge", Provider: "bridge", InstitutionID: "inst_bridge",
@@ -506,7 +506,7 @@ func TestAppendSyncDiagnosticsWithRecentRun(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Record a successful sync run for the demo plaid item.
-	if err := db.RecordSyncRun(ctx, core.SyncRun{
+	if err := db.RecordSyncRun(ctx, &core.SyncRun{
 		Provider:       "plaid",
 		ProviderItemID: "pi_demo_plaid",
 		StartedAt:      "2026-05-10T10:00:00Z",
@@ -542,7 +542,7 @@ func TestRunDoctorFixLinksRemovesErroredItems(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Add an errored provider item.
-	if err := db.StoreLinkedProviderItem(ctx, store.LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &store.LinkedProviderItem{
 		Institution: store.LinkedInstitution{ID: "inst_err", Name: "Err Bank", Provider: "plaid", ProviderInstitutionID: "ins_err"},
 		Item: store.LinkedItem{
 			ID: "pi_err", Provider: "plaid", InstitutionID: "inst_err",
@@ -600,7 +600,7 @@ func TestRunDoctorFixSyncMarksStuckRuns(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// RecordSyncRun with empty finished_at produces a stuck run (NULL finished_at).
-	if err := db.RecordSyncRun(ctx, core.SyncRun{
+	if err := db.RecordSyncRun(ctx, &core.SyncRun{
 		Provider:       "plaid",
 		ProviderItemID: "pi_demo_plaid",
 		StartedAt:      "2026-05-10T10:00:00Z",
@@ -679,7 +679,7 @@ func TestDoctorFixLogsToSlog(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Add an errored item to trigger a fix.
-	if err := db.StoreLinkedProviderItem(ctx, store.LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &store.LinkedProviderItem{
 		Institution: store.LinkedInstitution{ID: "inst_err2", Name: "Err Bank", Provider: "plaid", ProviderInstitutionID: "ins_err2"},
 		Item: store.LinkedItem{
 			ID: "pi_err2", Provider: "plaid", InstitutionID: "inst_err2",

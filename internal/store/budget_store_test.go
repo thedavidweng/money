@@ -16,7 +16,7 @@ func TestSQLiteStoreBudgetCRUDLifecycleWithCategories(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Create a budget.
-	budget, err := db.CreateBudget(ctx, core.Budget{
+	budget, err := db.CreateBudget(ctx, &core.Budget{
 		Name:      "Groceries",
 		Currency:  "USD",
 		Period:    "monthly",
@@ -34,7 +34,7 @@ func TestSQLiteStoreBudgetCRUDLifecycleWithCategories(t *testing.T) {
 	}
 
 	// Add categories to the budget.
-	catFood, err := db.CreateBudgetCategory(ctx, core.BudgetCategory{
+	catFood, err := db.CreateBudgetCategory(ctx, &core.BudgetCategory{
 		BudgetID:        budget.ID,
 		Name:            "Food",
 		LimitMinorUnits: 50000,
@@ -47,7 +47,7 @@ func TestSQLiteStoreBudgetCRUDLifecycleWithCategories(t *testing.T) {
 		t.Fatalf("food limit = %q, want %q", catFood.Limit, "500.00")
 	}
 
-	catTransport, err := db.CreateBudgetCategory(ctx, core.BudgetCategory{
+	catTransport, err := db.CreateBudgetCategory(ctx, &core.BudgetCategory{
 		BudgetID:        budget.ID,
 		Name:            "Transport",
 		LimitMinorUnits: 20000,
@@ -88,7 +88,7 @@ func TestSQLiteStoreBudgetCRUDLifecycleWithCategories(t *testing.T) {
 	}
 
 	// Update budget name.
-	updated, err := db.UpdateBudget(ctx, core.Budget{
+	updated, err := db.UpdateBudget(ctx, &core.Budget{
 		ID:        budget.ID,
 		Name:      "Monthly Groceries",
 		Currency:  "USD",
@@ -152,7 +152,7 @@ func TestSQLiteStoreBudgetCategoryWithLinkedCategory(t *testing.T) {
 		t.Skip("demo has no categories")
 	}
 
-	budget, err := db.CreateBudget(ctx, core.Budget{
+	budget, err := db.CreateBudget(ctx, &core.Budget{
 		Name:      "Dining",
 		Currency:  "USD",
 		Period:    "monthly",
@@ -165,7 +165,7 @@ func TestSQLiteStoreBudgetCategoryWithLinkedCategory(t *testing.T) {
 
 	// Create budget category linked to a real category.
 	catID := categories[0].ID
-	bc, err := db.CreateBudgetCategory(ctx, core.BudgetCategory{
+	bc, err := db.CreateBudgetCategory(ctx, &core.BudgetCategory{
 		BudgetID:        budget.ID,
 		CategoryID:      &catID,
 		Name:            categories[0].Name,

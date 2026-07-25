@@ -8,7 +8,7 @@ import (
 )
 
 func TestBuildPlaidLinkTokenCreateRequestUsesExplicitProductsAndCountries(t *testing.T) {
-	request, err := BuildPlaidLinkTokenCreateRequest(PlaidLinkTokenRequestConfig{
+	request, err := BuildPlaidLinkTokenCreateRequest(&PlaidLinkTokenRequestConfig{
 		ClientName:    "money",
 		Language:      "en",
 		ClientUserID:  "local-user",
@@ -42,7 +42,7 @@ func TestBuildPlaidLinkTokenCreateRequestUsesExplicitProductsAndCountries(t *tes
 }
 
 func TestBuildPlaidLinkTokenCreateRequestUsesConsentProductOptions(t *testing.T) {
-	request, err := BuildPlaidLinkTokenCreateRequest(PlaidLinkTokenRequestConfig{
+	request, err := BuildPlaidLinkTokenCreateRequest(&PlaidLinkTokenRequestConfig{
 		ClientName:                  "money",
 		Language:                    "en",
 		ClientUserID:                "local-user",
@@ -67,7 +67,7 @@ func TestBuildPlaidLinkTokenCreateRequestUsesConsentProductOptions(t *testing.T)
 }
 
 func TestBuildPlaidLinkTokenCreateRequestRejectsUnsupportedProduct(t *testing.T) {
-	_, err := BuildPlaidLinkTokenCreateRequest(PlaidLinkTokenRequestConfig{
+	_, err := BuildPlaidLinkTokenCreateRequest(&PlaidLinkTokenRequestConfig{
 		ClientName:   "money",
 		Language:     "en",
 		ClientUserID: "local-user",
@@ -80,7 +80,7 @@ func TestBuildPlaidLinkTokenCreateRequestRejectsUnsupportedProduct(t *testing.T)
 }
 
 func TestBuildPlaidLinkTokenCreateRequestRejectsUnsupportedConsentProduct(t *testing.T) {
-	_, err := BuildPlaidLinkTokenCreateRequest(PlaidLinkTokenRequestConfig{
+	_, err := BuildPlaidLinkTokenCreateRequest(&PlaidLinkTokenRequestConfig{
 		ClientName:                  "money",
 		Language:                    "en",
 		ClientUserID:                "local-user",
@@ -94,7 +94,7 @@ func TestBuildPlaidLinkTokenCreateRequestRejectsUnsupportedConsentProduct(t *tes
 }
 
 func TestBuildPlaidLinkTokenCreateRequestRequiresExplicitCountries(t *testing.T) {
-	_, err := BuildPlaidLinkTokenCreateRequest(PlaidLinkTokenRequestConfig{
+	_, err := BuildPlaidLinkTokenCreateRequest(&PlaidLinkTokenRequestConfig{
 		ClientName:   "money",
 		Language:     "en",
 		ClientUserID: "local-user",

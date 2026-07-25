@@ -182,8 +182,8 @@ func TestMonarchImporter_HashConsistency(t *testing.T) {
 		ID: "tx1", AccountID: "acc1", Date: "2026-05-01",
 		Amount: -10.50, Currency: "USD", Name: "Test", Pending: false,
 	}
-	h1 := hashMonarchRow(mt)
-	h2 := hashMonarchRow(mt)
+	h1 := hashMonarchRow(&mt)
+	h2 := hashMonarchRow(&mt)
 	if h1 != h2 {
 		t.Errorf("same input produced different hashes: %s != %s", h1, h2)
 	}
@@ -191,7 +191,7 @@ func TestMonarchImporter_HashConsistency(t *testing.T) {
 	// Different amount should produce different hash.
 	mt2 := mt
 	mt2.Amount = -20.00
-	h3 := hashMonarchRow(mt2)
+	h3 := hashMonarchRow(&mt2)
 	if h1 == h3 {
 		t.Errorf("different amounts produced same hash: %s", h1)
 	}

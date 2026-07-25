@@ -28,7 +28,7 @@ func newSetupCommand(_ context.Context, state *runtimeState, stdout io.Writer) *
 		RunE: func(cmd *cobra.Command, args []string) error {
 			result, err := config.Setup(state.configPath, state.profile, force)
 			if err != nil {
-				return cliError{
+				return &cliError{
 					command:  "setup",
 					code:     "CONFIG_WRITE_FAILED",
 					message:  err.Error(),
@@ -46,12 +46,12 @@ func newSetupCommand(_ context.Context, state *runtimeState, stdout io.Writer) *
 					result.DBCreated = true
 				case state.json:
 					env := contracts.NewSuccess("setup", result)
-					env.Warnings = append(env.Warnings, contracts.Warning{
+					env.Meta.Warnings = append(env.Meta.Warnings, contracts.Warning{
 						Code:     "DB_OPEN_FAILED",
 						Message:  openErr.Error(),
 						Category: contracts.CategoryInternal,
 					})
-					return contracts.WriteJSON(stdout, env)
+					return state.writeEnvelope(stdout, &env)
 				default:
 					_, _ = fmt.Fprintf(stdout, "Config written. Database failed to open: %s\nRun `money doctor` to diagnose.\n", openErr)
 					return nil
@@ -69,7 +69,7 @@ func newSetupCommand(_ context.Context, state *runtimeState, stdout io.Writer) *
 					"db_created":     result.DBCreated,
 					"diagnostics":    diagnostics,
 				})
-				return contracts.WriteJSON(stdout, env)
+				return state.writeEnvelope(stdout, &env)
 			}
 
 			_, _ = fmt.Fprintf(stdout, "Config:   %s\n", result.ConfigPath)
@@ -123,7 +123,7 @@ func newDoctorCommand(_ context.Context, state *runtimeState, stdout io.Writer) 
 			logDiagnostics(logger, diagnostics)
 			if state.json {
 				env := contracts.NewSuccess("doctor", map[string]any{"diagnostics": diagnostics})
-				return contracts.WriteJSON(stdout, env)
+				return state.writeEnvelope(stdout, &env)
 			}
 			printDiagnostics(stdout, diagnostics)
 			hasError := false
@@ -153,13 +153,13 @@ func runDoctorFix(state *runtimeState, stdout io.Writer, logger *slog.Logger, dr
 				"plan":   result,
 				"errors": errString(err),
 			})
-			return contracts.WriteJSON(stdout, env)
+			return state.writeEnvelope(stdout, &env)
 		}
 		_, _ = fmt.Fprintf(stdout, "Would create/verify:\n  Config:   %s\n  Secrets:  %s\n  Database: %s\n", result.ConfigPath, result.EnvPath, result.DatabasePath)
 		return nil
 	}
 	if err != nil {
-		return cliError{
+		return &cliError{
 			command:  "doctor",
 			code:     "CONFIG_WRITE_FAILED",
 			message:  err.Error(),
@@ -194,14 +194,14 @@ func runDoctorFix(state *runtimeState, stdout io.Writer, logger *slog.Logger, dr
 			"result":      result,
 			"diagnostics": diagnostics,
 		})
-		return contracts.WriteJSON(stdout, env)
+		return state.writeEnvelope(stdout, &env)
 	}
 	_, _ = fmt.Fprintln(stdout, "Repairs applied.")
 	printDiagnostics(stdout, diagnostics)
 	return nil
 }
 
-func runDiagnostics(configPath string, profile string) []Diagnostic {
+func runDiagnostics(configPath, profile string) []Diagnostic {
 	var diags []Diagnostic
 
 	cfg, err := config.Load(config.Options{ConfigPath: configPath, Profile: profile})
@@ -313,8 +313,8 @@ func appendLinksDiagnostics(ctx context.Context, db *store.SQLiteStore) []Diagno
 		return diags
 	}
 	counts := map[string]int{}
-	for _, item := range items {
-		counts[item.Provider]++
+	for i := range items {
+		counts[items[i].Provider]++
 	}
 	for provider, count := range counts {
 		diags = append(diags, Diagnostic{
@@ -357,7 +357,8 @@ func appendSyncDiagnostics(ctx context.Context, db *store.SQLiteStore) []Diagnos
 		latestByItem[r.ProviderItemID] = r
 	}
 
-	for _, item := range items {
+	for i := range items {
+		item := &items[i]
 		run, ok := latestByItem[item.ID]
 		if !ok {
 			diags = append(diags, Diagnostic{
@@ -390,7 +391,8 @@ func runDoctorFixLinks(ctx context.Context, db *store.SQLiteStore) (int, error) 
 		return 0, err
 	}
 	fixed := 0
-	for _, item := range items {
+	for i := range items {
+		item := &items[i]
 		if item.Status != "active" {
 			if err := db.RemoveProviderItem(ctx, item.ID); err != nil {
 				return fixed, err
@@ -508,7 +510,7 @@ func runSetupWizard(ctx context.Context, state *runtimeState, stdout io.Writer, 
 					if stderr == nil {
 						stderr = io.Discard
 					}
-					return runPlaidLoginCLI(ctx, state, stdout, stderr, plaidLoginCLIOptions{
+					return runPlaidLoginCLI(ctx, state, stdout, stderr, &plaidLoginCLIOptions{
 						CommandName: "plaid.login",
 						Environment: "sandbox",
 					})
@@ -634,7 +636,7 @@ func promptForProviderCredentials(stdout io.Writer, reader *bufio.Reader, spec c
 func runInteractiveProviderConfigure(state *runtimeState, stdout io.Writer, providerName string, cmd *cobra.Command, reader *bufio.Reader) error {
 	spec, err := providerSpecByName(providerName)
 	if err != nil {
-		return cliError{
+		return &cliError{
 			command:  "providers.configure",
 			code:     "UNKNOWN_PROVIDER",
 			message:  err.Error(),
@@ -680,7 +682,7 @@ func runInteractiveProviderConfigure(state *runtimeState, stdout io.Writer, prov
 		}
 	}
 	if len(missing) > 0 {
-		return cliError{
+		return &cliError{
 			command:  "providers.configure",
 			code:     "MISSING_CREDENTIALS",
 			message:  fmt.Sprintf("%s is missing required credentials: %s. Run interactively or pass them as flags.", providerName, strings.Join(missing, ", ")),
@@ -694,7 +696,7 @@ func runInteractiveProviderConfigure(state *runtimeState, stdout io.Writer, prov
 
 	result, err := config.ConfigureProvider(state.configPath, state.profile, spec, secrets, options, force)
 	if err != nil {
-		return cliError{
+		return &cliError{
 			command:  "providers.configure",
 			code:     "CONFIG_WRITE_FAILED",
 			message:  err.Error(),
@@ -717,7 +719,7 @@ func runInteractiveProviderConfigure(state *runtimeState, stdout io.Writer, prov
 			"keys_written": result.KeysWritten,
 			"diagnostics":  providerDiags,
 		})
-		return contracts.WriteJSON(stdout, env)
+		return state.writeEnvelope(stdout, &env)
 	}
 
 	if result.KeysWritten > 0 {
@@ -742,7 +744,7 @@ func confirmProviderCredentialOverwrite(state *runtimeState, output io.Writer, s
 	}
 	message := fmt.Sprintf("%s credentials already exist in %s; rerun with --force to overwrite %s.", spec.Name, envPath, strings.Join(conflicts, ", "))
 	if state.json || state.stdin == nil {
-		return cliError{
+		return &cliError{
 			command:   "providers.configure",
 			code:      "CONFIRMATION_REQUIRED",
 			message:   message,
@@ -763,7 +765,7 @@ func confirmProviderCredentialOverwrite(state *runtimeState, output io.Writer, s
 		return err
 	}
 	if choice != "yes" {
-		return cliError{
+		return &cliError{
 			command:   "providers.configure",
 			code:      "CONFIRMATION_REQUIRED",
 			message:   message,

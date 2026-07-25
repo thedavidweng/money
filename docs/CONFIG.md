@@ -4,33 +4,27 @@
 
 ## Config Shape
 
-Secret references use YAML objects with exactly one `env` key:
+Secret references use the string form `env:NAME`, which resolves to the value of environment variable `NAME` at load time (an error is raised if it is unset):
 
 ```yaml
 database:
   path: ~/.money/data/money.db
-  encryption_key:
-    env: MONEY_DB_ENCRYPTION_KEY
+  encryption_key: "env:MONEY_DB_ENCRYPTION_KEY"
 
 providers:
   plaid:
-    client_id:
-      env: PLAID_CLIENT_ID
-    secret:
-      env: PLAID_SECRET
+    client_id: "env:PLAID_CLIENT_ID"
+    secret: "env:PLAID_SECRET"
     environment: sandbox
     products: [transactions]
     country_codes: [US]
     additional_consented_products: [investments]
     required_if_supported_products: [liabilities]
     optional_products: [auth]
-    redirect_uri:
-      env: PLAID_REDIRECT_URI
+    redirect_uri: "env:PLAID_REDIRECT_URI"
   bridge:
-    client_id:
-      env: BRIDGE_CLIENT_ID
-    client_secret:
-      env: BRIDGE_CLIENT_SECRET
+    client_id: "env:BRIDGE_CLIENT_ID"
+    client_secret: "env:BRIDGE_CLIENT_SECRET"
 ```
 
 Direct scalar values are allowed only for non-secrets such as `database.path`, `providers.plaid.environment`, `products`, `country_codes`, and Plaid Link consent product lists. Direct scalar secrets are accepted for manually edited files, but config loading emits a structured warning recommending `.env` references.
@@ -61,7 +55,7 @@ Profile names must be alphanumeric, hyphen, or underscore only; path traversal c
 7. Validate required fields for the command being executed.
 8. Return config values plus structured warnings, such as direct secrets in YAML or broad env-file permissions.
 
-Environment variables complete explicit references; they do not form a magic override chain. For example, `PLAID_SECRET` is used only when config says `secret: { env: PLAID_SECRET }` or a setup/configure command writes that reference.
+Environment variables complete explicit references; they do not form a magic override chain. For example, `PLAID_SECRET` is used only when config says `secret: "env:PLAID_SECRET"` or a setup/configure command writes that reference.
 
 Plaid Dashboard OAuth bootstrap state is stored outside YAML at `plaid-dashboard-auth.json` beside the resolved config file. It is local bootstrap state for `money plaid login`, written `0600`, and may include Dashboard access/refresh tokens plus selected `team_id` and `client_id`. Provider API credentials still use the normal `.env` plus YAML `env:` references model.
 

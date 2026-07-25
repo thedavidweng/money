@@ -33,7 +33,7 @@ func TestSyncDispatchesLinkedItemToProviderAndAdvancesCursor(t *testing.T) {
 		t.Fatalf("open store: %v", err)
 	}
 	defer func() { _ = db.Close() }()
-	if err := db.StoreLinkedProviderItem(ctx, store.LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &store.LinkedProviderItem{
 		Institution: store.LinkedInstitution{ID: "inst_sync", Name: "Sync Bank", Provider: "plaid", ProviderInstitutionID: "ins_sync"},
 		Item: store.LinkedItem{
 			ID:                     "pi_sync",
@@ -85,7 +85,7 @@ func TestSyncPartialFailurePreservesPerItemResults(t *testing.T) {
 		{ID: "pi_ok", Provider: "plaid", InstitutionID: "inst_1", ProviderExternalItemID: "item_ok", EncryptedAccessToken: []byte("token"), Status: "active"},
 		{ID: "pi_bad", Provider: "plaid", InstitutionID: "inst_1", ProviderExternalItemID: "item_bad", EncryptedAccessToken: []byte("token"), Status: "active"},
 	} {
-		if err := db.StoreLinkedProviderItem(ctx, store.LinkedProviderItem{
+		if err := db.StoreLinkedProviderItem(ctx, &store.LinkedProviderItem{
 			Institution: store.LinkedInstitution{ID: item.InstitutionID, Name: "Bank", Provider: "plaid", ProviderInstitutionID: "ins_1"},
 			Item:        item,
 		}); err != nil {
@@ -133,7 +133,7 @@ func TestSyncPartialFailureCoversPlaidAndBridgeItems(t *testing.T) {
 			Item:        store.LinkedItem{ID: "pi_bridge", Provider: "bridge", InstitutionID: "inst_bridge", ProviderExternalItemID: "item_bridge", EncryptedAccessToken: []byte("bridge-user"), Status: "active"},
 		},
 	} {
-		if err := db.StoreLinkedProviderItem(ctx, linked); err != nil {
+		if err := db.StoreLinkedProviderItem(ctx, &linked); err != nil {
 			t.Fatalf("store linked item: %v", err)
 		}
 	}
@@ -190,14 +190,14 @@ func (p *fakeSyncProvider) ValidateConfig(ctx context.Context) []providers.Confi
 func (p *fakeSyncProvider) SearchInstitutions(ctx context.Context, query string) ([]providers.Institution, error) {
 	return nil, nil
 }
-func (p *fakeSyncProvider) CreateLinkSession(ctx context.Context, request providers.LinkRequest) (providers.LinkSession, error) {
+func (p *fakeSyncProvider) CreateLinkSession(ctx context.Context, request *providers.LinkRequest) (providers.LinkSession, error) {
 	return providers.LinkSession{}, nil
 }
-func (p *fakeSyncProvider) ExchangeLinkToken(ctx context.Context, session providers.LinkSession, callback providers.LinkCallback) (providers.LinkedItem, error) {
+func (p *fakeSyncProvider) ExchangeLinkToken(ctx context.Context, session *providers.LinkSession, callback *providers.LinkCallback) (providers.LinkedItem, error) {
 	return providers.LinkedItem{}, nil
 }
-func (p *fakeSyncProvider) Sync(ctx context.Context, item providers.ProviderItem, sink providers.SyncSink) (providers.SyncResult, error) {
-	p.item = item
+func (p *fakeSyncProvider) Sync(ctx context.Context, item *providers.ProviderItem, sink providers.SyncSink) (providers.SyncResult, error) {
+	p.item = *item
 	if err := p.failByItem[item.ID]; err != nil {
 		return providers.SyncResult{}, err
 	}

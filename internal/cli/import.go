@@ -31,7 +31,7 @@ func newImportCommand(ctx context.Context, state *runtimeState, stdout io.Writer
 			Args:  cobra.ExactArgs(1),
 			RunE: func(cmd *cobra.Command, args []string) error {
 				if state.json && !dryRun && !confirm {
-					return cliError{
+					return &cliError{
 						command:   "import." + sourceName,
 						code:      "CONFIRMATION_REQUIRED",
 						message:   "JSON import writes require --dry-run or --confirm",
@@ -65,7 +65,7 @@ func newImportCommand(ctx context.Context, state *runtimeState, stdout io.Writer
 				if err != nil {
 					var importErr importsource.ImportError
 					if errors.As(err, &importErr) {
-						return cliError{
+						return &cliError{
 							command:   "import." + sourceName,
 							code:      importErr.Code,
 							message:   importErr.Message,

@@ -97,15 +97,15 @@ type SyncResult struct {
 // SyncSink is the write-side interface for storing synced provider data.
 type SyncSink interface {
 	UpsertInstitution(ctx context.Context, institution Institution) error
-	UpsertProviderItem(ctx context.Context, item ProviderItem) error
-	UpsertAccount(ctx context.Context, account FinancialAccount) error
-	UpsertTransaction(ctx context.Context, transaction ProviderTransaction) error
-	UpsertRecurring(ctx context.Context, recurring ProviderRecurring) error
+	UpsertProviderItem(ctx context.Context, item *ProviderItem) error
+	UpsertAccount(ctx context.Context, account *FinancialAccount) error
+	UpsertTransaction(ctx context.Context, transaction *ProviderTransaction) error
+	UpsertRecurring(ctx context.Context, recurring *ProviderRecurring) error
 	MarkTransactionRemoved(ctx context.Context, providerItemID string, providerTransactionID string) error
-	RecordSyncRun(ctx context.Context, run SyncRun) error
-	UpsertSecurity(ctx context.Context, security InvestmentSecurity) error
-	UpsertHolding(ctx context.Context, providerItemID string, holding InvestmentHolding) error
+	RecordSyncRun(ctx context.Context, run *SyncRun) error
+	UpsertSecurity(ctx context.Context, security *InvestmentSecurity) error
+	UpsertHolding(ctx context.Context, providerItemID string, holding *InvestmentHolding) error
 	ClearHoldings(ctx context.Context, providerItemID string) error
-	UpsertLiability(ctx context.Context, providerItemID string, liability Liability) error
+	UpsertLiability(ctx context.Context, providerItemID string, liability *Liability) error
 	ClearLiabilities(ctx context.Context, providerItemID string) error
 }

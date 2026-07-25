@@ -8,7 +8,7 @@ type Registry struct {
 	providers map[string]Provider
 }
 
-func NewRegistry(cfg config.Config) Registry {
+func NewRegistry(cfg *config.Config) Registry {
 	return Registry{providers: map[string]Provider{
 		"plaid":  newPlaidProvider(cfg.Providers["plaid"]),
 		"bridge": newBridgeProvider(cfg.Providers["bridge"]),

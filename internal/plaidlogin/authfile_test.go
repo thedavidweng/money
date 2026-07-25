@@ -28,7 +28,7 @@ func TestAuthFileRoundTripAndDelete(t *testing.T) {
 		TeamID:       "team_1",
 		ClientID:     "client_1",
 	}
-	if err := WriteAuthFile(authPath, auth); err != nil {
+	if err := WriteAuthFile(authPath, &auth); err != nil {
 		t.Fatalf("WriteAuthFile: %v", err)
 	}
 	if runtime.GOOS != "windows" {
@@ -66,7 +66,7 @@ func TestAuthFileRoundTripAndDelete(t *testing.T) {
 func TestLoadFreshAuthRefreshesExpiredAuthFile(t *testing.T) {
 	dir := t.TempDir()
 	authPath := filepath.Join(dir, "plaid-dashboard-auth.json")
-	if err := WriteAuthFile(authPath, Auth{
+	if err := WriteAuthFile(authPath, &Auth{
 		AccessToken:  "old-access",
 		RefreshToken: "old-refresh",
 		ExpiresAt:    time.Unix(100, 0).UTC(),
@@ -109,7 +109,7 @@ func TestLoadFreshAuthRefreshesExpiredAuthFile(t *testing.T) {
 func TestLoadFreshAuthClassifiesRefreshFailure(t *testing.T) {
 	dir := t.TempDir()
 	authPath := filepath.Join(dir, "plaid-dashboard-auth.json")
-	if err := WriteAuthFile(authPath, Auth{
+	if err := WriteAuthFile(authPath, &Auth{
 		AccessToken:  "old-access",
 		RefreshToken: "old-refresh",
 		ExpiresAt:    time.Unix(100, 0).UTC(),

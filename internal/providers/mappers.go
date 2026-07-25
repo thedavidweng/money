@@ -44,7 +44,7 @@ type BridgeTransaction struct {
 	Pending               bool
 }
 
-func MapPlaidTransaction(input PlaidTransaction) Transaction {
+func MapPlaidTransaction(input *PlaidTransaction) Transaction {
 	merchant := input.MerchantName
 	if merchant == "" {
 		merchant = input.Name
@@ -65,7 +65,7 @@ func MapPlaidTransaction(input PlaidTransaction) Transaction {
 	}
 }
 
-func MapPlaidAccount(input PlaidAccount) FinancialAccount {
+func MapPlaidAccount(input *PlaidAccount) FinancialAccount {
 	currentBalance := minorUnits(input.CurrentBalance)
 	if liabilityAccount(input.Type) {
 		currentBalance = -currentBalance
@@ -85,7 +85,7 @@ func MapPlaidAccount(input PlaidAccount) FinancialAccount {
 	}
 }
 
-func MapBridgeTransaction(input BridgeTransaction) Transaction {
+func MapBridgeTransaction(input *BridgeTransaction) Transaction {
 	amount := minorUnits(input.Amount)
 	if input.Direction == "debit" {
 		amount = -amount

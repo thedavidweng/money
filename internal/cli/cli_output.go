@@ -27,16 +27,16 @@ func render(stdout io.Writer, state *runtimeState, command string, data any, tab
 	for _, opt := range opts {
 		opt(&env)
 	}
-	return contracts.WriteJSON(stdout, env)
+	return state.writeEnvelope(stdout, &env)
 }
 
-func writeManualPlan(stdout io.Writer, state *runtimeState, plan manualAccountPlan) error {
+func writeManualPlan(stdout io.Writer, state *runtimeState, plan *manualAccountPlan) error {
 	return render(stdout, state, "accounts.create_manual", map[string]any{"plan": plan}, func() {
 		_, _ = fmt.Fprintf(stdout, "Would create %s with balance %s %s\n", plan.AccountName, colorAmount(stdout, plan.SignedBalance), plan.Currency)
 	})
 }
 
-func writeTransactionsPage(stdout io.Writer, state *runtimeState, command string, transactions []core.Transaction, limit int, offset int, verbose bool) error {
+func writeTransactionsPage(stdout io.Writer, state *runtimeState, command string, transactions []core.Transaction, limit, offset int, verbose bool) error {
 	page := &contracts.Pagination{Limit: limit, Offset: offset, HasMore: len(transactions) == limit}
 	return render(stdout, state, command, map[string]any{"transactions": transactions}, func() {
 		table := tablewriter.NewWriter(stdout)
@@ -44,7 +44,8 @@ func writeTransactionsPage(stdout io.Writer, state *runtimeState, command string
 		table.SetBorder(false)
 		table.SetAutoWrapText(false)
 		table.SetAlignment(tablewriter.ALIGN_LEFT)
-		for _, tx := range transactions {
+		for i := range transactions {
+			tx := &transactions[i]
 			cat := ""
 			if tx.CategoryName != nil {
 				cat = *tx.CategoryName
@@ -76,7 +77,8 @@ func writeTransactionsPage(stdout io.Writer, state *runtimeState, command string
 		if !verbose {
 			return
 		}
-		for _, tx := range transactions {
+		for i := range transactions {
+			tx := &transactions[i]
 			_, _ = fmt.Fprintln(stdout)
 			_, _ = fmt.Fprintf(stdout, "  ID: %s\n", tx.ID)
 			_, _ = fmt.Fprintf(stdout, "  Account ID: %s\n", tx.AccountID)

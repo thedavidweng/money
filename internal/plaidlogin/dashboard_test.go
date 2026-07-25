@@ -34,7 +34,7 @@ func TestDashboardClientListsTeamsAndFetchesKeys(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewDashboardClient(DashboardClientConfig{
+	client := NewDashboardClient(&DashboardClientConfig{
 		BaseURL:    server.URL,
 		HTTPClient: server.Client(),
 		Token:      Auth{AccessToken: "access-token", ExpiresAt: time.Now().Add(time.Hour)},
@@ -81,7 +81,7 @@ func TestDashboardClientClassifiesContractDriftAndKnown401Codes(t *testing.T) {
 				_, _ = w.Write([]byte(tc.body))
 			}))
 			defer server.Close()
-			client := NewDashboardClient(DashboardClientConfig{
+			client := NewDashboardClient(&DashboardClientConfig{
 				BaseURL:    server.URL,
 				HTTPClient: server.Client(),
 				Token:      Auth{AccessToken: "access-token", ExpiresAt: time.Now().Add(time.Hour)},

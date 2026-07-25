@@ -50,7 +50,8 @@ func newBudgetsListCommand(ctx context.Context, state *runtimeState, stdout io.W
 					table.SetHeader([]string{"NAME", "PERIOD", "START", "END", "CURRENCY"})
 				}
 				table.SetBorder(false)
-				for _, b := range budgets {
+				for i := range budgets {
+					b := &budgets[i]
 					if verbose {
 						table.Append([]string{b.ID, b.Name, b.Period, b.StartDate, b.EndDate, b.Currency, strconv.Itoa(len(b.Categories))})
 					} else {
@@ -74,7 +75,7 @@ func newBudgetsCreateCommand(ctx context.Context, state *runtimeState, stdout io
 		Example: "  money budgets create --name Groceries --period monthly --start-date 2024-01-01 --end-date 2024-12-31 --confirm\n  money budgets create --name Rent --period yearly --start-date 2024-01-01 --end-date 2024-12-31 --dry-run",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if state.json && !dryRun && !confirm {
-				return cliError{
+				return &cliError{
 					command:   "budgets.create",
 					code:      "CONFIRMATION_REQUIRED",
 					message:   "JSON budget writes require --dry-run or --confirm",
@@ -105,7 +106,7 @@ func newBudgetsCreateCommand(ctx context.Context, state *runtimeState, stdout io
 			if err != nil {
 				return err
 			}
-			created, err := activeStore.CreateBudget(ctx, budget)
+			created, err := activeStore.CreateBudget(ctx, &budget)
 			if err != nil {
 				return err
 			}
@@ -142,7 +143,8 @@ func newBudgetsGetCommand(ctx context.Context, state *runtimeState, stdout io.Wr
 				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
 			var ids []string
-			for _, b := range budgets {
+			for i := range budgets {
+				b := &budgets[i]
 				ids = append(ids, b.ID+"\t"+b.Name)
 			}
 			return ids, cobra.ShellCompDirectiveNoFileComp
@@ -166,7 +168,8 @@ func newBudgetsGetCommand(ctx context.Context, state *runtimeState, stdout io.Wr
 					table := tablewriter.NewWriter(stdout)
 					table.SetHeader([]string{"NAME", "LIMIT", "CATEGORY ID"})
 					table.SetBorder(false)
-					for _, bc := range budget.Categories {
+					for i := range budget.Categories {
+						bc := &budget.Categories[i]
 						catID := "-"
 						if bc.CategoryID != nil {
 							catID = *bc.CategoryID
@@ -195,7 +198,8 @@ func newBudgetsDeleteCommand(ctx context.Context, state *runtimeState, stdout io
 				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
 			var ids []string
-			for _, b := range budgets {
+			for i := range budgets {
+				b := &budgets[i]
 				ids = append(ids, b.ID+"\t"+b.Name)
 			}
 			return ids, cobra.ShellCompDirectiveNoFileComp
@@ -236,7 +240,7 @@ func newBudgetCategoriesCreateCommand(ctx context.Context, state *runtimeState, 
 		Example: "  money budgets categories create --budget-id <id> --name Groceries --limit 50000 --confirm\n  money budgets categories create --budget-id <id> --name Dining --limit 30000 --currency USD --dry-run",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if state.json && !dryRun && !confirm {
-				return cliError{
+				return &cliError{
 					command:   "budgets.categories.create",
 					code:      "CONFIRMATION_REQUIRED",
 					message:   "JSON budget category writes require --dry-run or --confirm",
@@ -267,7 +271,7 @@ func newBudgetCategoriesCreateCommand(ctx context.Context, state *runtimeState, 
 			if err != nil {
 				return err
 			}
-			created, err := activeStore.CreateBudgetCategory(ctx, bc)
+			created, err := activeStore.CreateBudgetCategory(ctx, &bc)
 			if err != nil {
 				return err
 			}
@@ -301,8 +305,10 @@ func newBudgetCategoriesDeleteCommand(ctx context.Context, state *runtimeState, 
 				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
 			var ids []string
-			for _, b := range budgets {
-				for _, bc := range b.Categories {
+			for i := range budgets {
+				b := &budgets[i]
+				for j := range b.Categories {
+					bc := &b.Categories[j]
 					ids = append(ids, bc.ID+"\t"+bc.Name+" ("+b.Name+")")
 				}
 			}

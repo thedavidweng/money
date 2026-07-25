@@ -54,7 +54,8 @@ func newInvestmentsCommand(ctx context.Context, state *runtimeState, stdout io.W
 				table := tablewriter.NewWriter(stdout)
 				table.SetHeader([]string{"SECURITY ID", "NAME", "TICKER", "TYPE", "CLOSE PRICE", "CURRENCY"})
 				table.SetBorder(false)
-				for _, sec := range securities {
+				for i := range securities {
+					sec := &securities[i]
 					ticker := "-"
 					if sec.TickerSymbol != nil {
 						ticker = *sec.TickerSymbol
@@ -90,7 +91,8 @@ func newLiabilitiesCommand(ctx context.Context, state *runtimeState, stdout io.W
 				table := tablewriter.NewWriter(stdout)
 				table.SetHeader([]string{"ACCOUNT", "TYPE", "NAME", "BALANCE", "CURRENCY"})
 				table.SetBorder(false)
-				for _, l := range liabilities {
+				for i := range liabilities {
+					l := &liabilities[i]
 					table.Append([]string{l.AccountID, l.Type, l.Name, colorAmountFloat(stdout, l.CurrentBalance), l.Currency})
 				}
 				table.Render()

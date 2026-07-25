@@ -43,7 +43,7 @@ type LoginResult struct {
 	EnvPath           string `json:"env_path"`
 }
 
-func RunLogin(ctx context.Context, opts LoginOptions) (LoginResult, error) {
+func RunLogin(ctx context.Context, opts *LoginOptions) (LoginResult, error) {
 	environment := opts.Environment
 	if environment == "" {
 		environment = "sandbox"
@@ -67,7 +67,7 @@ func RunLogin(ctx context.Context, opts LoginOptions) (LoginResult, error) {
 	if err != nil {
 		return LoginResult{}, err
 	}
-	dashboard := NewDashboardClient(DashboardClientConfig{
+	dashboard := NewDashboardClient(&DashboardClientConfig{
 		BaseURL:    opts.DashboardURL,
 		HTTPClient: opts.HTTPClient,
 		Token:      auth,
@@ -136,7 +136,7 @@ func RunLogin(ctx context.Context, opts LoginOptions) (LoginResult, error) {
 	auth.TeamID = team.TeamID
 	auth.ClientID = keys.ClientID
 	authPath := DashboardAuthPath(meta.ConfigPath)
-	if err := WriteAuthFile(authPath, auth); err != nil {
+	if err := WriteAuthFile(authPath, &auth); err != nil {
 		return LoginResult{}, err
 	}
 	return LoginResult{
@@ -152,7 +152,7 @@ func RunLogin(ctx context.Context, opts LoginOptions) (LoginResult, error) {
 	}, nil
 }
 
-func providerOptions(environment string, opts LoginOptions) map[string]string {
+func providerOptions(environment string, opts *LoginOptions) map[string]string {
 	return map[string]string{
 		"environment":   environment,
 		"products":      opts.Products,

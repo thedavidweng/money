@@ -42,7 +42,8 @@ func newAccountsCommand(ctx context.Context, state *runtimeState, stdout io.Writ
 				}
 				table.SetBorder(false)
 				table.SetAutoWrapText(false)
-				for _, a := range accounts {
+				for i := range accounts {
+					a := &accounts[i]
 					if verbose {
 						avail := "-"
 						if a.AvailableBalance != nil {
@@ -84,7 +85,7 @@ func newCreateManualCommand(ctx context.Context, state *runtimeState, stdout io.
 		Example: "  money accounts create-manual --name Savings --type depository --balance 5000.00 --currency USD --confirm\n  money accounts create-manual --name \"Credit Card\" --type credit --balance 500.00 --dry-run",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if state.json && !dryRun && !confirm {
-				return cliError{
+				return &cliError{
 					command:   "accounts.create_manual",
 					code:      "CONFIRMATION_REQUIRED",
 					message:   "JSON manual account writes require --dry-run or --confirm",
@@ -114,13 +115,13 @@ func newCreateManualCommand(ctx context.Context, state *runtimeState, stdout io.
 			}
 			if dryRun {
 				plan.WillWrite = false
-				return writeManualPlan(stdout, state, plan)
+				return writeManualPlan(stdout, state, &plan)
 			}
 			activeStore, err := requireStore(state)
 			if err != nil {
 				return err
 			}
-			account, err := activeStore.CreateManualAccount(ctx, core.Account{
+			account, err := activeStore.CreateManualAccount(ctx, &core.Account{
 				Name:                     name,
 				Alias:                    alias,
 				Type:                     accountType,

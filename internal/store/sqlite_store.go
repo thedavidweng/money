@@ -218,7 +218,7 @@ ORDER BY a.hidden ASC, a.type ASC, a.name ASC, a.id ASC`)
 		); err != nil {
 			return nil, err
 		}
-		account.DisplayName = displayName(account)
+		account.DisplayName = displayName(&account)
 		account.CurrentBalance = core.FormatMinorUnits(account.CurrentBalanceMinorUnits, account.Currency)
 		account.AvailableBalanceMinorUnits, account.AvailableBalance = nullableMoney(availableBalance, account.Currency)
 		account.AvailableCreditMinorUnits, account.AvailableCredit = nullableMoney(availableCredit, account.Currency)
@@ -228,7 +228,8 @@ ORDER BY a.hidden ASC, a.type ASC, a.name ASC, a.id ASC`)
 	return accounts, rows.Err()
 }
 
-func (s *SQLiteStore) CreateManualAccount(ctx context.Context, account core.Account) (core.Account, error) {
+func (s *SQLiteStore) CreateManualAccount(ctx context.Context, in *core.Account) (core.Account, error) {
+	account := *in
 	now := time.Now().UTC().Format(time.RFC3339)
 	if account.ID == "" {
 		id, err := core.NewLocalID("acc_")
@@ -253,13 +254,13 @@ INSERT INTO accounts (
 	if err != nil {
 		return core.Account{}, err
 	}
-	account.DisplayName = displayName(account)
+	account.DisplayName = displayName(&account)
 	account.CurrentBalance = core.FormatMinorUnits(account.CurrentBalanceMinorUnits, account.Currency)
 	account.Source = source("manual", sql.NullString{}, sql.NullString{}, sql.NullString{}, sql.NullString{}, sql.NullString{}, sql.NullString{}, sql.NullString{}, sql.NullString{})
 	return account, nil
 }
 
-func (s *SQLiteStore) ListTransactions(ctx context.Context, query TransactionListQuery) ([]core.Transaction, error) {
+func (s *SQLiteStore) ListTransactions(ctx context.Context, query *TransactionListQuery) ([]core.Transaction, error) {
 	clauses := []string{"1=1"}
 	args := []any{}
 	switch query.RemovedMode {
@@ -658,7 +659,8 @@ FROM budgets WHERE id = ?`, id).Scan(&b.ID, &b.Name, &b.Currency, &b.Period, &b.
 	return b, nil
 }
 
-func (s *SQLiteStore) CreateBudget(ctx context.Context, budget core.Budget) (core.Budget, error) {
+func (s *SQLiteStore) CreateBudget(ctx context.Context, in *core.Budget) (core.Budget, error) {
+	budget := *in
 	now := time.Now().UTC().Format(time.RFC3339)
 	if budget.ID == "" {
 		id, err := core.NewLocalID("bdg_")
@@ -683,7 +685,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 	return budget, nil
 }
 
-func (s *SQLiteStore) UpdateBudget(ctx context.Context, budget core.Budget) (core.Budget, error) {
+func (s *SQLiteStore) UpdateBudget(ctx context.Context, budget *core.Budget) (core.Budget, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.ExecContext(ctx, `
 UPDATE budgets SET name = ?, currency = ?, period = ?, start_date = ?, end_date = ?, updated_at = ?
@@ -724,7 +726,8 @@ ORDER BY name ASC, id ASC`, budgetID)
 	return items, rows.Err()
 }
 
-func (s *SQLiteStore) CreateBudgetCategory(ctx context.Context, bc core.BudgetCategory) (core.BudgetCategory, error) {
+func (s *SQLiteStore) CreateBudgetCategory(ctx context.Context, in *core.BudgetCategory) (core.BudgetCategory, error) {
+	bc := *in
 	now := time.Now().UTC().Format(time.RFC3339)
 	if bc.ID == "" {
 		id, err := core.NewLocalID("bc_")
@@ -778,7 +781,8 @@ ORDER BY priority DESC, created_at ASC`)
 	return rules, rows.Err()
 }
 
-func (s *SQLiteStore) CreateRule(ctx context.Context, rule core.Rule) (core.Rule, error) {
+func (s *SQLiteStore) CreateRule(ctx context.Context, in *core.Rule) (core.Rule, error) {
+	rule := *in
 	now := time.Now().UTC().Format(time.RFC3339)
 	if rule.ID == "" {
 		id, err := core.NewLocalID("rule_")
@@ -803,7 +807,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 	return rule, nil
 }
 
-func (s *SQLiteStore) UpdateRule(ctx context.Context, rule core.Rule) (core.Rule, error) {
+func (s *SQLiteStore) UpdateRule(ctx context.Context, rule *core.Rule) (core.Rule, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.ExecContext(ctx, `
 UPDATE rules SET name = ?, condition_field = ?, condition_op = ?, condition_value = ?, action_type = ?, action_value = ?, priority = ?, enabled = ?, updated_at = ?
@@ -812,7 +816,7 @@ WHERE id = ?`,
 	if err != nil {
 		return core.Rule{}, err
 	}
-	return rule, nil
+	return *rule, nil
 }
 
 func (s *SQLiteStore) DeleteRule(ctx context.Context, id string) error {
@@ -840,7 +844,8 @@ func (s *SQLiteStore) ApplyRules(ctx context.Context) (core.ApplyRulesResult, er
 		"merchant_name": "t.merchant_name",
 		"name":          "t.name",
 	}
-	for i, rule := range rules {
+	for i := range rules {
+		rule := &rules[i]
 		col, ok := allowedFields[rule.ConditionField]
 		if !ok {
 			continue
@@ -920,7 +925,7 @@ ORDER BY rule_idx ASC
 	defer func() { _ = tx.Rollback() }()
 
 	for _, m := range matches {
-		if err := applyRuleActionTx(ctx, tx, m.txID, rules[m.ruleID]); err != nil {
+		if err := applyRuleActionTx(ctx, tx, m.txID, &rules[m.ruleID]); err != nil {
 			return core.ApplyRulesResult{}, err
 		}
 	}
@@ -930,7 +935,7 @@ ORDER BY rule_idx ASC
 	return core.ApplyRulesResult{TransactionsUpdated: len(matches)}, nil
 }
 
-func applyRuleActionTx(ctx context.Context, tx *sql.Tx, txID string, rule core.Rule) error {
+func applyRuleActionTx(ctx context.Context, tx *sql.Tx, txID string, rule *core.Rule) error {
 	switch rule.ActionType {
 	case "set_category":
 		var categoryName string
@@ -1030,7 +1035,7 @@ func stringPtr(value sql.NullString) *string {
 	return &value.String
 }
 
-func displayName(account core.Account) string {
+func displayName(account *core.Account) string {
 	if account.Alias != "" {
 		return account.Alias
 	}
@@ -1040,7 +1045,8 @@ func displayName(account core.Account) string {
 	return account.OfficialName
 }
 
-func (s *SQLiteStore) UpsertImportedAccount(ctx context.Context, account core.Account) error {
+func (s *SQLiteStore) UpsertImportedAccount(ctx context.Context, in *core.Account) error {
+	account := *in
 	now := time.Now().UTC().Format(time.RFC3339)
 	if account.UpdatedAt == "" {
 		account.UpdatedAt = now
@@ -1059,13 +1065,13 @@ INSERT INTO accounts (
 	return err
 }
 
-func (s *SQLiteStore) UpsertImportedTransaction(ctx context.Context, tx core.Transaction, sourceRowHash string) (bool, []string, error) {
+func (s *SQLiteStore) UpsertImportedTransaction(ctx context.Context, tx *core.Transaction, sourceRowHash string) (inserted bool, possibleDuplicateIDs []string, err error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	lastChanged := tx.LastChangedAt
 	if lastChanged == "" {
 		lastChanged = now
 	}
-	_, err := s.db.ExecContext(ctx, `
+	_, err = s.db.ExecContext(ctx, `
 INSERT INTO transactions (
   id, account_id, source_kind, import_source_id, import_batch_id, source_row_hash,
   date, amount_minor_units, currency, name, merchant_name,
@@ -1089,7 +1095,7 @@ INSERT INTO transactions (
 	return true, possibleDups, err
 }
 
-func (s *SQLiteStore) findPossibleDuplicates(ctx context.Context, tx core.Transaction) ([]string, error) {
+func (s *SQLiteStore) findPossibleDuplicates(ctx context.Context, tx *core.Transaction) ([]string, error) {
 	rows, err := s.db.QueryContext(ctx, `
 SELECT id FROM transactions
 WHERE account_id = ? AND date = ? AND amount_minor_units = ? AND id != ?

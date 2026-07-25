@@ -123,7 +123,7 @@ func TestWriteSyncJSONSuccessReturnsEnvelope(t *testing.T) {
 		},
 		Warnings: []syncer.Warning{},
 	}
-	err := writeSyncJSON(&buf, result, nil)
+	err := writeSyncJSON(&runtimeState{}, &buf, result, nil)
 	if err != nil {
 		t.Fatalf("writeSyncJSON returned error: %v", err)
 	}
@@ -168,7 +168,7 @@ func TestWriteSyncJSONPartialFailureReturnsErrorEnvelopeWithExitCode(t *testing.
 		},
 	}
 	partialErr := syncer.PartialFailure{Result: result}
-	err := writeSyncJSON(&buf, result, partialErr)
+	err := writeSyncJSON(&runtimeState{}, &buf, result, partialErr)
 
 	var exitErr cliExit
 	if !errors.As(err, &exitErr) {
@@ -185,9 +185,9 @@ func TestWriteSyncJSONPartialFailureReturnsErrorEnvelopeWithExitCode(t *testing.
 				Status string `json:"status"`
 			} `json:"items"`
 		} `json:"data"`
-		Errors []struct {
+		Error *struct {
 			Code string `json:"code"`
-		} `json:"errors"`
+		} `json:"error"`
 		Meta struct {
 			Command string `json:"command"`
 		} `json:"meta"`
@@ -198,8 +198,8 @@ func TestWriteSyncJSONPartialFailureReturnsErrorEnvelopeWithExitCode(t *testing.
 	if envelope.OK {
 		t.Fatal("ok = true, want false")
 	}
-	if len(envelope.Errors) != 1 || envelope.Errors[0].Code != "SYNC_PARTIAL_FAILURE" {
-		t.Fatalf("errors = %#v", envelope.Errors)
+	if envelope.Error == nil || envelope.Error.Code != "SYNC_PARTIAL_FAILURE" {
+		t.Fatalf("error = %#v", envelope.Error)
 	}
 	if len(envelope.Data.Items) != 2 {
 		t.Fatalf("data items length = %d, want 2 (partial failure includes result data)", len(envelope.Data.Items))
@@ -212,7 +212,7 @@ func TestWriteSyncJSONPartialFailureReturnsErrorEnvelopeWithExitCode(t *testing.
 func TestWriteSyncJSONGenericErrorReturnsRawError(t *testing.T) {
 	var buf bytes.Buffer
 	genericErr := fmt.Errorf("database connection failed")
-	err := writeSyncJSON(&buf, syncer.Result{}, genericErr)
+	err := writeSyncJSON(&runtimeState{}, &buf, syncer.Result{}, genericErr)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -227,7 +227,7 @@ func TestWriteSyncJSONGenericErrorReturnsRawError(t *testing.T) {
 
 func TestWriteSyncJSONSuccessWithEmptyResult(t *testing.T) {
 	var buf bytes.Buffer
-	err := writeSyncJSON(&buf, syncer.Result{}, nil)
+	err := writeSyncJSON(&runtimeState{}, &buf, syncer.Result{}, nil)
 	if err != nil {
 		t.Fatalf("writeSyncJSON returned error: %v", err)
 	}
@@ -466,7 +466,7 @@ func TestManualPlanJSONHasCorrectCommand(t *testing.T) {
 		FinancialPosition: "asset",
 		WillWrite:         true,
 	}
-	err := writeManualPlan(&buf, state, plan)
+	err := writeManualPlan(&buf, state, &plan)
 	if err != nil {
 		t.Fatalf("writeManualPlan returned error: %v", err)
 	}

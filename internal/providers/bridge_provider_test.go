@@ -28,7 +28,7 @@ func TestBridgeProviderCreateLinkSessionCreatesUserTokenAndConnectSession(t *tes
 		pollInterval: time.Millisecond,
 	}
 
-	session, err := provider.CreateLinkSession(context.Background(), LinkRequest{State: "state"})
+	session, err := provider.CreateLinkSession(context.Background(), &LinkRequest{State: "state"})
 	if err != nil {
 		t.Fatalf("create link session: %v", err)
 	}
@@ -68,12 +68,12 @@ func TestBridgeProviderExchangeLinkTokenPollsNewItemAndMapsLinkedItem(t *testing
 		pollInterval: time.Millisecond,
 	}
 
-	linked, err := provider.ExchangeLinkToken(context.Background(), LinkSession{
+	linked, err := provider.ExchangeLinkToken(context.Background(), &LinkSession{
 		Provider:                "bridge",
 		State:                   "bridge-user",
 		ProviderAccessToken:     "bridge-user-token",
 		ExistingProviderItemIDs: []string{"item_existing"},
-	}, LinkCallback{})
+	}, &LinkCallback{})
 	if err != nil {
 		t.Fatalf("exchange link token: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestBridgeProviderSyncAccountsThenTransactionsWithUpdatedAtCursor(t *testin
 	}
 	sink := &recordingSyncSink{}
 
-	result, err := provider.Sync(context.Background(), ProviderItem{
+	result, err := provider.Sync(context.Background(), &ProviderItem{
 		ID:                     "bridge:item_1",
 		ProviderExternalItemID: "item_1",
 		EncryptedAccessToken:   []byte("bridge-user"),
@@ -192,8 +192,8 @@ func (c *fakeBridgeAPI) CreateBridgeAuthToken(ctx context.Context, externalUserI
 	return token, nil
 }
 
-func (c *fakeBridgeAPI) CreateBridgeConnectSession(ctx context.Context, accessToken string, request BridgeConnectSessionRequest) (BridgeConnectSession, error) {
-	c.connectRequest = request
+func (c *fakeBridgeAPI) CreateBridgeConnectSession(ctx context.Context, accessToken string, request *BridgeConnectSessionRequest) (BridgeConnectSession, error) {
+	c.connectRequest = *request
 	return c.connect, nil
 }
 
@@ -209,12 +209,12 @@ func (c *fakeBridgeAPI) ListBridgeItems(ctx context.Context, accessToken string)
 	return c.polledItems[index], nil
 }
 
-func (c *fakeBridgeAPI) ListBridgeAccounts(ctx context.Context, accessToken string, itemID string) ([]BridgeAccount, error) {
+func (c *fakeBridgeAPI) ListBridgeAccounts(ctx context.Context, accessToken, itemID string) ([]BridgeAccount, error) {
 	c.accountsItemID = itemID
 	return c.accounts, nil
 }
 
-func (c *fakeBridgeAPI) ListBridgeTransactions(ctx context.Context, accessToken string, since string) ([]BridgeSyncTransaction, error) {
+func (c *fakeBridgeAPI) ListBridgeTransactions(ctx context.Context, accessToken, since string) ([]BridgeSyncTransaction, error) {
 	c.transactionsSince = since
 	return c.transactions, nil
 }

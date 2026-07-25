@@ -22,7 +22,7 @@ type SetupResult struct {
 	SyncFixed     int    `json:"sync_fixed,omitempty"`
 }
 
-func Setup(configPath string, profile string, force bool) (SetupResult, error) {
+func Setup(configPath, profile string, force bool) (SetupResult, error) {
 	if err := validateProfile(profile); err != nil {
 		return SetupResult{}, err
 	}
@@ -74,8 +74,7 @@ func configSkeleton(dbPath string) string {
 	rel = filepath.ToSlash(rel)
 	return fmt.Sprintf(`database:
   path: %s
-  encryption_key:
-    env: MONEY_DB_ENCRYPTION_KEY
+  encryption_key: "env:MONEY_DB_ENCRYPTION_KEY"
 
 providers: {}
 `, rel)
@@ -129,7 +128,7 @@ type ConfigureResult struct {
 	KeysWritten int    `json:"keys_written"`
 }
 
-func ConfigureProvider(configPath string, profile string, spec ProviderSpec, secrets map[string]string, options map[string]string, force bool) (ConfigureResult, error) {
+func ConfigureProvider(configPath, profile string, spec ProviderSpec, secrets, options map[string]string, force bool) (ConfigureResult, error) {
 	meta, err := ResolveMetadata(Options{ConfigPath: configPath, Profile: profile})
 	if err != nil {
 		return ConfigureResult{}, err
@@ -176,7 +175,7 @@ func ConfigureProvider(configPath string, profile string, spec ProviderSpec, sec
 	return result, nil
 }
 
-func ProviderCredentialConflicts(configPath string, profile string, spec ProviderSpec) (conflicts []string, envPath string, err error) {
+func ProviderCredentialConflicts(configPath, profile string, spec ProviderSpec) (conflicts []string, envPath string, err error) {
 	meta, err := ResolveMetadata(Options{ConfigPath: configPath, Profile: profile})
 	if err != nil {
 		return nil, "", err
@@ -230,7 +229,7 @@ func updateProviderConfig(configPath string, spec ProviderSpec, options map[stri
 
 	providerBlock := map[string]any{}
 	for _, field := range spec.SecretFields {
-		providerBlock[field] = map[string]any{"env": providerEnvVar(spec.Name, field)}
+		providerBlock[field] = "env:" + providerEnvVar(spec.Name, field)
 	}
 	for field, defaultVal := range spec.OptionalFields {
 		val := options[field]

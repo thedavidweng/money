@@ -42,7 +42,8 @@ func newRulesListCommand(ctx context.Context, state *runtimeState, stdout io.Wri
 				table := tablewriter.NewWriter(stdout)
 				table.SetHeader([]string{"NAME", "IF", "THEN", "PRIORITY"})
 				table.SetBorder(false)
-				for _, r := range rules {
+				for i := range rules {
+					r := &rules[i]
 					condition := fmt.Sprintf("%s %s %q", r.ConditionField, r.ConditionOp, r.ConditionValue)
 					action := fmt.Sprintf("%s %q", r.ActionType, r.ActionValue)
 					table.Append([]string{r.Name, condition, action, fmt.Sprintf("%d", r.Priority)})
@@ -63,7 +64,7 @@ func newRulesCreateCommand(ctx context.Context, state *runtimeState, stdout io.W
 		Example: "  money rules create --name \"Mark Uber\" --condition-field merchant_name --condition-op contains --condition-value uber --action-type set_category --action-value transport --confirm\n  money rules create --name \"Add note\" --condition-field name --condition-op equals --condition-value \"Starbucks\" --action-type set_note --action-value \"coffee\" --dry-run",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if state.json && !dryRun && !confirm {
-				return cliError{
+				return &cliError{
 					command:   "rules.create",
 					code:      "CONFIRMATION_REQUIRED",
 					message:   "JSON rule writes require --dry-run or --confirm",
@@ -95,7 +96,7 @@ func newRulesCreateCommand(ctx context.Context, state *runtimeState, stdout io.W
 			if err != nil {
 				return err
 			}
-			created, err := activeStore.CreateRule(ctx, rule)
+			created, err := activeStore.CreateRule(ctx, &rule)
 			if err != nil {
 				return err
 			}
@@ -140,8 +141,8 @@ func newRulesDeleteCommand(ctx context.Context, state *runtimeState, stdout io.W
 				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
 			var ids []string
-			for _, r := range rules {
-				ids = append(ids, r.ID+"\t"+r.Name)
+			for i := range rules {
+				ids = append(ids, rules[i].ID+"\t"+rules[i].Name)
 			}
 			return ids, cobra.ShellCompDirectiveNoFileComp
 		},

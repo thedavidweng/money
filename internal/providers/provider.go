@@ -30,15 +30,15 @@ type Provider interface {
 	Name() string
 	ValidateConfig(ctx context.Context) []ConfigDiagnostic
 	SearchInstitutions(ctx context.Context, query string) ([]Institution, error)
-	CreateLinkSession(ctx context.Context, request LinkRequest) (LinkSession, error)
-	ExchangeLinkToken(ctx context.Context, session LinkSession, callback LinkCallback) (LinkedItem, error)
-	Sync(ctx context.Context, item ProviderItem, sink SyncSink) (SyncResult, error)
+	CreateLinkSession(ctx context.Context, request *LinkRequest) (LinkSession, error)
+	ExchangeLinkToken(ctx context.Context, session *LinkSession, callback *LinkCallback) (LinkedItem, error)
+	Sync(ctx context.Context, item *ProviderItem, sink SyncSink) (SyncResult, error)
 }
 
 // TransactionQuerier is an optional interface for providers that support
 // querying transactions by date range without syncing.
 type TransactionQuerier interface {
-	QueryTransactions(ctx context.Context, item ProviderItem, startDate string, endDate string) ([]Transaction, error)
+	QueryTransactions(ctx context.Context, item *ProviderItem, startDate, endDate string) ([]Transaction, error)
 }
 
 // HoldingQuerier is an optional interface for providers that support

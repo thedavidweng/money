@@ -62,13 +62,14 @@ func (m *MonarchImporter) Import(ctx context.Context, store ImportStore, batchID
 			},
 			UpdatedAt: now,
 		}
-		if err := store.UpsertImportedAccount(ctx, acc); err != nil {
+		if err := store.UpsertImportedAccount(ctx, &acc); err != nil {
 			return result, ImportError{Code: "ACCOUNT_WRITE_FAILED", Message: err.Error()}
 		}
 		result.AccountsImported++
 	}
 
-	for _, mt := range payload.Transactions {
+	for i := range payload.Transactions {
+		mt := &payload.Transactions[i]
 		accountID, ok := accountIDMap[mt.AccountID]
 		if !ok {
 			return result, ImportError{Code: "UNKNOWN_ACCOUNT", Message: fmt.Sprintf("transaction references unknown account %q", mt.AccountID)}
@@ -100,7 +101,7 @@ func (m *MonarchImporter) Import(ctx context.Context, store ImportStore, batchID
 			tx.CategoryName = &mt.Category
 		}
 
-		inserted, possibleDups, err := store.UpsertImportedTransaction(ctx, tx, rowHash)
+		inserted, possibleDups, err := store.UpsertImportedTransaction(ctx, &tx, rowHash)
 		if err != nil {
 			return result, ImportError{Code: "TRANSACTION_WRITE_FAILED", Message: err.Error()}
 		}
@@ -155,7 +156,7 @@ func mapMonarchType(monarchType string) string {
 	}
 }
 
-func hashMonarchRow(mt monarchTransaction) string {
+func hashMonarchRow(mt *monarchTransaction) string {
 	h := sha256.New()
 	_, _ = fmt.Fprintf(h, "%s|%s|%s|%d|%s|%s|%t", mt.ID, mt.AccountID, mt.Date, int64(mt.Amount*100), mt.Currency, mt.Name, mt.Pending)
 	return hex.EncodeToString(h.Sum(nil))

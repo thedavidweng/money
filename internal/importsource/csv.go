@@ -82,7 +82,7 @@ func (c *CSVImporter) Import(ctx context.Context, store ImportStore, batchID str
 				Currency:                 currency,
 				Source:                   core.Source{Kind: "import", ImportSourceID: strPtr("csv"), ImportBatchID: strPtr(batchID)},
 			}
-			if err := store.UpsertImportedAccount(ctx, acc); err != nil {
+			if err := store.UpsertImportedAccount(ctx, &acc); err != nil {
 				return result, fmt.Errorf("upsert account %q: %w", accountName, err)
 			}
 			accountsByName[accountName] = acc
@@ -106,7 +106,7 @@ func (c *CSVImporter) Import(ctx context.Context, store ImportStore, batchID str
 			Source:           core.Source{Kind: "import", ImportSourceID: strPtr("csv"), ImportBatchID: strPtr(batchID)},
 		}
 
-		inserted, possibleDups, err := store.UpsertImportedTransaction(ctx, tx, rowHash)
+		inserted, possibleDups, err := store.UpsertImportedTransaction(ctx, &tx, rowHash)
 		if err != nil {
 			return result, fmt.Errorf("upsert transaction row %d: %w", i+2, err)
 		}

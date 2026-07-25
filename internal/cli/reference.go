@@ -129,7 +129,8 @@ func newItemsCommand(ctx context.Context, state *runtimeState, stdout io.Writer)
 				table := tablewriter.NewWriter(stdout)
 				table.SetHeader([]string{"ID", "PROVIDER", "INSTITUTION", "ALIAS", "STATUS", "PRODUCTS"})
 				table.SetBorder(false)
-				for _, item := range items {
+				for i := range items {
+					item := &items[i]
 					alias := item.Alias
 					if alias == "" {
 						alias = "-"
@@ -154,8 +155,8 @@ func newItemsCommand(ctx context.Context, state *runtimeState, stdout io.Writer)
 				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
 			var ids []string
-			for _, item := range items {
-				ids = append(ids, item.ID+"\t"+item.Provider+": "+item.InstitutionID)
+			for i := range items {
+				ids = append(ids, items[i].ID+"\t"+items[i].Provider+": "+items[i].InstitutionID)
 			}
 			return ids, cobra.ShellCompDirectiveNoFileComp
 		},
@@ -196,8 +197,8 @@ func newItemsCommand(ctx context.Context, state *runtimeState, stdout io.Writer)
 					return nil, cobra.ShellCompDirectiveNoFileComp
 				}
 				var ids []string
-				for _, item := range items {
-					ids = append(ids, item.ID+"\t"+item.Provider+": "+item.InstitutionID)
+				for i := range items {
+					ids = append(ids, items[i].ID+"\t"+items[i].Provider+": "+items[i].InstitutionID)
 				}
 				return ids, cobra.ShellCompDirectiveNoFileComp
 			}
@@ -231,8 +232,8 @@ func newItemsCommand(ctx context.Context, state *runtimeState, stdout io.Writer)
 				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
 			var ids []string
-			for _, item := range items {
-				ids = append(ids, item.ID+"\t"+item.Provider+": "+item.InstitutionID)
+			for i := range items {
+				ids = append(ids, items[i].ID+"\t"+items[i].Provider+": "+items[i].InstitutionID)
 			}
 			return ids, cobra.ShellCompDirectiveNoFileComp
 		},
@@ -279,7 +280,8 @@ func newRecurringCommand(ctx context.Context, state *runtimeState, stdout io.Wri
 					table.SetHeader([]string{"MERCHANT", "AMOUNT", "FREQUENCY", "NEXT DATE"})
 				}
 				table.SetBorder(false)
-				for _, r := range recurringItems {
+				for i := range recurringItems {
+					r := &recurringItems[i]
 					nextDate := "-"
 					if r.NextDate != nil {
 						nextDate = *r.NextDate

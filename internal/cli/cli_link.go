@@ -30,7 +30,7 @@ func newLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if providerName != "plaid" {
-				return cliError{
+				return &cliError{
 					command:   "link",
 					code:      "FEATURE_NOT_IMPLEMENTED",
 					message:   providerName + " institution-first Link flow is not implemented yet.",
@@ -43,7 +43,7 @@ func newLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 			if err != nil {
 				return err
 			}
-			registry := providers.NewRegistry(cfg)
+			registry := providers.NewRegistry(&cfg)
 			provider, ok := registry.Get(providerName)
 			if !ok {
 				return fmt.Errorf("%s provider is not registered", providerName)
@@ -58,7 +58,7 @@ func newLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 				if spec, ok := config.ProviderSpecByName(providerName); ok && spec.HelpURL != "" {
 					msg += " Get credentials: " + spec.HelpURL
 				}
-				return cliError{
+				return &cliError{
 					command:   "link",
 					code:      diagnostics[0].Code,
 					message:   msg,
@@ -68,7 +68,7 @@ func newLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 				}
 			}
 			if state.json {
-				return cliError{
+				return &cliError{
 					command:   "link",
 					code:      "INTERACTIVE_LINK_REQUIRES_HUMAN_MODE",
 					message:   providerName + " Link requires a local browser callback; omit --json for the live link flow.",
@@ -88,7 +88,7 @@ func newLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 						_, _ = fmt.Fprintf(stdout, "%s\t%s\t%s\n", candidate.Provider, candidate.ProviderInstitutionID, candidate.Name)
 					}
 				}
-				return cliError{
+				return &cliError{
 					command:   "link",
 					code:      "INSTITUTION_SELECTION_REQUIRED",
 					message:   err.Error(),
@@ -97,7 +97,7 @@ func newLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 					exitCode:  7,
 				}
 			}
-			return runPlaidLinkFlow(ctx, state, provider, plaidLinkFlowOptions{
+			return runPlaidLinkFlow(ctx, state, provider, &plaidLinkFlowOptions{
 				CommandName:                 "link",
 				Institution:                 institution,
 				RedirectURI:                 cfg.Providers["plaid"].Fields["redirect_uri"],
@@ -132,7 +132,7 @@ func newProviderLinkCommand(ctx context.Context, state *runtimeState, providerNa
 			if err != nil {
 				return err
 			}
-			registry := providers.NewRegistry(cfg)
+			registry := providers.NewRegistry(&cfg)
 			provider, ok := registry.Get(providerName)
 			if !ok {
 				return fmt.Errorf("%s provider is not registered", providerName)
@@ -143,7 +143,7 @@ func newProviderLinkCommand(ctx context.Context, state *runtimeState, providerNa
 				if spec, ok := config.ProviderSpecByName(providerName); ok && spec.HelpURL != "" {
 					msg += " Get credentials: " + spec.HelpURL
 				}
-				return cliError{
+				return &cliError{
 					command:   "providers." + providerName + ".link",
 					code:      diagnostics[0].Code,
 					message:   msg,
@@ -153,7 +153,7 @@ func newProviderLinkCommand(ctx context.Context, state *runtimeState, providerNa
 				}
 			}
 			if state.json {
-				return cliError{
+				return &cliError{
 					command:   "providers." + providerName + ".link",
 					code:      "INTERACTIVE_LINK_REQUIRES_HUMAN_MODE",
 					message:   providerName + " Link requires a local browser callback; omit --json for the live link flow.",
@@ -164,7 +164,7 @@ func newProviderLinkCommand(ctx context.Context, state *runtimeState, providerNa
 			}
 			switch providerName {
 			case "plaid":
-				return runPlaidLinkFlow(ctx, state, provider, plaidLinkFlowOptions{
+				return runPlaidLinkFlow(ctx, state, provider, &plaidLinkFlowOptions{
 					CommandName:                 "providers.plaid.link",
 					RedirectURI:                 cfg.Providers["plaid"].Fields["redirect_uri"],
 					NoOpen:                      noOpen,
@@ -175,7 +175,7 @@ func newProviderLinkCommand(ctx context.Context, state *runtimeState, providerNa
 			case "bridge":
 				return runBridgeLinkFlow(ctx, state, provider, cfg.Providers["bridge"].Fields["callback_url"], noOpen, stdout)
 			default:
-				return cliError{
+				return &cliError{
 					command:   "providers." + providerName + ".link",
 					code:      "FEATURE_NOT_IMPLEMENTED",
 					message:   providerName + " Link flow is not implemented yet.",
@@ -270,7 +270,7 @@ func commaList(value string) []string {
 	return values
 }
 
-func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider providers.Provider, opts plaidLinkFlowOptions, stdout io.Writer) error {
+func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider providers.Provider, opts *plaidLinkFlowOptions, stdout io.Writer) error {
 	activeStore, err := requireStore(state)
 	if err != nil {
 		return err
@@ -279,7 +279,7 @@ func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider provide
 	if err != nil {
 		return err
 	}
-	session, err := provider.CreateLinkSession(ctx, providers.LinkRequest{
+	session, err := provider.CreateLinkSession(ctx, &providers.LinkRequest{
 		Institution:                 opts.Institution,
 		RedirectURI:                 opts.RedirectURI,
 		State:                       linkState,
@@ -325,11 +325,11 @@ func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider provide
 	if err != nil {
 		return err
 	}
-	result, err := linking.CompleteProviderLink(ctx, activeStore, provider, session, callback)
+	result, err := linking.CompleteProviderLink(ctx, activeStore, provider, &session, &callback)
 	if err != nil {
 		var canceled linking.LinkCanceledError
 		if errors.As(err, &canceled) {
-			return cliError{
+			return &cliError{
 				command:   opts.CommandName,
 				code:      "LINK_CANCELED",
 				message:   canceled.Error(),
@@ -338,9 +338,9 @@ func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider provide
 				exitCode:  10,
 			}
 		}
-		var flowErr linking.LinkFlowError
+		var flowErr *linking.LinkFlowError
 		if errors.As(err, &flowErr) {
-			return cliError{
+			return &cliError{
 				command:   opts.CommandName,
 				code:      "LINK_ERROR",
 				message:   flowErr.Error(),
@@ -357,7 +357,7 @@ func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider provide
 			"provider_item_id": result.ProviderItemID,
 			"institution_id":   result.InstitutionID,
 		})
-		return contracts.WriteJSON(stdout, env)
+		return state.writeEnvelope(stdout, &env)
 	}
 	_, _ = fmt.Fprintf(stdout, "Linked %s Provider Item %s.\n", result.Provider, result.ProviderItemID)
 	_, _ = fmt.Fprintln(stdout, "No sync was run. Run `money sync` after linking.")
@@ -376,7 +376,7 @@ func runPlaidSandboxLink(ctx context.Context, state *runtimeState, sandboxCreato
 		environment = "sandbox"
 	}
 	if environment != "sandbox" {
-		return cliError{
+		return &cliError{
 			command:   "plaid.sandbox.link",
 			code:      "INVALID_ENVIRONMENT",
 			message:   "money plaid sandbox link requires providers.plaid.environment to be sandbox.",
@@ -388,7 +388,7 @@ func runPlaidSandboxLink(ctx context.Context, state *runtimeState, sandboxCreato
 	products := commaList(opts.Products)
 	for _, product := range products {
 		if product == "balance" {
-			return cliError{
+			return &cliError{
 				command:   "plaid.sandbox.link",
 				code:      "INVALID_PRODUCT",
 				message:   "Plaid Sandbox product balance is not supported; choose explicit initial products such as transactions.",
@@ -418,7 +418,7 @@ func runPlaidSandboxLink(ctx context.Context, state *runtimeState, sandboxCreato
 		State:    linkState,
 		Products: products,
 	}
-	result, err := linking.CompleteProviderLink(ctx, activeStore, provider, session, providers.LinkCallback{
+	result, err := linking.CompleteProviderLink(ctx, activeStore, provider, &session, &providers.LinkCallback{
 		PublicToken: publicToken,
 		State:       linkState,
 		Status:      "success",
@@ -435,7 +435,7 @@ func runPlaidSandboxLink(ctx context.Context, state *runtimeState, sandboxCreato
 			"provider_item_id": result.ProviderItemID,
 			"institution_id":   result.InstitutionID,
 		})
-		return contracts.WriteJSON(stdout, env)
+		return state.writeEnvelope(stdout, &env)
 	}
 	_, _ = fmt.Fprintf(stdout, "Linked %s Sandbox Provider Item %s.\n", result.Provider, result.ProviderItemID)
 	_, _ = fmt.Fprintln(stdout, "No sync was run. Run `money sync` after linking.")
@@ -451,7 +451,7 @@ func runBridgeLinkFlow(ctx context.Context, state *runtimeState, provider provid
 	if err != nil {
 		return err
 	}
-	session, err := provider.CreateLinkSession(ctx, providers.LinkRequest{
+	session, err := provider.CreateLinkSession(ctx, &providers.LinkRequest{
 		RedirectURI: callbackURL,
 		State:       linkState,
 	})
@@ -476,7 +476,7 @@ func runBridgeLinkFlow(ctx context.Context, state *runtimeState, provider provid
 	}
 	pollCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	result, err := linking.CompleteProviderLink(pollCtx, activeStore, provider, session, providers.LinkCallback{State: session.State})
+	result, err := linking.CompleteProviderLink(pollCtx, activeStore, provider, &session, &providers.LinkCallback{State: session.State})
 	if err != nil {
 		return err
 	}

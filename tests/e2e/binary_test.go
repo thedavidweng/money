@@ -110,7 +110,7 @@ func run(t *testing.T, bin string, args ...string) (stdout string, exitCode int)
 	return stdout, exitCode
 }
 
-func assertValidEnvelope(t *testing.T, stdout string, wantCommand string) map[string]any {
+func assertValidEnvelope(t *testing.T, stdout, wantCommand string) map[string]any {
 	t.Helper()
 	var envelope map[string]any
 	if err := json.Unmarshal([]byte(stdout), &envelope); err != nil {

@@ -20,7 +20,7 @@ type PlaidLinkTokenRequestConfig struct {
 	OptionalProducts            []string
 }
 
-func BuildPlaidLinkTokenCreateRequest(cfg PlaidLinkTokenRequestConfig) (plaid.LinkTokenCreateRequest, error) {
+func BuildPlaidLinkTokenCreateRequest(cfg *PlaidLinkTokenRequestConfig) (plaid.LinkTokenCreateRequest, error) {
 	if cfg.ClientName == "" {
 		return plaid.LinkTokenCreateRequest{}, fmt.Errorf("plaid client name is required")
 	}

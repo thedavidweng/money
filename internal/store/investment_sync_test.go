@@ -16,7 +16,7 @@ func TestInvestmentSyncLifecycleUpsertSecuritiesHoldingsThenClear(t *testing.T) 
 	defer func() { _ = db.Close() }()
 
 	// Link a provider item for the investment account.
-	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_inv", Name: "Invest Bank", Provider: "plaid", ProviderInstitutionID: "ins_inv"},
 		Item: LinkedItem{
 			ID: "pi_inv", Provider: "plaid", InstitutionID: "inst_inv",
@@ -27,7 +27,7 @@ func TestInvestmentSyncLifecycleUpsertSecuritiesHoldingsThenClear(t *testing.T) 
 		t.Fatalf("store linked item: %v", err)
 	}
 	// Upsert the investment account.
-	if err := db.UpsertAccount(ctx, core.FinancialAccount{
+	if err := db.UpsertAccount(ctx, &core.FinancialAccount{
 		ProviderItemID: "pi_inv", ProviderAccountID: "acc_inv",
 		Name: "Brokerage", Type: "investment", Currency: "USD",
 	}); err != nil {
@@ -36,7 +36,7 @@ func TestInvestmentSyncLifecycleUpsertSecuritiesHoldingsThenClear(t *testing.T) 
 
 	// Upsert two securities.
 	tickerAAPL := "AAPL"
-	if err := db.UpsertSecurity(ctx, core.InvestmentSecurity{
+	if err := db.UpsertSecurity(ctx, &core.InvestmentSecurity{
 		SecurityID:   "sec_aapl",
 		Name:         "Apple Inc",
 		TickerSymbol: &tickerAAPL,
@@ -46,7 +46,7 @@ func TestInvestmentSyncLifecycleUpsertSecuritiesHoldingsThenClear(t *testing.T) 
 	}); err != nil {
 		t.Fatalf("upsert AAPL: %v", err)
 	}
-	if err := db.UpsertSecurity(ctx, core.InvestmentSecurity{
+	if err := db.UpsertSecurity(ctx, &core.InvestmentSecurity{
 		SecurityID: "sec_spy",
 		Name:       "SPDR S&P 500 ETF",
 		Type:       "etf",
@@ -58,7 +58,7 @@ func TestInvestmentSyncLifecycleUpsertSecuritiesHoldingsThenClear(t *testing.T) 
 
 	// Upsert holdings.
 	costBasis := 15000.00
-	if err := db.UpsertHolding(ctx, "pi_inv", core.InvestmentHolding{
+	if err := db.UpsertHolding(ctx, "pi_inv", &core.InvestmentHolding{
 		AccountID:        "acc_inv",
 		SecurityID:       "sec_aapl",
 		Quantity:         100,
@@ -69,7 +69,7 @@ func TestInvestmentSyncLifecycleUpsertSecuritiesHoldingsThenClear(t *testing.T) 
 	}); err != nil {
 		t.Fatalf("upsert AAPL holding: %v", err)
 	}
-	if err := db.UpsertHolding(ctx, "pi_inv", core.InvestmentHolding{
+	if err := db.UpsertHolding(ctx, "pi_inv", &core.InvestmentHolding{
 		AccountID:        "acc_inv",
 		SecurityID:       "sec_spy",
 		Quantity:         50,
@@ -121,7 +121,7 @@ func TestInvestmentSyncLifecycleUpsertSecuritiesHoldingsThenClear(t *testing.T) 
 	}
 
 	// Upsert again with updated price (simulates re-sync).
-	if err := db.UpsertSecurity(ctx, core.InvestmentSecurity{
+	if err := db.UpsertSecurity(ctx, &core.InvestmentSecurity{
 		SecurityID: "sec_aapl",
 		Name:       "Apple Inc",
 		Type:       "equity",

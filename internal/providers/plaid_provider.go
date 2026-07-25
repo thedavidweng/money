@@ -11,13 +11,13 @@ import (
 )
 
 type plaidClient interface {
-	CreateLinkToken(ctx context.Context, request plaid.LinkTokenCreateRequest) (string, error)
+	CreateLinkToken(ctx context.Context, request *plaid.LinkTokenCreateRequest) (string, error)
 	CreateSandboxPublicToken(ctx context.Context, institutionID string, products []plaid.Products) (string, error)
 	ExchangePublicToken(ctx context.Context, publicToken string) (PlaidPublicTokenExchangeResult, error)
-	SearchInstitutions(ctx context.Context, request plaid.InstitutionsSearchRequest) ([]plaid.Institution, error)
+	SearchInstitutions(ctx context.Context, request *plaid.InstitutionsSearchRequest) ([]plaid.Institution, error)
 	GetAccounts(ctx context.Context, accessToken string) ([]plaid.AccountBase, error)
-	SyncTransactions(ctx context.Context, accessToken string, cursor string) (plaid.TransactionsSyncResponse, error)
-	GetTransactions(ctx context.Context, accessToken string, startDate string, endDate string) ([]plaid.Transaction, error)
+	SyncTransactions(ctx context.Context, accessToken, cursor string) (plaid.TransactionsSyncResponse, error)
+	GetTransactions(ctx context.Context, accessToken, startDate, endDate string) ([]plaid.Transaction, error)
 	GetHoldings(ctx context.Context, accessToken string) (plaid.InvestmentsHoldingsGetResponse, error)
 	GetLiabilities(ctx context.Context, accessToken string) (plaid.LiabilitiesGetResponse, error)
 }
@@ -68,12 +68,13 @@ func (p plaidProvider) SearchInstitutions(ctx context.Context, query string) ([]
 	}
 	request := plaid.NewInstitutionsSearchRequest(query, countries)
 	request.SetProducts(products)
-	plaidInstitutions, err := client.SearchInstitutions(ctx, *request)
+	plaidInstitutions, err := client.SearchInstitutions(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 	institutions := make([]Institution, 0, len(plaidInstitutions))
-	for _, institution := range plaidInstitutions {
+	for i := range plaidInstitutions {
+		institution := &plaidInstitutions[i]
 		institutions = append(institutions, Institution{
 			ID:                    providerScopedID("plaid", institution.GetInstitutionId()),
 			Name:                  institution.GetName(),
@@ -84,12 +85,12 @@ func (p plaidProvider) SearchInstitutions(ctx context.Context, query string) ([]
 	return institutions, nil
 }
 
-func (p plaidProvider) CreateLinkSession(ctx context.Context, request LinkRequest) (LinkSession, error) {
+func (p plaidProvider) CreateLinkSession(ctx context.Context, request *LinkRequest) (LinkSession, error) {
 	client, err := p.plaidClient()
 	if err != nil {
 		return LinkSession{}, err
 	}
-	linkTokenRequest, err := BuildPlaidLinkTokenCreateRequest(PlaidLinkTokenRequestConfig{
+	linkTokenRequest, err := BuildPlaidLinkTokenCreateRequest(&PlaidLinkTokenRequestConfig{
 		ClientName:                  "money",
 		Language:                    "en",
 		ClientUserID:                request.State,
@@ -104,7 +105,7 @@ func (p plaidProvider) CreateLinkSession(ctx context.Context, request LinkReques
 	if err != nil {
 		return LinkSession{}, err
 	}
-	linkToken, err := client.CreateLinkToken(ctx, linkTokenRequest)
+	linkToken, err := client.CreateLinkToken(ctx, &linkTokenRequest)
 	if err != nil {
 		return LinkSession{}, err
 	}
@@ -126,7 +127,7 @@ func (p plaidProvider) CreateSandboxPublicToken(ctx context.Context, request San
 	return client.CreateSandboxPublicToken(ctx, request.InstitutionID, products)
 }
 
-func (p plaidProvider) ExchangeLinkToken(ctx context.Context, session LinkSession, callback LinkCallback) (LinkedItem, error) {
+func (p plaidProvider) ExchangeLinkToken(ctx context.Context, session *LinkSession, callback *LinkCallback) (LinkedItem, error) {
 	if callback.State != session.State {
 		return LinkedItem{}, fmt.Errorf("plaid Link callback state does not match session state")
 	}
@@ -165,7 +166,7 @@ func (p plaidProvider) ExchangeLinkToken(ctx context.Context, session LinkSessio
 	}, nil
 }
 
-func (p plaidProvider) QueryTransactions(ctx context.Context, item ProviderItem, startDate string, endDate string) ([]Transaction, error) {
+func (p plaidProvider) QueryTransactions(ctx context.Context, item *ProviderItem, startDate, endDate string) ([]Transaction, error) {
 	client, err := p.plaidClient()
 	if err != nil {
 		return nil, err
@@ -179,13 +180,13 @@ func (p plaidProvider) QueryTransactions(ctx context.Context, item ProviderItem,
 		return nil, err
 	}
 	transactions := make([]Transaction, 0, len(plaidTxs))
-	for _, tx := range plaidTxs {
-		transactions = append(transactions, mapPlaidSDKTransaction(item.ID, tx))
+	for i := range plaidTxs {
+		transactions = append(transactions, mapPlaidSDKTransaction(item.ID, &plaidTxs[i]))
 	}
 	return transactions, nil
 }
 
-func (p plaidProvider) Sync(ctx context.Context, item ProviderItem, sink SyncSink) (SyncResult, error) {
+func (p plaidProvider) Sync(ctx context.Context, item *ProviderItem, sink SyncSink) (SyncResult, error) {
 	client, err := p.plaidClient()
 	if err != nil {
 		return SyncResult{}, err
@@ -199,8 +200,9 @@ func (p plaidProvider) Sync(ctx context.Context, item ProviderItem, sink SyncSin
 	if err != nil {
 		return SyncResult{}, err
 	}
-	for _, account := range accounts {
-		if err := sink.UpsertAccount(ctx, mapPlaidSDKAccount(item.ID, account)); err != nil {
+	for i := range accounts {
+		acct := mapPlaidSDKAccount(item.ID, &accounts[i])
+		if err := sink.UpsertAccount(ctx, &acct); err != nil {
 			return SyncResult{}, err
 		}
 		result.AccountsSeen++
@@ -212,14 +214,18 @@ func (p plaidProvider) Sync(ctx context.Context, item ProviderItem, sink SyncSin
 		if err != nil {
 			return SyncResult{}, err
 		}
-		for _, transaction := range page.GetAdded() {
-			if err := sink.UpsertTransaction(ctx, mapPlaidSDKTransaction(item.ID, transaction)); err != nil {
+		added := page.GetAdded()
+		for i := range added {
+			txn := mapPlaidSDKTransaction(item.ID, &added[i])
+			if err := sink.UpsertTransaction(ctx, &txn); err != nil {
 				return SyncResult{}, err
 			}
 			result.TransactionsAdded++
 		}
-		for _, transaction := range page.GetModified() {
-			if err := sink.UpsertTransaction(ctx, mapPlaidSDKTransaction(item.ID, transaction)); err != nil {
+		modified := page.GetModified()
+		for i := range modified {
+			txn := mapPlaidSDKTransaction(item.ID, &modified[i])
+			if err := sink.UpsertTransaction(ctx, &txn); err != nil {
 				return SyncResult{}, err
 			}
 			result.TransactionsModified++
@@ -269,13 +275,13 @@ func linkProductsOrConfig(requestValues []string, cfg config.ProviderConfig, nam
 	return providerListField(cfg, name)
 }
 
-func providerScopedID(provider string, externalID string) string {
+func providerScopedID(provider, externalID string) string {
 	return provider + ":" + externalID
 }
 
-func mapPlaidSDKAccount(providerItemID string, account plaid.AccountBase) FinancialAccount {
+func mapPlaidSDKAccount(providerItemID string, account *plaid.AccountBase) FinancialAccount {
 	balances := account.GetBalances()
-	return MapPlaidAccount(PlaidAccount{
+	return MapPlaidAccount(&PlaidAccount{
 		ProviderItemID:    providerItemID,
 		ProviderAccountID: account.GetAccountId(),
 		Name:              account.GetName(),
@@ -290,9 +296,9 @@ func mapPlaidSDKAccount(providerItemID string, account plaid.AccountBase) Financ
 	})
 }
 
-func mapPlaidSDKTransaction(providerItemID string, transaction plaid.Transaction) Transaction {
+func mapPlaidSDKTransaction(providerItemID string, transaction *plaid.Transaction) Transaction {
 	category, subcategory := plaidCategories(transaction.Category)
-	return MapPlaidTransaction(PlaidTransaction{
+	return MapPlaidTransaction(&PlaidTransaction{
 		ProviderItemID:        providerItemID,
 		ProviderTransactionID: transaction.GetTransactionId(),
 		ProviderAccountID:     transaction.GetAccountId(),
@@ -322,14 +328,14 @@ func plaidNullableString(value *string, ok bool) *string {
 	return value
 }
 
-func plaidCurrency(iso string, unofficial string) string {
+func plaidCurrency(iso, unofficial string) string {
 	if iso != "" {
 		return iso
 	}
 	return unofficial
 }
 
-func plaidCategories(categories []string) (category *string, subcategory *string) {
+func plaidCategories(categories []string) (category, subcategory *string) {
 	if len(categories) == 0 {
 		return nil, nil
 	}

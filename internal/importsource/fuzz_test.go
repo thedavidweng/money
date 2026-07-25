@@ -12,11 +12,11 @@ import (
 // so we can fuzz the CSV parsing pipeline for panics.
 type noopStore struct{}
 
-func (noopStore) UpsertImportedAccount(_ context.Context, _ core.Account) error {
+func (noopStore) UpsertImportedAccount(_ context.Context, _ *core.Account) error {
 	return nil
 }
 
-func (noopStore) UpsertImportedTransaction(_ context.Context, _ core.Transaction, _ string) (inserted bool, duplicateIDs []string, err error) {
+func (noopStore) UpsertImportedTransaction(_ context.Context, _ *core.Transaction, _ string) (inserted bool, duplicateIDs []string, err error) {
 	return true, nil, nil
 }
 

@@ -16,7 +16,7 @@ func TestLiabilitySyncLifecycleUpsertThenClear(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Link a provider item for the liability account.
-	if err := db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
+	if err := db.StoreLinkedProviderItem(ctx, &LinkedProviderItem{
 		Institution: LinkedInstitution{ID: "inst_liab", Name: "Loan Bank", Provider: "plaid", ProviderInstitutionID: "ins_liab"},
 		Item: LinkedItem{
 			ID: "pi_liab", Provider: "plaid", InstitutionID: "inst_liab",
@@ -26,7 +26,7 @@ func TestLiabilitySyncLifecycleUpsertThenClear(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("store linked item: %v", err)
 	}
-	if err := db.UpsertAccount(ctx, core.FinancialAccount{
+	if err := db.UpsertAccount(ctx, &core.FinancialAccount{
 		ProviderItemID: "pi_liab", ProviderAccountID: "acc_liab",
 		Name: "Student Loan", Type: "loan", Currency: "USD",
 	}); err != nil {
@@ -38,7 +38,7 @@ func TestLiabilitySyncLifecycleUpsertThenClear(t *testing.T) {
 	lastPayment := 350.00
 	apr := 5.5
 	nextDue := "2026-06-01"
-	if err := db.UpsertLiability(ctx, "pi_liab", core.Liability{
+	if err := db.UpsertLiability(ctx, "pi_liab", &core.Liability{
 		AccountID:          "acc_liab",
 		Type:               "student",
 		CurrentBalance:     22000.00,
@@ -76,7 +76,7 @@ func TestLiabilitySyncLifecycleUpsertThenClear(t *testing.T) {
 	}
 
 	// Upsert again with updated balance (simulates re-sync).
-	if err := db.UpsertLiability(ctx, "pi_liab", core.Liability{
+	if err := db.UpsertLiability(ctx, "pi_liab", &core.Liability{
 		AccountID:      "acc_liab",
 		Type:           "student",
 		CurrentBalance: 21650.00,

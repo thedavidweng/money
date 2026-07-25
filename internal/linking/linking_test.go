@@ -18,11 +18,11 @@ func TestCompleteProviderLinkExchangesTokenAndStoresProviderItem(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	result, err := CompleteProviderLink(ctx, db, fakeProvider{}, providers.LinkSession{
+	result, err := CompleteProviderLink(ctx, db, fakeProvider{}, &providers.LinkSession{
 		Provider: "plaid",
 		URL:      "http://127.0.0.1/link",
 		State:    "state",
-	}, providers.LinkCallback{
+	}, &providers.LinkCallback{
 		PublicToken: "public-token",
 		State:       "state",
 	})
@@ -50,10 +50,10 @@ func TestCompleteProviderLinkStoresTokenInEncryptedStore(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	result, err := CompleteProviderLink(ctx, db, fakeProvider{}, providers.LinkSession{
+	result, err := CompleteProviderLink(ctx, db, fakeProvider{}, &providers.LinkSession{
 		Provider: "plaid",
 		State:    "state",
-	}, providers.LinkCallback{
+	}, &providers.LinkCallback{
 		PublicToken: "public-token",
 		State:       "state",
 	})
@@ -78,7 +78,7 @@ func TestCompleteProviderLinkDoesNotExchangeTokenForCancelOrError(t *testing.T) 
 	}
 	defer func() { _ = db.Close() }()
 
-	_, err = CompleteProviderLink(ctx, db, exchangeCountingProvider{}, providers.LinkSession{Provider: "plaid", State: "state"}, providers.LinkCallback{
+	_, err = CompleteProviderLink(ctx, db, exchangeCountingProvider{}, &providers.LinkSession{Provider: "plaid", State: "state"}, &providers.LinkCallback{
 		Status: "cancel",
 		State:  "state",
 	})
@@ -87,7 +87,7 @@ func TestCompleteProviderLinkDoesNotExchangeTokenForCancelOrError(t *testing.T) 
 		t.Fatalf("cancel err = %#v", err)
 	}
 
-	_, err = CompleteProviderLink(ctx, db, exchangeCountingProvider{}, providers.LinkSession{Provider: "plaid", State: "state"}, providers.LinkCallback{
+	_, err = CompleteProviderLink(ctx, db, exchangeCountingProvider{}, &providers.LinkSession{Provider: "plaid", State: "state"}, &providers.LinkCallback{
 		Status: "error",
 		State:  "state",
 		Error:  providers.LinkError{Type: "ITEM_ERROR", Code: "INVALID_CREDENTIALS", Message: "bad credentials"},
@@ -96,7 +96,7 @@ func TestCompleteProviderLinkDoesNotExchangeTokenForCancelOrError(t *testing.T) 
 			LinkSessionID: "link-session",
 		},
 	})
-	var linkErr LinkFlowError
+	var linkErr *LinkFlowError
 	if !errors.As(err, &linkErr) || linkErr.Code != "INVALID_CREDENTIALS" {
 		t.Fatalf("link err = %#v", err)
 	}
@@ -115,10 +115,10 @@ func (fakeProvider) ValidateConfig(ctx context.Context) []providers.ConfigDiagno
 func (fakeProvider) SearchInstitutions(ctx context.Context, query string) ([]providers.Institution, error) {
 	return nil, nil
 }
-func (fakeProvider) CreateLinkSession(ctx context.Context, request providers.LinkRequest) (providers.LinkSession, error) {
+func (fakeProvider) CreateLinkSession(ctx context.Context, request *providers.LinkRequest) (providers.LinkSession, error) {
 	return providers.LinkSession{}, nil
 }
-func (fakeProvider) ExchangeLinkToken(ctx context.Context, session providers.LinkSession, callback providers.LinkCallback) (providers.LinkedItem, error) {
+func (fakeProvider) ExchangeLinkToken(ctx context.Context, session *providers.LinkSession, callback *providers.LinkCallback) (providers.LinkedItem, error) {
 	return providers.LinkedItem{
 		Institution: providers.Institution{
 			ID:                    "inst_fake",
@@ -137,7 +137,7 @@ func (fakeProvider) ExchangeLinkToken(ctx context.Context, session providers.Lin
 		},
 	}, nil
 }
-func (fakeProvider) Sync(ctx context.Context, item providers.ProviderItem, sink providers.SyncSink) (providers.SyncResult, error) {
+func (fakeProvider) Sync(ctx context.Context, item *providers.ProviderItem, sink providers.SyncSink) (providers.SyncResult, error) {
 	return providers.SyncResult{}, nil
 }
 
@@ -145,6 +145,6 @@ type exchangeCountingProvider struct {
 	fakeProvider
 }
 
-func (exchangeCountingProvider) ExchangeLinkToken(ctx context.Context, session providers.LinkSession, callback providers.LinkCallback) (providers.LinkedItem, error) {
+func (exchangeCountingProvider) ExchangeLinkToken(ctx context.Context, session *providers.LinkSession, callback *providers.LinkCallback) (providers.LinkedItem, error) {
 	panic("ExchangeLinkToken should not be called for canceled or errored Link callbacks")
 }

@@ -16,9 +16,9 @@ type ImportSource interface {
 
 // ImportStore is the minimal store surface needed by import sources.
 type ImportStore interface {
-	UpsertImportedAccount(ctx context.Context, account core.Account) error
+	UpsertImportedAccount(ctx context.Context, account *core.Account) error
 	// UpsertImportedTransaction inserts or skips a transaction. Returns (inserted, possibleDuplicateIDs, error).
-	UpsertImportedTransaction(ctx context.Context, tx core.Transaction, sourceRowHash string) (bool, []string, error)
+	UpsertImportedTransaction(ctx context.Context, tx *core.Transaction, sourceRowHash string) (bool, []string, error)
 }
 
 // Result reports what an import source produced.

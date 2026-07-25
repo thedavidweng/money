@@ -1,6 +1,6 @@
 # JSON envelope and exit-code contract
 
-Status: Accepted
+Status: Accepted (envelope shape superseded by ADR-0003; exit-code contract still current)
 
 ## Context
 

@@ -19,7 +19,7 @@ func BenchmarkListTransactions(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := db.ListTransactions(ctx, query); err != nil {
+		if _, err := db.ListTransactions(ctx, &query); err != nil {
 			b.Fatalf("list transactions: %v", err)
 		}
 	}
@@ -67,12 +67,13 @@ func BenchmarkApplyRules(b *testing.B) {
 		if err != nil {
 			b.Fatalf("open demo: %v", err)
 		}
-		for _, r := range []core.Rule{
+		benchRules := []core.Rule{
 			{Name: "bench-coffee", ConditionField: "merchant_name", ConditionOp: "contains", ConditionValue: "Blue Bottle", ActionType: "set_category", ActionValue: catID, Priority: 10, Enabled: true},
 			{Name: "bench-rent", ConditionField: "merchant_name", ConditionOp: "contains", ConditionValue: "Rent", ActionType: "set_category", ActionValue: catID, Priority: 9, Enabled: true},
 			{Name: "bench-grocery", ConditionField: "merchant_name", ConditionOp: "contains", ConditionValue: "Grocery", ActionType: "set_category", ActionValue: catID, Priority: 8, Enabled: true},
-		} {
-			if _, err := db.CreateRule(ctx, r); err != nil {
+		}
+		for i := range benchRules {
+			if _, err := db.CreateRule(ctx, &benchRules[i]); err != nil {
 				_ = db.Close()
 				b.Fatalf("create rule: %v", err)
 			}

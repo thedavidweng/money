@@ -3,25 +3,26 @@ package contracts
 import (
 	"encoding/json"
 	"io"
-	"time"
 )
 
-const SchemaVersion = "0.1"
+const SchemaVersion = "2026-07-25"
 
 type Envelope struct {
-	OK       bool       `json:"ok"`
-	Data     any        `json:"data,omitempty"`
-	Meta     Meta       `json:"meta"`
-	Warnings []Warning  `json:"warnings"`
-	Errors   []APIError `json:"errors"`
+	OK    bool      `json:"ok"`
+	Data  any       `json:"data,omitempty"`
+	Error *APIError `json:"error,omitempty"`
+	Meta  Meta      `json:"meta"`
 }
 
 type Meta struct {
 	Command       string      `json:"command"`
+	Profile       string      `json:"profile"`
+	DurationMs    int64       `json:"duration_ms"`
 	SchemaVersion string      `json:"schema_version"`
-	GeneratedAt   string      `json:"generated_at"`
+	RequestID     string      `json:"request_id"`
 	Demo          bool        `json:"demo,omitempty"`
 	Pagination    *Pagination `json:"pagination,omitempty"`
+	Warnings      []Warning   `json:"warnings,omitempty"`
 }
 
 type Pagination struct {
@@ -32,10 +33,11 @@ type Pagination struct {
 }
 
 type APIError struct {
-	Code      string   `json:"code"`
-	Message   string   `json:"message"`
-	Category  Category `json:"category"`
-	Retryable bool     `json:"retryable"`
+	Code      string     `json:"code"`
+	Message   string     `json:"message"`
+	Category  Category   `json:"category"`
+	Retryable bool       `json:"retryable"`
+	Details   []APIError `json:"details,omitempty"`
 }
 
 type Warning struct {
@@ -63,28 +65,25 @@ func NewSuccess(command string, data any) Envelope {
 		Meta: Meta{
 			Command:       command,
 			SchemaVersion: SchemaVersion,
-			GeneratedAt:   time.Now().UTC().Format(time.RFC3339),
 		},
-		Warnings: []Warning{},
-		Errors:   []APIError{},
 	}
 }
 
 func NewError(command, code, message string, category Category, retryable bool) Envelope {
 	return Envelope{
-		OK: false,
+		OK:    false,
+		Error: &APIError{Code: code, Message: message, Category: category, Retryable: retryable},
 		Meta: Meta{
 			Command:       command,
 			SchemaVersion: SchemaVersion,
-			GeneratedAt:   time.Now().UTC().Format(time.RFC3339),
 		},
-		Warnings: []Warning{},
-		Errors:   []APIError{{Code: code, Message: message, Category: category, Retryable: retryable}},
 	}
 }
 
-func WriteJSON(w io.Writer, env Envelope) error {
+func WriteJSON(w io.Writer, env *Envelope, pretty bool) error {
 	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
+	if pretty {
+		enc.SetIndent("", "  ")
+	}
 	return enc.Encode(env)
 }

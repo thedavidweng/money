@@ -3,7 +3,7 @@ package providers
 import "testing"
 
 func TestMapPlaidTransactionNormalizesOutflowToNegative(t *testing.T) {
-	tx := MapPlaidTransaction(PlaidTransaction{
+	tx := MapPlaidTransaction(&PlaidTransaction{
 		ProviderItemID:        "pi_demo",
 		ProviderTransactionID: "plaid_tx_1",
 		ProviderAccountID:     "plaid_acc_1",
@@ -23,7 +23,7 @@ func TestMapPlaidTransactionNormalizesOutflowToNegative(t *testing.T) {
 }
 
 func TestMapPlaidCreditAccountNormalizesLiabilityBalanceToNegative(t *testing.T) {
-	account := MapPlaidAccount(PlaidAccount{
+	account := MapPlaidAccount(&PlaidAccount{
 		ProviderItemID:    "pi_demo",
 		ProviderAccountID: "plaid_credit_1",
 		Name:              "Credit Card",
@@ -43,7 +43,7 @@ func TestMapPlaidCreditAccountNormalizesLiabilityBalanceToNegative(t *testing.T)
 }
 
 func TestMapBridgeTransactionKeepsPositiveCreditAndNegativeDebit(t *testing.T) {
-	credit := MapBridgeTransaction(BridgeTransaction{
+	credit := MapBridgeTransaction(&BridgeTransaction{
 		ProviderItemID:        "pi_bridge",
 		ProviderTransactionID: "bridge_tx_credit",
 		ProviderAccountID:     "bridge_acc",
@@ -53,7 +53,7 @@ func TestMapBridgeTransactionKeepsPositiveCreditAndNegativeDebit(t *testing.T) {
 		Description:           "Interest",
 		Currency:              "USD",
 	})
-	debit := MapBridgeTransaction(BridgeTransaction{
+	debit := MapBridgeTransaction(&BridgeTransaction{
 		ProviderItemID:        "pi_bridge",
 		ProviderTransactionID: "bridge_tx_debit",
 		ProviderAccountID:     "bridge_acc",

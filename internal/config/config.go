@@ -61,6 +61,10 @@ type yamlNode struct {
 func (n *yamlNode) UnmarshalYAML(value *yaml.Node) error {
 	switch value.Kind {
 	case yaml.ScalarNode:
+		if name, ok := strings.CutPrefix(value.Value, "env:"); ok {
+			n.Value = envReference{Name: name}
+			return nil
+		}
 		n.Value = value.Value
 	case yaml.SequenceNode:
 		values := make([]string, 0, len(value.Content))
@@ -68,14 +72,8 @@ func (n *yamlNode) UnmarshalYAML(value *yaml.Node) error {
 			values = append(values, child.Value)
 		}
 		n.Value = values
-	case yaml.MappingNode:
-		if len(value.Content) == 2 && value.Content[0].Value == "env" {
-			n.Value = envReference{Name: value.Content[1].Value}
-			return nil
-		}
-		return fmt.Errorf("unsupported YAML object; secret references must be {env: NAME}")
 	default:
-		return fmt.Errorf("unsupported YAML node kind %d", value.Kind)
+		return fmt.Errorf("unsupported YAML node kind %d; secret references must be the string \"env:NAME\"", value.Kind)
 	}
 	return nil
 }
@@ -345,7 +343,7 @@ func processEnv() map[string]string {
 	return env
 }
 
-func resolvePath(path string, baseDir string) string {
+func resolvePath(path, baseDir string) string {
 	path = expandHome(path)
 	if filepath.IsAbs(path) {
 		return filepath.Clean(path)

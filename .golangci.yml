@@ -24,12 +24,6 @@ linters:
         - diagnostic
         - performance
         - style
-      disabled-checks:
-        - hugeParam
-        - rangeValCopy
-        - paramTypeCombine
-        - nestingReduce
-        - unnamedResult
     misspell:
       locale: US
     nolintlint:

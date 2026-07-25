@@ -34,7 +34,7 @@ func TestRunPlaidLinkFlowNoOpenStoresLinkedItem(t *testing.T) {
 		if linkToken != "link-token" || state == "" {
 			t.Fatalf("server input linkToken=%q state=%q", linkToken, state)
 		}
-		return fakeLinkSessionServer{
+		return &fakeLinkSessionServer{
 			url: "http://127.0.0.1:4000",
 			callback: providers.LinkCallback{
 				PublicToken: "public-token",
@@ -49,7 +49,7 @@ func TestRunPlaidLinkFlowNoOpenStoresLinkedItem(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	state := &runtimeState{store: db, stderr: &stderr}
-	if err := runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, plaidLinkFlowOptions{NoOpen: true}, &stdout); err != nil {
+	if err := runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, &plaidLinkFlowOptions{NoOpen: true}, &stdout); err != nil {
 		t.Fatalf("run plaid link flow: %v", err)
 	}
 	if opened {
@@ -84,7 +84,7 @@ func TestRunPlaidLinkFlowWaitsForEnterBeforeOpeningBrowser(t *testing.T) {
 	})
 
 	startPlaidLinkSessionServer = func(linkToken string, state string, timeout time.Duration) (linkSessionServer, error) {
-		return fakeLinkSessionServer{
+		return &fakeLinkSessionServer{
 			url: "http://127.0.0.1:4000",
 			callback: providers.LinkCallback{
 				PublicToken: "public-token",
@@ -100,7 +100,7 @@ func TestRunPlaidLinkFlowWaitsForEnterBeforeOpeningBrowser(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	state := &runtimeState{store: db, stdin: strings.NewReader("\n"), stderr: &stderr}
-	if err := runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, plaidLinkFlowOptions{}, &stdout); err != nil {
+	if err := runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, &plaidLinkFlowOptions{}, &stdout); err != nil {
 		t.Fatalf("run plaid link flow: %v", err)
 	}
 	if openedURL != "http://127.0.0.1:4000" {
@@ -119,7 +119,7 @@ func TestRunPlaidLinkFlowPassesConsentProductOptions(t *testing.T) {
 	oldStart := startPlaidLinkSessionServer
 	t.Cleanup(func() { startPlaidLinkSessionServer = oldStart })
 	startPlaidLinkSessionServer = func(linkToken string, state string, timeout time.Duration) (linkSessionServer, error) {
-		return fakeLinkSessionServer{
+		return &fakeLinkSessionServer{
 			url: "http://127.0.0.1:4000",
 			callback: providers.LinkCallback{
 				PublicToken: "public-token",
@@ -131,7 +131,7 @@ func TestRunPlaidLinkFlowPassesConsentProductOptions(t *testing.T) {
 	provider := &recordingPlaidCLIProvider{}
 	var stdout, stderr bytes.Buffer
 	state := &runtimeState{store: db, stderr: &stderr}
-	err = runPlaidLinkFlow(ctx, state, provider, plaidLinkFlowOptions{
+	err = runPlaidLinkFlow(ctx, state, provider, &plaidLinkFlowOptions{
 		NoOpen:                      true,
 		AdditionalConsentedProducts: "investments",
 		RequiredIfSupportedProducts: "liabilities",
@@ -200,7 +200,7 @@ func TestRunPlaidSandboxLinkValidation(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			provider := &fakePlaidSandboxProvider{}
 			err := runPlaidSandboxLink(context.Background(), state, provider, provider, opts, io.Discard)
-			var cliErr cliError
+			var cliErr *cliError
 			if !errors.As(err, &cliErr) || cliErr.category != "validation" {
 				t.Fatalf("err = %#v", err)
 			}
@@ -266,7 +266,7 @@ func TestWriteSyncJSONPartialFailureReturnsExitSentinelWithItemDiagnostics(t *te
 		{Provider: "bridge", ProviderItemID: "pi_bad", Status: "error", ErrorCode: "NETWORK_ERROR"},
 	}}
 
-	err := writeSyncJSON(&stdout, result, syncer.PartialFailure{Result: result})
+	err := writeSyncJSON(&runtimeState{}, &stdout, result, syncer.PartialFailure{Result: result})
 	var exitErr cliExit
 	if !errors.As(err, &exitErr) {
 		t.Fatalf("error = %#v, want cliExit", err)
@@ -274,7 +274,7 @@ func TestWriteSyncJSONPartialFailureReturnsExitSentinelWithItemDiagnostics(t *te
 	if exitErr.exitCode != 6 {
 		t.Fatalf("exit code = %d, want 6", exitErr.exitCode)
 	}
-	if !strings.Contains(stdout.String(), `"ok": false`) || !strings.Contains(stdout.String(), `"pi_bad"`) {
+	if !strings.Contains(stdout.String(), `"ok":false`) || !strings.Contains(stdout.String(), `"pi_bad"`) {
 		t.Fatalf("stdout = %s", stdout.String())
 	}
 }
@@ -322,15 +322,15 @@ type fakeLinkSessionServer struct {
 	callback providers.LinkCallback
 }
 
-func (s fakeLinkSessionServer) LinkURL() string {
+func (s *fakeLinkSessionServer) LinkURL() string {
 	return s.url
 }
 
-func (s fakeLinkSessionServer) Wait(ctx context.Context) (providers.LinkCallback, error) {
+func (s *fakeLinkSessionServer) Wait(ctx context.Context) (providers.LinkCallback, error) {
 	return s.callback, nil
 }
 
-func (s fakeLinkSessionServer) Shutdown(ctx context.Context) error {
+func (s *fakeLinkSessionServer) Shutdown(ctx context.Context) error {
 	return nil
 }
 
@@ -345,7 +345,7 @@ func TestRunPlaidLinkFlowReturnsCLIErrorOnCancel(t *testing.T) {
 	oldStart := startPlaidLinkSessionServer
 	t.Cleanup(func() { startPlaidLinkSessionServer = oldStart })
 	startPlaidLinkSessionServer = func(linkToken string, state string, timeout time.Duration) (linkSessionServer, error) {
-		return fakeLinkSessionServer{
+		return &fakeLinkSessionServer{
 			url: "http://127.0.0.1:4000",
 			callback: providers.LinkCallback{
 				State:    state,
@@ -357,8 +357,8 @@ func TestRunPlaidLinkFlowReturnsCLIErrorOnCancel(t *testing.T) {
 
 	var stdout bytes.Buffer
 	state := &runtimeState{store: db}
-	err = runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, plaidLinkFlowOptions{CommandName: "providers.plaid.link", NoOpen: true}, &stdout)
-	var cliErr cliError
+	err = runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, &plaidLinkFlowOptions{CommandName: "providers.plaid.link", NoOpen: true}, &stdout)
+	var cliErr *cliError
 	if !errors.As(err, &cliErr) {
 		t.Fatalf("expected cliError, got %#v", err)
 	}
@@ -393,7 +393,7 @@ func TestRunPlaidLinkFlowReturnsCLIErrorOnLinkError(t *testing.T) {
 	oldStart := startPlaidLinkSessionServer
 	t.Cleanup(func() { startPlaidLinkSessionServer = oldStart })
 	startPlaidLinkSessionServer = func(linkToken string, state string, timeout time.Duration) (linkSessionServer, error) {
-		return fakeLinkSessionServer{
+		return &fakeLinkSessionServer{
 			url: "http://127.0.0.1:4000",
 			callback: providers.LinkCallback{
 				State:    state,
@@ -406,8 +406,8 @@ func TestRunPlaidLinkFlowReturnsCLIErrorOnLinkError(t *testing.T) {
 
 	var stdout bytes.Buffer
 	state := &runtimeState{store: db}
-	err = runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, plaidLinkFlowOptions{CommandName: "link", NoOpen: true}, &stdout)
-	var cliErr cliError
+	err = runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, &plaidLinkFlowOptions{CommandName: "link", NoOpen: true}, &stdout)
+	var cliErr *cliError
 	if !errors.As(err, &cliErr) {
 		t.Fatalf("expected cliError, got %#v", err)
 	}
@@ -442,7 +442,7 @@ func TestRunPlaidLinkFlowWritesJSONWhenStateJSON(t *testing.T) {
 	oldStart := startPlaidLinkSessionServer
 	t.Cleanup(func() { startPlaidLinkSessionServer = oldStart })
 	startPlaidLinkSessionServer = func(linkToken string, state string, timeout time.Duration) (linkSessionServer, error) {
-		return fakeLinkSessionServer{
+		return &fakeLinkSessionServer{
 			url: "http://127.0.0.1:4000",
 			callback: providers.LinkCallback{
 				PublicToken: "public-token",
@@ -453,17 +453,17 @@ func TestRunPlaidLinkFlowWritesJSONWhenStateJSON(t *testing.T) {
 
 	var stdout bytes.Buffer
 	state := &runtimeState{store: db, json: true}
-	if err := runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, plaidLinkFlowOptions{CommandName: "link", NoOpen: true}, &stdout); err != nil {
+	if err := runPlaidLinkFlow(ctx, state, fakePlaidCLIProvider{}, &plaidLinkFlowOptions{CommandName: "link", NoOpen: true}, &stdout); err != nil {
 		t.Fatalf("run plaid link flow: %v", err)
 	}
 	out := stdout.String()
-	if !strings.Contains(out, `"ok": true`) {
+	if !strings.Contains(out, `"ok":true`) {
 		t.Fatalf("expected success envelope, stdout = %q", out)
 	}
-	if !strings.Contains(out, `"provider_item_id": "pi_cli"`) {
+	if !strings.Contains(out, `"provider_item_id":"pi_cli"`) {
 		t.Fatalf("expected provider_item_id in JSON, stdout = %q", out)
 	}
-	if !strings.Contains(out, `"institution_id": "inst_cli"`) {
+	if !strings.Contains(out, `"institution_id":"inst_cli"`) {
 		t.Fatalf("expected institution_id in JSON, stdout = %q", out)
 	}
 	if strings.Contains(out, "Plaid Link URL") {
@@ -492,13 +492,13 @@ func TestRunPlaidSandboxLinkWritesJSONWhenStateJSON(t *testing.T) {
 		t.Fatalf("run plaid sandbox link: %v", err)
 	}
 	out := stdout.String()
-	if !strings.Contains(out, `"ok": true`) {
+	if !strings.Contains(out, `"ok":true`) {
 		t.Fatalf("expected success envelope, stdout = %q", out)
 	}
-	if !strings.Contains(out, `"provider_item_id": "pi_sandbox"`) {
+	if !strings.Contains(out, `"provider_item_id":"pi_sandbox"`) {
 		t.Fatalf("expected provider_item_id in JSON, stdout = %q", out)
 	}
-	if !strings.Contains(out, `"institution_id": "plaid:ins_56"`) {
+	if !strings.Contains(out, `"institution_id":"plaid:ins_56"`) {
 		t.Fatalf("expected institution_id in JSON, stdout = %q", out)
 	}
 	if strings.Contains(out, "Linked plaid Sandbox") {
@@ -515,10 +515,10 @@ func (fakePlaidCLIProvider) ValidateConfig(ctx context.Context) []providers.Conf
 func (fakePlaidCLIProvider) SearchInstitutions(ctx context.Context, query string) ([]providers.Institution, error) {
 	return nil, nil
 }
-func (fakePlaidCLIProvider) CreateLinkSession(ctx context.Context, request providers.LinkRequest) (providers.LinkSession, error) {
+func (fakePlaidCLIProvider) CreateLinkSession(ctx context.Context, request *providers.LinkRequest) (providers.LinkSession, error) {
 	return providers.LinkSession{Provider: "plaid", LinkToken: "link-token", State: request.State}, nil
 }
-func (fakePlaidCLIProvider) ExchangeLinkToken(ctx context.Context, session providers.LinkSession, callback providers.LinkCallback) (providers.LinkedItem, error) {
+func (fakePlaidCLIProvider) ExchangeLinkToken(ctx context.Context, session *providers.LinkSession, callback *providers.LinkCallback) (providers.LinkedItem, error) {
 	return providers.LinkedItem{
 		Institution: providers.Institution{
 			ID:                    "inst_cli",
@@ -536,7 +536,7 @@ func (fakePlaidCLIProvider) ExchangeLinkToken(ctx context.Context, session provi
 		},
 	}, nil
 }
-func (fakePlaidCLIProvider) Sync(ctx context.Context, item providers.ProviderItem, sink providers.SyncSink) (providers.SyncResult, error) {
+func (fakePlaidCLIProvider) Sync(ctx context.Context, item *providers.ProviderItem, sink providers.SyncSink) (providers.SyncResult, error) {
 	return providers.SyncResult{}, nil
 }
 
@@ -545,8 +545,8 @@ type recordingPlaidCLIProvider struct {
 	request providers.LinkRequest
 }
 
-func (p *recordingPlaidCLIProvider) CreateLinkSession(ctx context.Context, request providers.LinkRequest) (providers.LinkSession, error) {
-	p.request = request
+func (p *recordingPlaidCLIProvider) CreateLinkSession(ctx context.Context, request *providers.LinkRequest) (providers.LinkSession, error) {
+	p.request = *request
 	return providers.LinkSession{Provider: "plaid", LinkToken: "link-token", State: request.State}, nil
 }
 
@@ -562,8 +562,8 @@ func (p *fakePlaidSandboxProvider) CreateSandboxPublicToken(ctx context.Context,
 	return p.publicToken, nil
 }
 
-func (p *fakePlaidSandboxProvider) ExchangeLinkToken(ctx context.Context, session providers.LinkSession, callback providers.LinkCallback) (providers.LinkedItem, error) {
-	p.callback = callback
+func (p *fakePlaidSandboxProvider) ExchangeLinkToken(ctx context.Context, session *providers.LinkSession, callback *providers.LinkCallback) (providers.LinkedItem, error) {
+	p.callback = *callback
 	return providers.LinkedItem{
 		Institution: providers.Institution{
 			ID:                    "plaid:ins_56",
@@ -592,7 +592,7 @@ func (fakeBridgeCLIProvider) ValidateConfig(ctx context.Context) []providers.Con
 func (fakeBridgeCLIProvider) SearchInstitutions(ctx context.Context, query string) ([]providers.Institution, error) {
 	return nil, nil
 }
-func (fakeBridgeCLIProvider) CreateLinkSession(ctx context.Context, request providers.LinkRequest) (providers.LinkSession, error) {
+func (fakeBridgeCLIProvider) CreateLinkSession(ctx context.Context, request *providers.LinkRequest) (providers.LinkSession, error) {
 	return providers.LinkSession{
 		Provider:            "bridge",
 		URL:                 "https://connect.bridgeapi.io/session/session-1",
@@ -600,7 +600,7 @@ func (fakeBridgeCLIProvider) CreateLinkSession(ctx context.Context, request prov
 		ProviderAccessToken: "bridge-user-token",
 	}, nil
 }
-func (fakeBridgeCLIProvider) ExchangeLinkToken(ctx context.Context, session providers.LinkSession, callback providers.LinkCallback) (providers.LinkedItem, error) {
+func (fakeBridgeCLIProvider) ExchangeLinkToken(ctx context.Context, session *providers.LinkSession, callback *providers.LinkCallback) (providers.LinkedItem, error) {
 	return providers.LinkedItem{
 		Institution: providers.Institution{
 			ID:                    "bridge:bank_cli",
@@ -619,6 +619,6 @@ func (fakeBridgeCLIProvider) ExchangeLinkToken(ctx context.Context, session prov
 		},
 	}, nil
 }
-func (fakeBridgeCLIProvider) Sync(ctx context.Context, item providers.ProviderItem, sink providers.SyncSink) (providers.SyncResult, error) {
+func (fakeBridgeCLIProvider) Sync(ctx context.Context, item *providers.ProviderItem, sink providers.SyncSink) (providers.SyncResult, error) {
 	return providers.SyncResult{}, nil
 }

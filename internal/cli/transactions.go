@@ -69,7 +69,7 @@ func newTransactionsListCommand(ctx context.Context, state *runtimeState, stdout
 			if err != nil {
 				return err
 			}
-			transactions, err := activeStore.ListTransactions(ctx, store.TransactionListQuery{
+			transactions, err := activeStore.ListTransactions(ctx, &store.TransactionListQuery{
 				AccountID:   accountID,
 				CategoryID:  categoryID,
 				Merchant:    merchant,

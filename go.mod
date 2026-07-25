@@ -4,6 +4,7 @@ go 1.26.4
 
 require (
 	charm.land/huh/v2 v2.0.3
+	github.com/google/uuid v1.6.0
 	github.com/ncruces/go-sqlite3 v0.34.1
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/plaid/plaid-go/v40 v40.1.0

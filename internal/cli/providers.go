@@ -31,7 +31,7 @@ type plaidLoginCLIOptions struct {
 
 var runPlaidLoginCLI = runPlaidLoginLive
 
-func newProvidersCommand(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer) *cobra.Command {
+func newProvidersCommand(ctx context.Context, state *runtimeState, stdout, stderr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "providers",
 		Short:   "Manage financial data providers",
@@ -43,14 +43,14 @@ func newProvidersCommand(ctx context.Context, state *runtimeState, stdout io.Wri
 	return cmd
 }
 
-func newPlaidProviderCommand(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer) *cobra.Command {
+func newPlaidProviderCommand(ctx context.Context, state *runtimeState, stdout, stderr io.Writer) *cobra.Command {
 	cmd := newProviderLinkCommand(ctx, state, "plaid", stdout)
 	cmd.AddCommand(newPlaidLoginCommand(ctx, state, stdout, stderr, "providers.plaid.login"))
 	cmd.AddCommand(newPlaidLogoutCommand(state, stdout, "providers.plaid.logout"))
 	return cmd
 }
 
-func newPlaidCommand(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer) *cobra.Command {
+func newPlaidCommand(ctx context.Context, state *runtimeState, stdout, stderr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "plaid",
 		Short:   "Plaid-specific setup and Dashboard commands",
@@ -83,7 +83,7 @@ func newPlaidSandboxLinkCommand(ctx context.Context, state *runtimeState, stdout
 			if err != nil {
 				return err
 			}
-			registry := providers.NewRegistry(cfg)
+			registry := providers.NewRegistry(&cfg)
 			provider, ok := registry.Get("plaid")
 			if !ok {
 				return fmt.Errorf("plaid provider is not registered")
@@ -107,7 +107,7 @@ func newPlaidSandboxLinkCommand(ctx context.Context, state *runtimeState, stdout
 	return cmd
 }
 
-func newPlaidLoginCommand(_ context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer, commandName string) *cobra.Command {
+func newPlaidLoginCommand(_ context.Context, state *runtimeState, stdout, stderr io.Writer, commandName string) *cobra.Command {
 	var noOpen, force bool
 	var team, environment, products, countryCodes, redirectURI string
 	cmd := &cobra.Command{
@@ -115,7 +115,7 @@ func newPlaidLoginCommand(_ context.Context, state *runtimeState, stdout io.Writ
 		Short:   "Sign in to Plaid Dashboard and fetch API keys",
 		Example: "  money plaid login\n  money plaid login --environment production --no-open",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runPlaidLoginCLI(cmd.Context(), state, stdout, stderr, plaidLoginCLIOptions{
+			return runPlaidLoginCLI(cmd.Context(), state, stdout, stderr, &plaidLoginCLIOptions{
 				CommandName:  commandName,
 				NoOpen:       noOpen,
 				Team:         team,
@@ -143,11 +143,11 @@ func newPlaidLoginCommand(_ context.Context, state *runtimeState, stdout io.Writ
 	return cmd
 }
 
-func runPlaidLoginLive(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer, opts plaidLoginCLIOptions) error {
+func runPlaidLoginLive(ctx context.Context, state *runtimeState, stdout, stderr io.Writer, opts *plaidLoginCLIOptions) error {
 	meta, err := config.ResolveMetadata(config.Options{ConfigPath: state.configPath, Profile: state.profile})
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return cliError{
+			return &cliError{
 				command:   opts.CommandName,
 				code:      plaidlogin.ErrorBaseConfigMissing,
 				message:   "Base money config is missing. Run `money setup` first.",
@@ -159,7 +159,7 @@ func runPlaidLoginLive(ctx context.Context, state *runtimeState, stdout io.Write
 		return err
 	}
 	if meta.ReadOnly {
-		return cliError{
+		return &cliError{
 			command:   opts.CommandName,
 			code:      plaidlogin.ErrorReadOnlyViolation,
 			message:   "Plaid Dashboard login would modify local config while read-only mode is enabled.",
@@ -168,7 +168,7 @@ func runPlaidLoginLive(ctx context.Context, state *runtimeState, stdout io.Write
 			exitCode:  4,
 		}
 	}
-	if err := validatePlaidLoginOverwrite(state, meta, &opts, stderr); err != nil {
+	if err := validatePlaidLoginOverwrite(state, meta, opts, stderr); err != nil {
 		return err
 	}
 	stateValue, err := plaidlogin.NewRandomString(16)
@@ -214,7 +214,7 @@ func runPlaidLoginLive(ctx context.Context, state *runtimeState, stdout io.Write
 	if err != nil {
 		return plaidLoginError(opts.CommandName, err)
 	}
-	result, err := plaidlogin.RunLogin(ctx, plaidlogin.LoginOptions{
+	result, err := plaidlogin.RunLogin(ctx, &plaidlogin.LoginOptions{
 		ConfigPath:   meta.ConfigPath,
 		Profile:      state.profile,
 		Environment:  opts.Environment,
@@ -232,7 +232,7 @@ func runPlaidLoginLive(ctx context.Context, state *runtimeState, stdout io.Write
 	if err != nil {
 		return plaidLoginError(opts.CommandName, err)
 	}
-	return writePlaidLoginResult(state, stdout, result, opts.CommandName)
+	return writePlaidLoginResult(state, stdout, &result, opts.CommandName)
 }
 
 func plaidLoginTeamPrompt(state *runtimeState, stderr io.Writer) prompt.Selector {
@@ -265,7 +265,7 @@ func validatePlaidLoginOverwrite(state *runtimeState, meta config.Metadata, opts
 	}
 	message := fmt.Sprintf("Plaid %s credentials already exist; rerun with --force to overwrite them with %s credentials.", fields["environment"], opts.Environment)
 	if state.json || state.stdin == nil {
-		return cliError{
+		return &cliError{
 			command:   opts.CommandName,
 			code:      "CONFIRMATION_REQUIRED",
 			message:   message,
@@ -286,7 +286,7 @@ func validatePlaidLoginOverwrite(state *runtimeState, meta config.Metadata, opts
 		return err
 	}
 	if choice != "yes" {
-		return cliError{
+		return &cliError{
 			command:   opts.CommandName,
 			code:      "CONFIRMATION_REQUIRED",
 			message:   message,
@@ -307,9 +307,10 @@ func isMissingPlaidCredentialConfigError(err error) bool {
 	return missing.Path == "providers.plaid.client_id" || missing.Path == "providers.plaid.secret"
 }
 
-func writePlaidLoginResult(state *runtimeState, stdout io.Writer, result plaidlogin.LoginResult, commandName string) error {
+func writePlaidLoginResult(state *runtimeState, stdout io.Writer, result *plaidlogin.LoginResult, commandName string) error {
 	if state.json {
-		return contracts.WriteJSON(stdout, contracts.NewSuccess(commandName, result))
+		env := contracts.NewSuccess(commandName, result)
+		return state.writeEnvelope(stdout, &env)
 	}
 	_, _ = fmt.Fprintf(stdout, "Plaid Dashboard login complete for team %s.\n", result.TeamID)
 	switch result.CredentialAction {
@@ -324,7 +325,7 @@ func writePlaidLoginResult(state *runtimeState, stdout io.Writer, result plaidlo
 
 func plaidLoginError(command string, err error) error {
 	if errors.Is(err, context.DeadlineExceeded) {
-		return cliError{
+		return &cliError{
 			command:   command,
 			code:      "PLAID_DASHBOARD_LOGIN_TIMEOUT",
 			message:   "Plaid Dashboard login timed out. Run the command again to retry.",
@@ -334,7 +335,7 @@ func plaidLoginError(command string, err error) error {
 		}
 	}
 	if errors.Is(err, context.Canceled) {
-		return cliError{
+		return &cliError{
 			command:   command,
 			code:      "LOGIN_CANCELED",
 			message:   "Plaid Dashboard login was canceled.",
@@ -381,7 +382,7 @@ func plaidLoginError(command string, err error) error {
 	if dashErr.Code == plaidlogin.ErrorDashboardContractChanged || dashErr.Code == plaidlogin.ErrorPlaidDashboardLoginRejected {
 		message += " Run `money providers configure plaid` manually. Get credentials: " + config.PlaidSpec.HelpURL
 	}
-	return cliError{
+	return &cliError{
 		command:   command,
 		code:      dashErr.Code,
 		message:   message,
@@ -402,7 +403,7 @@ func newPlaidLogoutCommand(state *runtimeState, stdout io.Writer, commandName st
 				return err
 			}
 			if meta.ReadOnly {
-				return cliError{
+				return &cliError{
 					command:   commandName,
 					code:      plaidlogin.ErrorReadOnlyViolation,
 					message:   "Plaid Dashboard logout would modify local auth files while read-only mode is enabled.",
@@ -424,7 +425,8 @@ func newPlaidLogoutCommand(state *runtimeState, stdout io.Writer, commandName st
 				"env_path":               meta.EnvPath,
 			}
 			if state.json {
-				return contracts.WriteJSON(stdout, contracts.NewSuccess(commandName, data))
+				env := contracts.NewSuccess(commandName, data)
+				return state.writeEnvelope(stdout, &env)
 			}
 			if removed {
 				_, _ = fmt.Fprintf(stdout, "Plaid Dashboard auth removed from %s.\n", authPath)

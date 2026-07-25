@@ -13,10 +13,10 @@ import (
 type bridgeAPI interface {
 	CreateBridgeUser(ctx context.Context, externalUserID string) error
 	CreateBridgeAuthToken(ctx context.Context, externalUserID string) (BridgeAuthToken, error)
-	CreateBridgeConnectSession(ctx context.Context, accessToken string, request BridgeConnectSessionRequest) (BridgeConnectSession, error)
+	CreateBridgeConnectSession(ctx context.Context, accessToken string, request *BridgeConnectSessionRequest) (BridgeConnectSession, error)
 	ListBridgeItems(ctx context.Context, accessToken string) ([]BridgeItem, error)
-	ListBridgeAccounts(ctx context.Context, accessToken string, itemID string) ([]BridgeAccount, error)
-	ListBridgeTransactions(ctx context.Context, accessToken string, since string) ([]BridgeSyncTransaction, error)
+	ListBridgeAccounts(ctx context.Context, accessToken, itemID string) ([]BridgeAccount, error)
+	ListBridgeTransactions(ctx context.Context, accessToken, since string) ([]BridgeSyncTransaction, error)
 }
 
 type BridgeAuthToken struct {
@@ -111,7 +111,7 @@ func (p bridgeProvider) SearchInstitutions(ctx context.Context, query string) ([
 	return nil, ErrProviderNotImplemented
 }
 
-func (p bridgeProvider) CreateLinkSession(ctx context.Context, request LinkRequest) (LinkSession, error) {
+func (p bridgeProvider) CreateLinkSession(ctx context.Context, request *LinkRequest) (LinkSession, error) {
 	client, err := p.bridgeClient()
 	if err != nil {
 		return LinkSession{}, err
@@ -131,7 +131,7 @@ func (p bridgeProvider) CreateLinkSession(ctx context.Context, request LinkReque
 	if err != nil {
 		return LinkSession{}, err
 	}
-	session, err := client.CreateBridgeConnectSession(ctx, token.AccessToken, BridgeConnectSessionRequest{
+	session, err := client.CreateBridgeConnectSession(ctx, token.AccessToken, &BridgeConnectSessionRequest{
 		UserEmail:    p.cfg.Fields["user_email"],
 		CountryCode:  p.cfg.Fields["country_code"],
 		Capabilities: providerListField(p.cfg, "capabilities"),
@@ -151,7 +151,7 @@ func (p bridgeProvider) CreateLinkSession(ctx context.Context, request LinkReque
 	}, nil
 }
 
-func (p bridgeProvider) ExchangeLinkToken(ctx context.Context, session LinkSession, callback LinkCallback) (LinkedItem, error) {
+func (p bridgeProvider) ExchangeLinkToken(ctx context.Context, session *LinkSession, callback *LinkCallback) (LinkedItem, error) {
 	client, err := p.bridgeClient()
 	if err != nil {
 		return LinkedItem{}, err
@@ -180,7 +180,7 @@ func (p bridgeProvider) ExchangeLinkToken(ctx context.Context, session LinkSessi
 	}
 }
 
-func (p bridgeProvider) Sync(ctx context.Context, item ProviderItem, sink SyncSink) (SyncResult, error) {
+func (p bridgeProvider) Sync(ctx context.Context, item *ProviderItem, sink SyncSink) (SyncResult, error) {
 	client, err := p.bridgeClient()
 	if err != nil {
 		return SyncResult{}, err
@@ -201,11 +201,13 @@ func (p bridgeProvider) Sync(ctx context.Context, item ProviderItem, sink SyncSi
 	if err != nil {
 		return SyncResult{}, err
 	}
-	for _, account := range accounts {
+	for i := range accounts {
+		account := &accounts[i]
 		if account.DataAccess == "disabled" {
 			continue
 		}
-		if err := sink.UpsertAccount(ctx, mapBridgeAccount(item.ID, account)); err != nil {
+		acct := mapBridgeAccount(item.ID, account)
+		if err := sink.UpsertAccount(ctx, &acct); err != nil {
 			return SyncResult{}, err
 		}
 		result.AccountsSeen++
@@ -215,7 +217,8 @@ func (p bridgeProvider) Sync(ctx context.Context, item ProviderItem, sink SyncSi
 		return SyncResult{}, err
 	}
 	nextCursor := item.TransactionCursor
-	for _, transaction := range transactions {
+	for i := range transactions {
+		transaction := &transactions[i]
 		if transaction.UpdatedAt > nextCursor {
 			nextCursor = transaction.UpdatedAt
 		}
@@ -226,7 +229,8 @@ func (p bridgeProvider) Sync(ctx context.Context, item ProviderItem, sink SyncSi
 			result.TransactionsRemoved++
 			continue
 		}
-		if err := sink.UpsertTransaction(ctx, mapBridgeSyncTransaction(item.ID, transaction)); err != nil {
+		txn := mapBridgeSyncTransaction(item.ID, transaction)
+		if err := sink.UpsertTransaction(ctx, &txn); err != nil {
 			return SyncResult{}, err
 		}
 		if item.TransactionCursor == "" {
@@ -250,7 +254,7 @@ func (p bridgeProvider) bridgeClient() (bridgeAPI, error) {
 	})
 }
 
-func (p bridgeProvider) linkedItem(session LinkSession, item BridgeItem) (LinkedItem, error) {
+func (p bridgeProvider) linkedItem(session *LinkSession, item BridgeItem) (LinkedItem, error) {
 	if item.ID == "" || item.ProviderID == "" || item.ProviderName == "" {
 		return LinkedItem{}, fmt.Errorf("bridge item metadata is incomplete")
 	}
@@ -301,7 +305,7 @@ func bridgeStringID(value any) string {
 	}
 }
 
-func mapBridgeAccount(providerItemID string, account BridgeAccount) FinancialAccount {
+func mapBridgeAccount(providerItemID string, account *BridgeAccount) FinancialAccount {
 	return FinancialAccount{
 		ProviderItemID:           providerItemID,
 		ProviderAccountID:        account.ID,
@@ -314,14 +318,14 @@ func mapBridgeAccount(providerItemID string, account BridgeAccount) FinancialAcc
 	}
 }
 
-func mapBridgeSyncTransaction(providerItemID string, transaction BridgeSyncTransaction) Transaction {
+func mapBridgeSyncTransaction(providerItemID string, transaction *BridgeSyncTransaction) Transaction {
 	direction := "credit"
 	amount := transaction.Amount
 	if amount < 0 {
 		direction = "debit"
 		amount = -amount
 	}
-	return MapBridgeTransaction(BridgeTransaction{
+	return MapBridgeTransaction(&BridgeTransaction{
 		ProviderItemID:        providerItemID,
 		ProviderTransactionID: transaction.ID,
 		ProviderAccountID:     transaction.AccountID,

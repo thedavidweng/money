@@ -124,13 +124,13 @@ type mockImportStore struct {
 	dupIDs       []string
 }
 
-func (m *mockImportStore) UpsertImportedAccount(ctx context.Context, account core.Account) error {
-	m.accounts = append(m.accounts, account)
+func (m *mockImportStore) UpsertImportedAccount(ctx context.Context, account *core.Account) error {
+	m.accounts = append(m.accounts, *account)
 	return nil
 }
 
-func (m *mockImportStore) UpsertImportedTransaction(ctx context.Context, tx core.Transaction, sourceRowHash string) (inserted bool, duplicateIDs []string, err error) {
-	m.transactions = append(m.transactions, tx)
+func (m *mockImportStore) UpsertImportedTransaction(ctx context.Context, tx *core.Transaction, sourceRowHash string) (inserted bool, duplicateIDs []string, err error) {
+	m.transactions = append(m.transactions, *tx)
 	return m.inserted, m.dupIDs, nil
 }
 

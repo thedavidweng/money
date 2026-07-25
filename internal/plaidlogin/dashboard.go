@@ -44,7 +44,7 @@ type DashboardClient struct {
 	token      Auth
 }
 
-func NewDashboardClient(cfg DashboardClientConfig) DashboardClient {
+func NewDashboardClient(cfg *DashboardClientConfig) DashboardClient {
 	baseURL := strings.TrimRight(cfg.BaseURL, "/")
 	if baseURL == "" {
 		baseURL = DashboardAPIURL
@@ -56,7 +56,7 @@ func NewDashboardClient(cfg DashboardClientConfig) DashboardClient {
 	return DashboardClient{baseURL: baseURL, httpClient: httpClient, token: cfg.Token}
 }
 
-func (c DashboardClient) ListTeams(ctx context.Context) ([]Team, error) {
+func (c *DashboardClient) ListTeams(ctx context.Context) ([]Team, error) {
 	req, err := c.newRequest(ctx, http.MethodGet, "/cli/teams/list", nil)
 	if err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func (c DashboardClient) ListTeams(ctx context.Context) ([]Team, error) {
 	return teams, nil
 }
 
-func (c DashboardClient) FetchKeys(ctx context.Context, teamID string) (Keys, error) {
+func (c *DashboardClient) FetchKeys(ctx context.Context, teamID string) (Keys, error) {
 	payload, err := json.Marshal(map[string]string{"team_id": teamID})
 	if err != nil {
 		return Keys{}, err
@@ -140,7 +140,7 @@ func (c DashboardClient) FetchKeys(ctx context.Context, teamID string) (Keys, er
 	return Keys{ClientID: body.ClientID, Secrets: secrets}, nil
 }
 
-func (c DashboardClient) newRequest(ctx context.Context, method string, path string, body []byte) (*http.Request, error) {
+func (c *DashboardClient) newRequest(ctx context.Context, method, path string, body []byte) (*http.Request, error) {
 	var reader io.Reader
 	if body != nil {
 		reader = bytes.NewReader(body)

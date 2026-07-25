@@ -1,6 +1,6 @@
 # Command Contracts
 
-`money` commands write one JSON envelope to stdout when `--json` is set. Human mode may print compact text, but automation should use JSON.
+`money` commands write one JSON envelope to stdout when `--json` is set. Human mode may print compact text, but automation should use JSON. JSON output is compact by default; pass `--pretty` for indented output.
 
 ## Envelope
 
@@ -12,21 +12,20 @@ All JSON commands use:
   "data": {},
   "meta": {
     "command": "transactions.list",
-    "schema_version": "0.1",
-    "generated_at": "2026-05-10T00:00:00Z",
-    "demo": false,
+    "profile": "default",
+    "duration_ms": 12,
+    "schema_version": "2026-07-25",
+    "request_id": "3f8a1c2e-9b4d-4e6a-8f21-0c5d7e2a1b9c",
     "pagination": {
       "limit": 50,
       "offset": 0,
       "has_more": false
     }
-  },
-  "warnings": [],
-  "errors": []
+  }
 }
 ```
 
-Errors use `ok: false` and `errors[]` entries with `code`, `message`, `category`, and `retryable`. JSON mode does not require stderr parsing.
+Errors use `ok: false` and a single `error` object with `code`, `message`, `category`, and `retryable` (plus optional `details[]` when errors are aggregated). Warnings, when present, are carried under `meta.warnings`. JSON mode does not require stderr parsing.
 
 ## Read Commands
 
@@ -133,6 +132,7 @@ All commands support:
 - `--config` (config file path)
 - `--profile` (configuration profile, default "default")
 - `-j, --json` (write JSON envelope to stdout)
+- `--pretty` (indent JSON output)
 
 The `--profile` flag selects a named configuration profile. The default profile uses `~/.money/config.yaml`; custom profiles use `~/.money/profiles/<name>/config.yaml`.
 
@@ -308,4 +308,4 @@ These commands never include Plaid API secrets, Dashboard OAuth tokens, masked s
 
 ## Monarch Compatibility Notes
 
-The command names and stdout/stderr discipline follow Monarch CLI habits where useful. `money` differs by using object-wrapped collection fields, multi-error envelopes, explicit source provenance, encrypted local storage, and BYOK Provider adapters.
+The command names and stdout/stderr discipline follow Monarch CLI habits where useful. `money` differs by using object-wrapped collection fields, a single structured `error` object (with aggregated errors in `error.details`), explicit source provenance, encrypted local storage, and BYOK Provider adapters.

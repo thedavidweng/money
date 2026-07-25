@@ -30,14 +30,14 @@ func newSyncCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 			if err != nil {
 				return err
 			}
-			result, err := syncer.Sync(ctx, activeStore, providers.NewRegistry(cfg), syncer.Options{
+			result, err := syncer.Sync(ctx, activeStore, providers.NewRegistry(&cfg), syncer.Options{
 				Provider:       providerName,
 				ProviderItemID: providerItemID,
 				StartDate:      startDate,
 				EndDate:        endDate,
 			})
 			if state.json {
-				return writeSyncJSON(stdout, result, err)
+				return writeSyncJSON(state, stdout, result, err)
 			}
 			writeSyncHuman(stdout, result, verbose)
 			return err
@@ -54,15 +54,16 @@ func newSyncCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 	return cmd
 }
 
-func writeSyncJSON(stdout io.Writer, result syncer.Result, err error) error {
+func writeSyncJSON(state *runtimeState, stdout io.Writer, result syncer.Result, err error) error {
 	if err == nil {
-		return contracts.WriteJSON(stdout, contracts.NewSuccess("sync", result))
+		env := contracts.NewSuccess("sync", result)
+		return state.writeEnvelope(stdout, &env)
 	}
 	var partial syncer.PartialFailure
 	if errors.As(err, &partial) {
 		env := contracts.NewError("sync", "SYNC_PARTIAL_FAILURE", err.Error(), contracts.CategoryAPI, true)
 		env.Data = result
-		if writeErr := contracts.WriteJSON(stdout, env); writeErr != nil {
+		if writeErr := state.writeEnvelope(stdout, &env); writeErr != nil {
 			return writeErr
 		}
 		return cliExit{exitCode: 6}
@@ -78,7 +79,8 @@ func writeSyncHuman(stdout io.Writer, result syncer.Result, verbose bool) {
 		return
 	}
 	var okCount, errorCount int
-	for _, item := range result.Items {
+	for i := range result.Items {
+		item := &result.Items[i]
 		if item.Status == "ok" {
 			okCount++
 		} else {

@@ -8,7 +8,7 @@ import (
 )
 
 func TestRegistryIncludesPlaidAndBridge(t *testing.T) {
-	registry := NewRegistry(config.Config{Providers: map[string]config.ProviderConfig{}})
+	registry := NewRegistry(&config.Config{Providers: map[string]config.ProviderConfig{}})
 
 	if _, ok := registry.Get("plaid"); !ok {
 		t.Fatal("plaid provider missing from registry")
@@ -19,7 +19,7 @@ func TestRegistryIncludesPlaidAndBridge(t *testing.T) {
 }
 
 func TestMissingProviderCredentialsProduceStableConfigDiagnostics(t *testing.T) {
-	registry := NewRegistry(config.Config{Providers: map[string]config.ProviderConfig{}})
+	registry := NewRegistry(&config.Config{Providers: map[string]config.ProviderConfig{}})
 
 	plaid, _ := registry.Get("plaid")
 	plaidDiagnostics := plaid.ValidateConfig(context.Background())

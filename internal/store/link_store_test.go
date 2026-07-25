@@ -13,7 +13,7 @@ func TestStoreLinkedProviderItemPersistsInstitutionAndTokenOnlyInStore(t *testin
 	}
 	defer func() { _ = db.Close() }()
 
-	err = db.StoreLinkedProviderItem(ctx, LinkedProviderItem{
+	err = db.StoreLinkedProviderItem(ctx, &LinkedProviderItem{
 		Institution: LinkedInstitution{
 			ID:                    "inst_test_bank",
 			Name:                  "Test Bank",

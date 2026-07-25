@@ -8,7 +8,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
@@ -28,15 +30,27 @@ type runtimeState struct {
 	store      store.Store
 	demo       bool
 	json       bool
+	pretty     bool
 	configPath string
 	profile    string
+	requestID  string
+	started    time.Time
 	stdin      io.Reader
 	stderr     io.Writer
 	prompter   prompt.Selector
 }
 
-func Run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
-	state := &runtimeState{stdin: stdin, stderr: stderr}
+// writeEnvelope stamps the request-scoped meta fields (profile, request id,
+// elapsed time) and encodes the envelope, honoring the --pretty flag.
+func (s *runtimeState) writeEnvelope(w io.Writer, env *contracts.Envelope) error {
+	env.Meta.Profile = s.profile
+	env.Meta.RequestID = s.requestID
+	env.Meta.DurationMs = time.Since(s.started).Milliseconds()
+	return contracts.WriteJSON(w, env, s.pretty)
+}
+
+func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	state := &runtimeState{stdin: stdin, stderr: stderr, started: time.Now(), requestID: uuid.NewString()}
 	defer func() {
 		if closer, ok := state.store.(interface{ Close() error }); ok {
 			_ = closer.Close()
@@ -53,10 +67,10 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, 
 		if errors.As(err, &exitErr) {
 			return exitErr.exitCode
 		}
-		if cliErr, ok := err.(cliError); ok {
+		if cliErr, ok := err.(*cliError); ok {
 			if state.json {
 				env := contracts.NewError(cliErr.command, cliErr.code, cliErr.message, cliErr.category, cliErr.retryable)
-				if writeErr := contracts.WriteJSON(stdout, env); writeErr != nil {
+				if writeErr := state.writeEnvelope(stdout, &env); writeErr != nil {
 					_, _ = fmt.Fprintln(stderr, writeErr)
 				}
 			} else {
@@ -66,7 +80,7 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, 
 		}
 		if state.json {
 			env := contracts.NewError(commandName(root), "COMMAND_FAILED", err.Error(), contracts.CategoryInternal, false)
-			if writeErr := contracts.WriteJSON(stdout, env); writeErr != nil {
+			if writeErr := state.writeEnvelope(stdout, &env); writeErr != nil {
 				_, _ = fmt.Fprintln(stderr, writeErr)
 			}
 		} else {
@@ -77,7 +91,7 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, 
 	return 0
 }
 
-func newRootCommand(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer) *cobra.Command {
+func newRootCommand(ctx context.Context, state *runtimeState, stdout, stderr io.Writer) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "money",
 		Short: "A local-first finance backend for external AI agents",
@@ -102,6 +116,7 @@ link financial institutions and sync transactions locally.
 	}
 
 	root.PersistentFlags().BoolVarP(&state.json, "json", "j", false, "write a JSON envelope to stdout")
+	root.PersistentFlags().BoolVar(&state.pretty, "pretty", false, "indent JSON output")
 	root.PersistentFlags().StringVar(&state.configPath, "config", "", "config file path")
 	root.PersistentFlags().StringVar(&state.profile, "profile", "default", "configuration profile")
 
@@ -229,7 +244,7 @@ type cliError struct {
 	exitCode  int
 }
 
-func (e cliError) Error() string {
+func (e *cliError) Error() string {
 	return e.message
 }
 
@@ -241,7 +256,7 @@ func (e cliExit) Error() string {
 	return fmt.Sprintf("exit %d", e.exitCode)
 }
 
-func optionalBoolFlag(name string, value string) (*bool, error) {
+func optionalBoolFlag(name, value string) (*bool, error) {
 	if value == "" {
 		return nil, nil
 	}
