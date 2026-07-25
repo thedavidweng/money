@@ -21,13 +21,9 @@ jobs:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: rp
         with:
-          skip-github-release: true
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
       - name: Create GitHub Release
-        # release_created is still set to true with skip-github-release: true
-        # (the action creates the tag but skips the GitHub release API call).
-        # Also check tag_name as a guard against future behavior changes.
         if: ${{ steps.rp.outputs.release_created == 'true' && steps.rp.outputs.tag_name != '' }}
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
