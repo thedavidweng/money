@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
@@ -28,13 +27,11 @@ func newCashflowCommand(ctx context.Context, state *runtimeState, stdout io.Writ
 				return err
 			}
 			return render(stdout, state, "cashflow", map[string]any{"periods": periods}, func() {
-				table := tablewriter.NewWriter(stdout)
-				table.SetHeader([]string{"PERIOD", "INCOME", "EXPENSES", "NET"})
-				table.SetBorder(false)
+				rows := make([][]string, 0, len(periods))
 				for _, p := range periods {
-					table.Append([]string{p.Period, colorAmount(stdout, p.Income), colorAmount(stdout, p.Expenses), colorAmount(stdout, p.Net)})
+					rows = append(rows, []string{p.Period, colorAmount(stdout, p.Income), colorAmount(stdout, p.Expenses), colorAmount(stdout, p.Net)})
 				}
-				table.Render()
+				renderTable(stdout, []string{"PERIOD", "INCOME", "EXPENSES", "NET"}, rows)
 			})
 		},
 	}

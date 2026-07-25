@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 
 	"github.com/thedavidweng/money/internal/contracts"
@@ -34,14 +33,11 @@ func newAccountsCommand(ctx context.Context, state *runtimeState, stdout io.Writ
 				return err
 			}
 			return render(stdout, state, "accounts.list", map[string]any{"accounts": accounts}, func() {
-				table := tablewriter.NewWriter(stdout)
+				headers := []string{"NAME", "TYPE", "BALANCE", "CURRENCY", "SOURCE"}
 				if verbose {
-					table.SetHeader([]string{"ID", "NAME", "TYPE", "BALANCE", "AVAILABLE", "AVAILABLE CREDIT", "CURRENCY", "SOURCE", "PROVIDER", "PROVIDER ACCOUNT ID", "UPDATED"})
-				} else {
-					table.SetHeader([]string{"NAME", "TYPE", "BALANCE", "CURRENCY", "SOURCE"})
+					headers = []string{"ID", "NAME", "TYPE", "BALANCE", "AVAILABLE", "AVAILABLE CREDIT", "CURRENCY", "SOURCE", "PROVIDER", "PROVIDER ACCOUNT ID", "UPDATED"}
 				}
-				table.SetBorder(false)
-				table.SetAutoWrapText(false)
+				rows := make([][]string, 0, len(accounts))
 				for i := range accounts {
 					a := &accounts[i]
 					if verbose {
@@ -61,12 +57,12 @@ func newAccountsCommand(ctx context.Context, state *runtimeState, stdout io.Writ
 						if a.Source.ProviderAccountID != nil {
 							providerAccountID = *a.Source.ProviderAccountID
 						}
-						table.Append([]string{a.ID, a.DisplayName, a.Type, colorAmount(stdout, a.CurrentBalance), colorAmount(stdout, avail), colorAmount(stdout, availCredit), a.Currency, a.Source.Kind, provider, providerAccountID, a.UpdatedAt})
+						rows = append(rows, []string{a.ID, a.DisplayName, a.Type, colorAmount(stdout, a.CurrentBalance), colorAmount(stdout, avail), colorAmount(stdout, availCredit), a.Currency, a.Source.Kind, provider, providerAccountID, a.UpdatedAt})
 					} else {
-						table.Append([]string{a.DisplayName, a.Type, colorAmount(stdout, a.CurrentBalance), a.Currency, a.Source.Kind})
+						rows = append(rows, []string{a.DisplayName, a.Type, colorAmount(stdout, a.CurrentBalance), a.Currency, a.Source.Kind})
 					}
 				}
-				table.Render()
+				renderTable(stdout, headers, rows)
 			})
 		},
 	}

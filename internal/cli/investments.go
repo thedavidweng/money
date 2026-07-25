@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
@@ -28,13 +27,11 @@ func newInvestmentsCommand(ctx context.Context, state *runtimeState, stdout io.W
 				return err
 			}
 			return render(stdout, state, "investments.holdings", map[string]any{"holdings": holdings}, func() {
-				table := tablewriter.NewWriter(stdout)
-				table.SetHeader([]string{"ACCOUNT", "SECURITY", "QUANTITY", "PRICE", "VALUE", "CURRENCY"})
-				table.SetBorder(false)
+				rows := make([][]string, 0, len(holdings))
 				for _, h := range holdings {
-					table.Append([]string{h.AccountID, h.SecurityID, fmt.Sprintf("%.4f", h.Quantity), colorAmountFloat(stdout, h.InstitutionPrice), colorAmountFloat(stdout, h.InstitutionValue), h.Currency})
+					rows = append(rows, []string{h.AccountID, h.SecurityID, fmt.Sprintf("%.4f", h.Quantity), colorAmountFloat(stdout, h.InstitutionPrice), colorAmountFloat(stdout, h.InstitutionValue), h.Currency})
 				}
-				table.Render()
+				renderTable(stdout, []string{"ACCOUNT", "SECURITY", "QUANTITY", "PRICE", "VALUE", "CURRENCY"}, rows)
 			})
 		},
 	})
@@ -51,18 +48,16 @@ func newInvestmentsCommand(ctx context.Context, state *runtimeState, stdout io.W
 				return err
 			}
 			return render(stdout, state, "investments.securities", map[string]any{"securities": securities}, func() {
-				table := tablewriter.NewWriter(stdout)
-				table.SetHeader([]string{"SECURITY ID", "NAME", "TICKER", "TYPE", "CLOSE PRICE", "CURRENCY"})
-				table.SetBorder(false)
+				rows := make([][]string, 0, len(securities))
 				for i := range securities {
 					sec := &securities[i]
 					ticker := "-"
 					if sec.TickerSymbol != nil {
 						ticker = *sec.TickerSymbol
 					}
-					table.Append([]string{sec.SecurityID, sec.Name, ticker, sec.Type, colorAmountFloat(stdout, sec.ClosePrice), sec.Currency})
+					rows = append(rows, []string{sec.SecurityID, sec.Name, ticker, sec.Type, colorAmountFloat(stdout, sec.ClosePrice), sec.Currency})
 				}
-				table.Render()
+				renderTable(stdout, []string{"SECURITY ID", "NAME", "TICKER", "TYPE", "CLOSE PRICE", "CURRENCY"}, rows)
 			})
 		},
 	})
@@ -88,14 +83,12 @@ func newLiabilitiesCommand(ctx context.Context, state *runtimeState, stdout io.W
 				return err
 			}
 			return render(stdout, state, "liabilities.list", map[string]any{"liabilities": liabilities}, func() {
-				table := tablewriter.NewWriter(stdout)
-				table.SetHeader([]string{"ACCOUNT", "TYPE", "NAME", "BALANCE", "CURRENCY"})
-				table.SetBorder(false)
+				rows := make([][]string, 0, len(liabilities))
 				for i := range liabilities {
 					l := &liabilities[i]
-					table.Append([]string{l.AccountID, l.Type, l.Name, colorAmountFloat(stdout, l.CurrentBalance), l.Currency})
+					rows = append(rows, []string{l.AccountID, l.Type, l.Name, colorAmountFloat(stdout, l.CurrentBalance), l.Currency})
 				}
-				table.Render()
+				renderTable(stdout, []string{"ACCOUNT", "TYPE", "NAME", "BALANCE", "CURRENCY"}, rows)
 			})
 		},
 	})

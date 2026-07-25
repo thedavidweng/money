@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 
 	"github.com/thedavidweng/money/internal/contracts"
@@ -39,16 +38,14 @@ func newRulesListCommand(ctx context.Context, state *runtimeState, stdout io.Wri
 				return err
 			}
 			return render(stdout, state, "rules.list", map[string]any{"rules": rules}, func() {
-				table := tablewriter.NewWriter(stdout)
-				table.SetHeader([]string{"NAME", "IF", "THEN", "PRIORITY"})
-				table.SetBorder(false)
+				rows := make([][]string, 0, len(rules))
 				for i := range rules {
 					r := &rules[i]
 					condition := fmt.Sprintf("%s %s %q", r.ConditionField, r.ConditionOp, r.ConditionValue)
 					action := fmt.Sprintf("%s %q", r.ActionType, r.ActionValue)
-					table.Append([]string{r.Name, condition, action, fmt.Sprintf("%d", r.Priority)})
+					rows = append(rows, []string{r.Name, condition, action, fmt.Sprintf("%d", r.Priority)})
 				}
-				table.Render()
+				renderTable(stdout, []string{"NAME", "IF", "THEN", "PRIORITY"}, rows)
 			})
 		},
 	}

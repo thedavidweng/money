@@ -6,7 +6,6 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 
 	"github.com/thedavidweng/money/internal/contracts"
@@ -43,22 +42,20 @@ func newBudgetsListCommand(ctx context.Context, state *runtimeState, stdout io.W
 				return err
 			}
 			return render(stdout, state, "budgets.list", map[string]any{"budgets": budgets}, func() {
-				table := tablewriter.NewWriter(stdout)
+				headers := []string{"NAME", "PERIOD", "START", "END", "CURRENCY"}
 				if verbose {
-					table.SetHeader([]string{"ID", "NAME", "PERIOD", "START", "END", "CURRENCY", "CATEGORIES"})
-				} else {
-					table.SetHeader([]string{"NAME", "PERIOD", "START", "END", "CURRENCY"})
+					headers = []string{"ID", "NAME", "PERIOD", "START", "END", "CURRENCY", "CATEGORIES"}
 				}
-				table.SetBorder(false)
+				rows := make([][]string, 0, len(budgets))
 				for i := range budgets {
 					b := &budgets[i]
 					if verbose {
-						table.Append([]string{b.ID, b.Name, b.Period, b.StartDate, b.EndDate, b.Currency, strconv.Itoa(len(b.Categories))})
+						rows = append(rows, []string{b.ID, b.Name, b.Period, b.StartDate, b.EndDate, b.Currency, strconv.Itoa(len(b.Categories))})
 					} else {
-						table.Append([]string{b.Name, b.Period, b.StartDate, b.EndDate, b.Currency})
+						rows = append(rows, []string{b.Name, b.Period, b.StartDate, b.EndDate, b.Currency})
 					}
 				}
-				table.Render()
+				renderTable(stdout, headers, rows)
 			})
 		},
 	}
@@ -165,18 +162,16 @@ func newBudgetsGetCommand(ctx context.Context, state *runtimeState, stdout io.Wr
 				_, _ = fmt.Fprintf(stdout, "Currency: %s\n", budget.Currency)
 				if len(budget.Categories) > 0 {
 					_, _ = fmt.Fprintln(stdout, "Categories:")
-					table := tablewriter.NewWriter(stdout)
-					table.SetHeader([]string{"NAME", "LIMIT", "CATEGORY ID"})
-					table.SetBorder(false)
+					rows := make([][]string, 0, len(budget.Categories))
 					for i := range budget.Categories {
 						bc := &budget.Categories[i]
 						catID := "-"
 						if bc.CategoryID != nil {
 							catID = *bc.CategoryID
 						}
-						table.Append([]string{bc.Name, colorAmount(stdout, bc.Limit), catID})
+						rows = append(rows, []string{bc.Name, colorAmount(stdout, bc.Limit), catID})
 					}
-					table.Render()
+					renderTable(stdout, []string{"NAME", "LIMIT", "CATEGORY ID"}, rows)
 				}
 			})
 		},

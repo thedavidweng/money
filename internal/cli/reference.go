@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 
 	"github.com/thedavidweng/money/internal/store"
@@ -33,13 +32,11 @@ func newCategoriesCommand(ctx context.Context, state *runtimeState, stdout io.Wr
 				return err
 			}
 			return render(stdout, state, "categories.list", map[string]any{"categories": categories}, func() {
-				table := tablewriter.NewWriter(stdout)
+				headers := []string{"NAME", "GROUP", "HIDDEN"}
 				if verbose {
-					table.SetHeader([]string{"ID", "NAME", "GROUP", "HIDDEN"})
-				} else {
-					table.SetHeader([]string{"NAME", "GROUP", "HIDDEN"})
+					headers = []string{"ID", "NAME", "GROUP", "HIDDEN"}
 				}
-				table.SetBorder(false)
+				rows := make([][]string, 0, len(categories))
 				for _, c := range categories {
 					group := "-"
 					if c.GroupName != nil {
@@ -50,12 +47,12 @@ func newCategoriesCommand(ctx context.Context, state *runtimeState, stdout io.Wr
 						hidden = "yes"
 					}
 					if verbose {
-						table.Append([]string{c.ID, c.Name, group, hidden})
+						rows = append(rows, []string{c.ID, c.Name, group, hidden})
 					} else {
-						table.Append([]string{c.Name, group, hidden})
+						rows = append(rows, []string{c.Name, group, hidden})
 					}
 				}
-				table.Render()
+				renderTable(stdout, headers, rows)
 			})
 		},
 	}
@@ -84,21 +81,19 @@ func newTagsCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 				return err
 			}
 			return render(stdout, state, "tags.list", map[string]any{"tags": tags}, func() {
-				table := tablewriter.NewWriter(stdout)
+				headers := []string{"NAME"}
 				if verbose {
-					table.SetHeader([]string{"ID", "NAME"})
-				} else {
-					table.SetHeader([]string{"NAME"})
+					headers = []string{"ID", "NAME"}
 				}
-				table.SetBorder(false)
+				rows := make([][]string, 0, len(tags))
 				for _, t := range tags {
 					if verbose {
-						table.Append([]string{t.ID, t.Name})
+						rows = append(rows, []string{t.ID, t.Name})
 					} else {
-						table.Append([]string{t.Name})
+						rows = append(rows, []string{t.Name})
 					}
 				}
-				table.Render()
+				renderTable(stdout, headers, rows)
 			})
 		},
 	}
@@ -126,18 +121,16 @@ func newItemsCommand(ctx context.Context, state *runtimeState, stdout io.Writer)
 				return err
 			}
 			return render(stdout, state, "items.list", map[string]any{"items": items}, func() {
-				table := tablewriter.NewWriter(stdout)
-				table.SetHeader([]string{"ID", "PROVIDER", "INSTITUTION", "ALIAS", "STATUS", "PRODUCTS"})
-				table.SetBorder(false)
+				rows := make([][]string, 0, len(items))
 				for i := range items {
 					item := &items[i]
 					alias := item.Alias
 					if alias == "" {
 						alias = "-"
 					}
-					table.Append([]string{item.ID, item.Provider, item.InstitutionID, alias, item.Status, strings.Join(item.Products, ",")})
+					rows = append(rows, []string{item.ID, item.Provider, item.InstitutionID, alias, item.Status, strings.Join(item.Products, ",")})
 				}
-				table.Render()
+				renderTable(stdout, []string{"ID", "PROVIDER", "INSTITUTION", "ALIAS", "STATUS", "PRODUCTS"}, rows)
 			})
 		},
 	})
@@ -174,11 +167,7 @@ func newItemsCommand(ctx context.Context, state *runtimeState, stdout io.Writer)
 				if alias == "" {
 					alias = "-"
 				}
-				table := tablewriter.NewWriter(stdout)
-				table.SetHeader([]string{"ID", "PROVIDER", "INSTITUTION", "ALIAS", "STATUS", "PRODUCTS"})
-				table.SetBorder(false)
-				table.Append([]string{item.ID, item.Provider, item.InstitutionID, alias, item.Status, strings.Join(item.Products, ",")})
-				table.Render()
+				renderTable(stdout, []string{"ID", "PROVIDER", "INSTITUTION", "ALIAS", "STATUS", "PRODUCTS"}, [][]string{{item.ID, item.Provider, item.InstitutionID, alias, item.Status, strings.Join(item.Products, ",")}})
 			})
 		},
 	})
@@ -273,13 +262,11 @@ func newRecurringCommand(ctx context.Context, state *runtimeState, stdout io.Wri
 				return err
 			}
 			return render(stdout, state, "recurring.list", map[string]any{"recurring": recurringItems}, func() {
-				table := tablewriter.NewWriter(stdout)
+				headers := []string{"MERCHANT", "AMOUNT", "FREQUENCY", "NEXT DATE"}
 				if verbose {
-					table.SetHeader([]string{"ID", "ACCOUNT", "MERCHANT", "AMOUNT", "FREQUENCY", "NEXT DATE"})
-				} else {
-					table.SetHeader([]string{"MERCHANT", "AMOUNT", "FREQUENCY", "NEXT DATE"})
+					headers = []string{"ID", "ACCOUNT", "MERCHANT", "AMOUNT", "FREQUENCY", "NEXT DATE"}
 				}
-				table.SetBorder(false)
+				rows := make([][]string, 0, len(recurringItems))
 				for i := range recurringItems {
 					r := &recurringItems[i]
 					nextDate := "-"
@@ -287,12 +274,12 @@ func newRecurringCommand(ctx context.Context, state *runtimeState, stdout io.Wri
 						nextDate = *r.NextDate
 					}
 					if verbose {
-						table.Append([]string{r.ID, r.AccountID, r.MerchantName, colorAmount(stdout, r.AverageAmount), r.Frequency, nextDate})
+						rows = append(rows, []string{r.ID, r.AccountID, r.MerchantName, colorAmount(stdout, r.AverageAmount), r.Frequency, nextDate})
 					} else {
-						table.Append([]string{r.MerchantName, colorAmount(stdout, r.AverageAmount), r.Frequency, nextDate})
+						rows = append(rows, []string{r.MerchantName, colorAmount(stdout, r.AverageAmount), r.Frequency, nextDate})
 					}
 				}
-				table.Render()
+				renderTable(stdout, headers, rows)
 			})
 		},
 	}

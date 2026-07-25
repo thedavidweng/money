@@ -6,10 +6,24 @@ import (
 	"strings"
 
 	"github.com/olekukonko/tablewriter"
+	"github.com/olekukonko/tablewriter/renderer"
+	"github.com/olekukonko/tablewriter/tw"
 
 	"github.com/thedavidweng/money/internal/contracts"
 	"github.com/thedavidweng/money/internal/core"
 )
+
+func renderTable(w io.Writer, headers []string, rows [][]string) {
+	table := tablewriter.NewTable(w, tablewriter.WithRenderer(renderer.NewBlueprint(tw.Rendition{
+		Borders: tw.Border{Left: tw.Off, Right: tw.Off, Top: tw.Off, Bottom: tw.Off},
+		Symbols: tw.NewSymbols(tw.StyleASCII),
+	})))
+	table.Header(headers)
+	for _, row := range rows {
+		_ = table.Append(row)
+	}
+	_ = table.Render()
+}
 
 type renderOpt func(*contracts.Envelope)
 
@@ -39,11 +53,7 @@ func writeManualPlan(stdout io.Writer, state *runtimeState, plan *manualAccountP
 func writeTransactionsPage(stdout io.Writer, state *runtimeState, command string, transactions []core.Transaction, limit, offset int, verbose bool) error {
 	page := &contracts.Pagination{Limit: limit, Offset: offset, HasMore: len(transactions) == limit}
 	return render(stdout, state, command, map[string]any{"transactions": transactions}, func() {
-		table := tablewriter.NewWriter(stdout)
-		table.SetHeader([]string{"DATE", "ACCOUNT", "MERCHANT", "AMOUNT", "CATEGORY", "STATUS"})
-		table.SetBorder(false)
-		table.SetAutoWrapText(false)
-		table.SetAlignment(tablewriter.ALIGN_LEFT)
+		rows := make([][]string, 0, len(transactions))
 		for i := range transactions {
 			tx := &transactions[i]
 			cat := ""
@@ -71,9 +81,9 @@ func writeTransactionsPage(stdout io.Writer, state *runtimeState, command string
 			if accountName == "" {
 				accountName = "-"
 			}
-			table.Append([]string{tx.Date, accountName, merchant, colorAmount(stdout, tx.Amount), cat, status})
+			rows = append(rows, []string{tx.Date, accountName, merchant, colorAmount(stdout, tx.Amount), cat, status})
 		}
-		table.Render()
+		renderTable(stdout, []string{"DATE", "ACCOUNT", "MERCHANT", "AMOUNT", "CATEGORY", "STATUS"}, rows)
 		if !verbose {
 			return
 		}
