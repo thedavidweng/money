@@ -38,7 +38,7 @@ func newRulesListCommand(ctx context.Context, state *runtimeState, stdout io.Wri
 			if err != nil {
 				return err
 			}
-			if !state.json {
+			return render(stdout, state, "rules.list", map[string]any{"rules": rules}, func() {
 				table := tablewriter.NewWriter(stdout)
 				table.SetHeader([]string{"NAME", "IF", "THEN", "PRIORITY"})
 				table.SetBorder(false)
@@ -48,11 +48,7 @@ func newRulesListCommand(ctx context.Context, state *runtimeState, stdout io.Wri
 					table.Append([]string{r.Name, condition, action, fmt.Sprintf("%d", r.Priority)})
 				}
 				table.Render()
-				return nil
-			}
-			env := contracts.NewSuccess("rules.list", map[string]any{"rules": rules})
-			env.Meta.Demo = state.demo
-			return contracts.WriteJSON(stdout, env)
+			})
 		},
 	}
 }
@@ -73,7 +69,7 @@ func newRulesCreateCommand(ctx context.Context, state *runtimeState, stdout io.W
 					message:   "JSON rule writes require --dry-run or --confirm",
 					category:  contracts.CategoryValidation,
 					retryable: false,
-					exitCode:  2,
+					exitCode:  7,
 				}
 			}
 			if name == "" || conditionField == "" || conditionOp == "" || conditionValue == "" || actionType == "" || actionValue == "" {
@@ -90,14 +86,10 @@ func newRulesCreateCommand(ctx context.Context, state *runtimeState, stdout io.W
 				Enabled:        true,
 			}
 			if dryRun {
-				if state.json {
-					env := contracts.NewSuccess("rules.create", map[string]any{"dry_run": true, "rule": rule})
-					env.Meta.Demo = state.demo
-					return contracts.WriteJSON(stdout, env)
-				}
-				_, _ = fmt.Fprintf(stdout, "Would create rule %q: if %s %s %q then %s %q (priority %d)\n",
-					rule.Name, rule.ConditionField, rule.ConditionOp, rule.ConditionValue, rule.ActionType, rule.ActionValue, rule.Priority)
-				return nil
+				return render(stdout, state, "rules.create", map[string]any{"dry_run": true, "rule": rule}, func() {
+					_, _ = fmt.Fprintf(stdout, "Would create rule %q: if %s %s %q then %s %q (priority %d)\n",
+						rule.Name, rule.ConditionField, rule.ConditionOp, rule.ConditionValue, rule.ActionType, rule.ActionValue, rule.Priority)
+				})
 			}
 			activeStore, err := requireStore(state)
 			if err != nil {
@@ -107,13 +99,9 @@ func newRulesCreateCommand(ctx context.Context, state *runtimeState, stdout io.W
 			if err != nil {
 				return err
 			}
-			if state.json {
-				env := contracts.NewSuccess("rules.create", map[string]any{"rule": created})
-				env.Meta.Demo = state.demo
-				return contracts.WriteJSON(stdout, env)
-			}
-			_, _ = fmt.Fprintf(stdout, "Created rule %s (%s)\n", created.Name, created.ID)
-			return nil
+			return render(stdout, state, "rules.create", map[string]any{"rule": created}, func() {
+				_, _ = fmt.Fprintf(stdout, "Created rule %s (%s)\n", created.Name, created.ID)
+			})
 		},
 	}
 	cmd.Flags().StringVar(&name, "name", "", "rule name")
@@ -165,13 +153,9 @@ func newRulesDeleteCommand(ctx context.Context, state *runtimeState, stdout io.W
 			if err := activeStore.DeleteRule(ctx, args[0]); err != nil {
 				return err
 			}
-			if state.json {
-				env := contracts.NewSuccess("rules.delete", map[string]string{"id": args[0]})
-				env.Meta.Demo = state.demo
-				return contracts.WriteJSON(stdout, env)
-			}
-			_, _ = fmt.Fprintf(stdout, "Deleted rule %s\n", args[0])
-			return nil
+			return render(stdout, state, "rules.delete", map[string]string{"id": args[0]}, func() {
+				_, _ = fmt.Fprintf(stdout, "Deleted rule %s\n", args[0])
+			})
 		},
 	}
 }
@@ -189,13 +173,9 @@ func newRulesApplyCommand(ctx context.Context, state *runtimeState, stdout io.Wr
 			if err != nil {
 				return err
 			}
-			if !state.json {
+			return render(stdout, state, "rules.apply", map[string]any{"result": result}, func() {
 				_, _ = fmt.Fprintf(stdout, "Updated %d transactions\n", result.TransactionsUpdated)
-				return nil
-			}
-			env := contracts.NewSuccess("rules.apply", map[string]any{"result": result})
-			env.Meta.Demo = state.demo
-			return contracts.WriteJSON(stdout, env)
+			})
 		},
 	}
 }

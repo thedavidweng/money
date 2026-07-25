@@ -74,7 +74,7 @@ func newLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 					message:   providerName + " Link requires a local browser callback; omit --json for the live link flow.",
 					category:  contracts.CategoryValidation,
 					retryable: false,
-					exitCode:  2,
+					exitCode:  7,
 				}
 			}
 			institutions, err := provider.SearchInstitutions(ctx, args[0])
@@ -94,7 +94,7 @@ func newLinkCommand(ctx context.Context, state *runtimeState, stdout io.Writer) 
 					message:   err.Error(),
 					category:  contracts.CategoryValidation,
 					retryable: false,
-					exitCode:  2,
+					exitCode:  7,
 				}
 			}
 			return runPlaidLinkFlow(ctx, state, provider, plaidLinkFlowOptions{
@@ -159,7 +159,7 @@ func newProviderLinkCommand(ctx context.Context, state *runtimeState, providerNa
 					message:   providerName + " Link requires a local browser callback; omit --json for the live link flow.",
 					category:  contracts.CategoryValidation,
 					retryable: false,
-					exitCode:  2,
+					exitCode:  7,
 				}
 			}
 			switch providerName {
@@ -382,7 +382,7 @@ func runPlaidSandboxLink(ctx context.Context, state *runtimeState, sandboxCreato
 			message:   "money plaid sandbox link requires providers.plaid.environment to be sandbox.",
 			category:  contracts.CategoryValidation,
 			retryable: false,
-			exitCode:  2,
+			exitCode:  7,
 		}
 	}
 	products := commaList(opts.Products)
@@ -394,7 +394,7 @@ func runPlaidSandboxLink(ctx context.Context, state *runtimeState, sandboxCreato
 				message:   "Plaid Sandbox product balance is not supported; choose explicit initial products such as transactions.",
 				category:  contracts.CategoryValidation,
 				retryable: false,
-				exitCode:  2,
+				exitCode:  7,
 			}
 		}
 	}

@@ -14,18 +14,17 @@ Config, encrypted SQLite migrations, accounts/transactions/categories/tags/recur
 
 Plaid and Bridge configuration, link/sync commands, provider item/account/transaction storage, fixture tests.
 
-## Planned
-
 ### Phase 3: Monarch Migration
 
-- Monarch import source.
-- Map Monarch accounts and transactions into canonical records.
+Monarch import source; Monarch accounts and transactions mapped into canonical records.
 
 ### Phase 4: Finance Primitives
 
-- Budgets, categories, rules, cashflow, spending summaries, recurring bills, net worth.
+Budgets, budget categories, rules, cashflow, and net worth.
+
+## Planned
 
 ### Phase 5: Additional Providers and Imports
 
 - MX, Finicity provider adapters.
-- CSV and Apple Card export import sources.
+- Apple Card export import source.

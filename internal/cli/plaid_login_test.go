@@ -333,11 +333,11 @@ func TestDoctorWarnsOnBroadPlaidDashboardAuthPermissions(t *testing.T) {
 	}
 }
 
-func writePlaidLoginTestConfig(t *testing.T) (string, string) {
+func writePlaidLoginTestConfig(t *testing.T) (configPath, envPath string) {
 	t.Helper()
 	dir := t.TempDir()
-	configPath := filepath.Join(dir, "config.yaml")
-	envPath := filepath.Join(dir, ".env")
+	configPath = filepath.Join(dir, "config.yaml")
+	envPath = filepath.Join(dir, ".env")
 	key := base64.RawURLEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
 	if err := os.WriteFile(configPath, []byte(`
 database:

@@ -61,7 +61,7 @@ func ParseUnsignedDecimalMinorUnits(input string) (int64, error) {
 	return wholeUnits*100 + fractionUnits, nil
 }
 
-func SignedManualBalance(accountType string, unsignedMinorUnits int64) (int64, string, error) {
+func SignedManualBalance(accountType string, unsignedMinorUnits int64) (signedMinorUnits int64, position string, err error) {
 	switch accountType {
 	case "credit", "loan", "other_liability":
 		return -unsignedMinorUnits, "decreases", nil

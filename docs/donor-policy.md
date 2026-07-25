@@ -1,8 +1,3 @@
----
-name: donor-policy
-description: Rules for working with donor/reference repositories in donors/
----
-
 # Donor Policy
 
 Use donor repositories for reference:

@@ -16,7 +16,7 @@ func (noopStore) UpsertImportedAccount(_ context.Context, _ core.Account) error 
 	return nil
 }
 
-func (noopStore) UpsertImportedTransaction(_ context.Context, _ core.Transaction, _ string) (bool, []string, error) {
+func (noopStore) UpsertImportedTransaction(_ context.Context, _ core.Transaction, _ string) (inserted bool, duplicateIDs []string, err error) {
 	return true, nil, nil
 }
 

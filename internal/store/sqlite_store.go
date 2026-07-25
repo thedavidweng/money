@@ -997,12 +997,12 @@ ORDER BY t.name ASC, t.id ASC`, strings.Join(placeholders, ","))
 	return nil
 }
 
-func nullableMoney(value sql.NullInt64, currency string) (*int64, *string) {
+func nullableMoney(value sql.NullInt64, currency string) (amount *int64, formatted *string) {
 	if !value.Valid {
 		return nil, nil
 	}
-	formatted := core.FormatMinorUnits(value.Int64, currency)
-	return &value.Int64, &formatted
+	formattedValue := core.FormatMinorUnits(value.Int64, currency)
+	return &value.Int64, &formattedValue
 }
 
 func source(kind string, provider, providerItemID, providerExternalItemID, institutionID, providerAccountID, providerTransactionID, importSourceID, importBatchID sql.NullString) core.Source {

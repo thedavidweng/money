@@ -166,7 +166,7 @@ func TestRuleCreateDryRunHumanOutputsPlan(t *testing.T) {
 }
 
 func TestRuleCreateConfirmJSONPersistsAndReturnsCreatedRule(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	var createOut, createErr bytes.Buffer
 	exitCode := Run(context.Background(), []string{
@@ -234,7 +234,7 @@ func TestRuleCreateConfirmJSONPersistsAndReturnsCreatedRule(t *testing.T) {
 }
 
 func TestRuleCreateConfirmHumanOutputsCreatedRule(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	var createOut, createErr bytes.Buffer
 	exitCode := Run(context.Background(), []string{
@@ -264,7 +264,7 @@ func TestRuleCreateConfirmHumanOutputsCreatedRule(t *testing.T) {
 }
 
 func TestRuleDeleteHumanOutputsDeletedRule(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	// Create a rule.
 	var createOut, createErr bytes.Buffer
@@ -316,7 +316,7 @@ func TestRuleDeleteHumanOutputsDeletedRule(t *testing.T) {
 }
 
 func TestRulesListHumanWithRealRulesShowsTable(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	// Create a rule.
 	var createOut, createErr bytes.Buffer
@@ -358,7 +358,7 @@ func TestRulesListHumanWithRealRulesShowsTable(t *testing.T) {
 }
 
 func TestRuleDeleteJSONRemovesRule(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	// Create a rule.
 	var createOut, createErr bytes.Buffer
@@ -434,7 +434,7 @@ func TestRuleDeleteJSONRemovesRule(t *testing.T) {
 }
 
 func TestRuleApplyJSONReturnsResult(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	// Create a rule.
 	var ruleOut, ruleErr bytes.Buffer
@@ -491,7 +491,7 @@ func TestRuleApplyJSONReturnsResult(t *testing.T) {
 }
 
 func TestRuleApplyHumanOutputsUpdatedCount(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	// Apply rules in human mode.
 	var applyOut, applyErr bytes.Buffer
@@ -520,8 +520,8 @@ func TestRuleCreateJSONWithoutConfirmationReturnsError(t *testing.T) {
 		"--action-value", "test_cat",
 		"--json",
 	}, nil, &stdout, &stderr)
-	if exitCode != 2 {
-		t.Fatalf("exit code = %d, want 2; stderr = %s, stdout = %s", exitCode, stderr.String(), stdout.String())
+	if exitCode != 7 {
+		t.Fatalf("exit code = %d, want 7; stderr = %s, stdout = %s", exitCode, stderr.String(), stdout.String())
 	}
 
 	var envelope struct {

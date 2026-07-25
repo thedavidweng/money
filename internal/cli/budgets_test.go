@@ -191,7 +191,7 @@ func TestBudgetCreateDryRunHumanOutputsPlan(t *testing.T) {
 }
 
 func TestBudgetListVerboseHumanWithRealBudgetsShowsVerboseColumns(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	// Create a budget so the list has data.
 	var createOut, createErr bytes.Buffer
@@ -227,7 +227,7 @@ func TestBudgetListVerboseHumanWithRealBudgetsShowsVerboseColumns(t *testing.T) 
 }
 
 func TestBudgetCreateConfirmHumanOutputsCreatedBudget(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	var createOut, createErr bytes.Buffer
 	exitCode := Run(context.Background(), []string{
@@ -255,7 +255,7 @@ func TestBudgetCreateConfirmHumanOutputsCreatedBudget(t *testing.T) {
 }
 
 func TestBudgetDeleteHumanOutputsDeletedBudget(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	// Create a budget.
 	var createOut, createErr bytes.Buffer
@@ -305,7 +305,7 @@ func TestBudgetDeleteHumanOutputsDeletedBudget(t *testing.T) {
 }
 
 func TestBudgetCategoriesCreateConfirmHumanOutputsCreatedCategory(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	// Create a budget.
 	var budgetOut, budgetErr bytes.Buffer
@@ -359,7 +359,7 @@ func TestBudgetCategoriesCreateConfirmHumanOutputsCreatedCategory(t *testing.T) 
 }
 
 func TestBudgetCategoriesDeleteHumanOutputsDeletedCategory(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	// Create a budget.
 	var budgetOut, budgetErr bytes.Buffer
@@ -431,7 +431,7 @@ func TestBudgetCategoriesDeleteHumanOutputsDeletedCategory(t *testing.T) {
 }
 
 func TestBudgetGetHumanWithCategoriesShowsCategoryTable(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	// Create a budget.
 	var budgetOut, budgetErr bytes.Buffer
@@ -496,7 +496,7 @@ func TestBudgetGetHumanWithCategoriesShowsCategoryTable(t *testing.T) {
 }
 
 func TestBudgetCreateConfirmJSONPersistsAndReturnsCreatedBudget(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	var createOut, createErr bytes.Buffer
 	exitCode := Run(context.Background(), []string{
@@ -558,7 +558,7 @@ func TestBudgetCreateConfirmJSONPersistsAndReturnsCreatedBudget(t *testing.T) {
 }
 
 func TestBudgetGetJSONReturnsBudgetWithID(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	// Create a budget first.
 	var createOut, createErr bytes.Buffer
@@ -632,7 +632,7 @@ func TestBudgetGetJSONReturnsBudgetWithID(t *testing.T) {
 }
 
 func TestBudgetGetHumanOutputsBudgetDetails(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	// Create a budget.
 	var createOut, createErr bytes.Buffer
@@ -681,7 +681,7 @@ func TestBudgetGetHumanOutputsBudgetDetails(t *testing.T) {
 }
 
 func TestBudgetDeleteJSONRemovesBudget(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	// Create a budget.
 	var createOut, createErr bytes.Buffer
@@ -825,7 +825,7 @@ func TestBudgetCategoriesCreateDryRunHumanOutputsPlan(t *testing.T) {
 }
 
 func TestBudgetCategoriesDeleteJSONRemovesCategory(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	// Create a budget first.
 	var budgetOut, budgetErr bytes.Buffer
@@ -927,8 +927,8 @@ func TestBudgetCreateJSONWithoutConfirmationReturnsError(t *testing.T) {
 		"--end-date", "2026-12-31",
 		"--json",
 	}, nil, &stdout, &stderr)
-	if exitCode != 2 {
-		t.Fatalf("exit code = %d, want 2; stderr = %s, stdout = %s", exitCode, stderr.String(), stdout.String())
+	if exitCode != 7 {
+		t.Fatalf("exit code = %d, want 7; stderr = %s, stdout = %s", exitCode, stderr.String(), stdout.String())
 	}
 
 	var envelope struct {
@@ -998,8 +998,8 @@ func TestBudgetCategoriesCreateJSONWithoutConfirmationReturnsError(t *testing.T)
 		"--limit", "50000",
 		"--json",
 	}, nil, &stdout, &stderr)
-	if exitCode != 2 {
-		t.Fatalf("exit code = %d, want 2; stderr = %s, stdout = %s", exitCode, stderr.String(), stdout.String())
+	if exitCode != 7 {
+		t.Fatalf("exit code = %d, want 7; stderr = %s, stdout = %s", exitCode, stderr.String(), stdout.String())
 	}
 
 	var envelope struct {

@@ -1,17 +1,52 @@
 version: "2"
+
 linters:
+  default: none
   enable:
     - errcheck
     - govet
     - ineffassign
     - staticcheck
     - unused
+    - gocritic
     - misspell
+    - unconvert
+    - prealloc
+    - unparam
+    - godox
+    - whitespace
+    - nolintlint
+  settings:
+    errcheck:
+      check-type-assertions: true
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+        - style
+      disabled-checks:
+        - hugeParam
+        - rangeValCopy
+        - paramTypeCombine
+        - nestingReduce
+        - unnamedResult
+    misspell:
+      locale: US
+    nolintlint:
+      require-explanation: true
+      require-specific: true
   exclusions:
     presets:
       - std-error-handling
-    paths:
-      - third_party
-      - vendor
-      - testdata
-      - website
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/thedavidweng/money
+
+run:
+  timeout: 5m

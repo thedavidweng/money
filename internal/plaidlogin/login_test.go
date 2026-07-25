@@ -479,11 +479,11 @@ func loginFakeDashboard(t *testing.T, clientID string, secret string) *httptest.
 	}))
 }
 
-func writeLoginConfig(t *testing.T, providersYAML string) (string, string) {
+func writeLoginConfig(t *testing.T, providersYAML string) (configPath, envPath string) {
 	t.Helper()
 	dir := t.TempDir()
-	configPath := filepath.Join(dir, "config.yaml")
-	envPath := filepath.Join(dir, ".env")
+	configPath = filepath.Join(dir, "config.yaml")
+	envPath = filepath.Join(dir, ".env")
 	key := base64.RawURLEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
 	if providersYAML == "" {
 		providersYAML = "providers: {}\n"

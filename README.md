@@ -143,7 +143,7 @@ Read commands use local data only. Sync is the explicit boundary where outbound 
 | Document | Purpose |
 |----------|---------|
 | [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) | Install, setup, and pricing guide |
-| [`docs/COMMANDS.md`](docs/COMMANDS.md) | Command inventory and global flags |
+| [`COMMANDS.md`](COMMANDS.md) | Command inventory and global flags |
 | [`docs/PRD.md`](docs/PRD.md) | Product requirements |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Module boundaries and data flow |
 | [`docs/CONTRACTS.md`](docs/CONTRACTS.md) | Current CLI JSON contracts |

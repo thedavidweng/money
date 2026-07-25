@@ -129,7 +129,7 @@ func (m *mockImportStore) UpsertImportedAccount(ctx context.Context, account cor
 	return nil
 }
 
-func (m *mockImportStore) UpsertImportedTransaction(ctx context.Context, tx core.Transaction, sourceRowHash string) (bool, []string, error) {
+func (m *mockImportStore) UpsertImportedTransaction(ctx context.Context, tx core.Transaction, sourceRowHash string) (inserted bool, duplicateIDs []string, err error) {
 	m.transactions = append(m.transactions, tx)
 	return m.inserted, m.dupIDs, nil
 }

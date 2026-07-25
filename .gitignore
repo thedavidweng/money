@@ -28,6 +28,7 @@ website/dist/
 
 # Local test artifacts
 .playwright-mcp/
+.scratch/
 
 coverage.out
 *.test

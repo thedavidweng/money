@@ -329,14 +329,14 @@ func plaidCurrency(iso string, unofficial string) string {
 	return unofficial
 }
 
-func plaidCategories(categories []string) (*string, *string) {
+func plaidCategories(categories []string) (category *string, subcategory *string) {
 	if len(categories) == 0 {
 		return nil, nil
 	}
-	category := categories[0]
-	var subcategory *string
+	first := categories[0]
+	category = &first
 	if len(categories) > 1 {
 		subcategory = &categories[len(categories)-1]
 	}
-	return &category, subcategory
+	return category, subcategory
 }

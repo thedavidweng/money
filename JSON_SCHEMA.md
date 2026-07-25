@@ -88,11 +88,11 @@ Provider errors are classified as:
 |------|----------|-----------|-----------|---------|
 | `BASE_CONFIG_MISSING` | config | false | 3 | Config doesn't exist yet |
 | `NOT_LOGGED_IN` | auth | false | 3 | Dashboard auth required |
-| `TEAM_SELECTION_REQUIRED` | validation | false | 2 | Multiple teams, no selection |
+| `TEAM_SELECTION_REQUIRED` | validation | false | 7 | Multiple teams, no selection |
 | `API_KEYS_FETCH_REQUIRED` | auth | true | 3 | Dashboard auth exists but API keys need fetching |
 | `DASHBOARD_TOKEN_REFRESH_FAILED` | auth | false | 3 | Refresh token expired |
 | `READ_ONLY_VIOLATION` | safety | false | 4 | Mutation blocked by read-only mode |
-| `CONFIRMATION_REQUIRED` | validation | false | 2 | JSON write without `--confirm` or `--dry-run` |
+| `CONFIRMATION_REQUIRED` | validation | false | 7 | JSON write without `--confirm` or `--dry-run` |
 | `CONFIRMATION_REQUIRED` | safety | false | 10 | Destructive op without `--confirm` (via requireConfirm) |
 | `SYNC_PARTIAL_FAILURE` | api | true | 6 | Some provider items failed |
 | `CONFIG_WRITE_FAILED` | config | false | 1 | Config/env file write failure |

@@ -234,7 +234,6 @@ func TestMonarchImporter_TransactionAmountConversion(t *testing.T) {
 	if result.TransactionsImported != 1 {
 		t.Fatalf("TransactionsImported = %d, want 1", result.TransactionsImported)
 	}
-	// -1234.56 * 100 = -123456
 	if store.transactions[0].AmountMinorUnits != -123456 {
 		t.Fatalf("amount = %d, want -123456", store.transactions[0].AmountMinorUnits)
 	}

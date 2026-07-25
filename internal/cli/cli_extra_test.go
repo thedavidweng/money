@@ -179,7 +179,7 @@ func TestDemoLiabilitiesListHumanMode(t *testing.T) {
 }
 
 func TestNetWorthJSON(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	var stdout, stderr bytes.Buffer
 	exitCode := Run(context.Background(), []string{"--config", configPath, "net-worth", "--json"}, nil, &stdout, &stderr)
@@ -211,7 +211,7 @@ func TestNetWorthJSON(t *testing.T) {
 }
 
 func TestNetWorthHumanMode(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	var stdout, stderr bytes.Buffer
 	exitCode := Run(context.Background(), []string{"--config", configPath, "net-worth"}, nil, &stdout, &stderr)
@@ -227,7 +227,7 @@ func TestNetWorthHumanMode(t *testing.T) {
 }
 
 func TestCashflowJSON(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	var stdout, stderr bytes.Buffer
 	exitCode := Run(context.Background(), []string{
@@ -262,7 +262,7 @@ func TestCashflowJSON(t *testing.T) {
 }
 
 func TestCashflowHumanMode(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	var stdout, stderr bytes.Buffer
 	exitCode := Run(context.Background(), []string{

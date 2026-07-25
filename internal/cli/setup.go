@@ -37,14 +37,14 @@ func newSetupCommand(_ context.Context, state *runtimeState, stdout io.Writer) *
 				}
 			}
 
-			// Open the store to run migrations
 			cfg, loadErr := config.Load(config.Options{ConfigPath: result.ConfigPath, Profile: state.profile})
 			if loadErr == nil {
 				opened, openErr := store.OpenEncrypted(context.Background(), cfg.DatabasePath, cfg.DatabaseEncryptionKeyBytes)
-				if openErr == nil {
+				switch {
+				case openErr == nil:
 					_ = opened.Close()
 					result.DBCreated = true
-				} else if state.json {
+				case state.json:
 					env := contracts.NewSuccess("setup", result)
 					env.Warnings = append(env.Warnings, contracts.Warning{
 						Code:     "DB_OPEN_FAILED",
@@ -52,13 +52,12 @@ func newSetupCommand(_ context.Context, state *runtimeState, stdout io.Writer) *
 						Category: contracts.CategoryInternal,
 					})
 					return contracts.WriteJSON(stdout, env)
-				} else {
+				default:
 					_, _ = fmt.Fprintf(stdout, "Config written. Database failed to open: %s\nRun `money doctor` to diagnose.\n", openErr)
 					return nil
 				}
 			}
 
-			// Run doctor diagnostics
 			diagnostics := runDiagnostics(result.ConfigPath, state.profile)
 
 			if state.json {
@@ -86,7 +85,6 @@ func newSetupCommand(_ context.Context, state *runtimeState, stdout io.Writer) *
 			}
 			printDiagnostics(stdout, diagnostics)
 
-			// Post-setup interactive wizard: offer to configure providers
 			if !state.json && state.stdin != nil {
 				if err := runSetupWizard(cmd.Context(), state, stdout, diagnostics); err != nil {
 					return err
@@ -99,7 +97,6 @@ func newSetupCommand(_ context.Context, state *runtimeState, stdout io.Writer) *
 	return cmd
 }
 
-// Diagnostic represents a single doctor check result.
 type Diagnostic struct {
 	Section  string `json:"section"`
 	Code     string `json:"code"`
@@ -115,7 +112,6 @@ func newDoctorCommand(_ context.Context, state *runtimeState, stdout io.Writer) 
 		Short:   "Check configuration and system health",
 		Example: "  money doctor\n  money doctor --fix\n  money doctor --fix --dry-run",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Only log to slog when stderr is a TTY (not piped/combined).
 			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 			if f, ok := state.stderr.(*os.File); ok && isTerminal(f) {
 				logger = slog.New(slog.NewTextHandler(state.stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -171,7 +167,6 @@ func runDoctorFix(state *runtimeState, stdout io.Writer, logger *slog.Logger, dr
 			exitCode: 1,
 		}
 	}
-	// Open DB to ensure migrations run, then fix links and sync.
 	ctx := context.Background()
 	cfg, loadErr := config.Load(config.Options{ConfigPath: result.ConfigPath, Profile: state.profile})
 	if loadErr == nil {
@@ -209,7 +204,6 @@ func runDoctorFix(state *runtimeState, stdout io.Writer, logger *slog.Logger, dr
 func runDiagnostics(configPath string, profile string) []Diagnostic {
 	var diags []Diagnostic
 
-	// Config section
 	cfg, err := config.Load(config.Options{ConfigPath: configPath, Profile: profile})
 	if err != nil {
 		diags = append(diags, Diagnostic{
@@ -223,7 +217,6 @@ func runDiagnostics(configPath string, profile string) []Diagnostic {
 		Message: "Config loaded from " + cfg.ConfigPath, Category: "config",
 	})
 
-	// Config warnings
 	for _, w := range cfg.Warnings {
 		diags = append(diags, Diagnostic{
 			Section: "Warnings", Code: w.Code, Status: "warn",
@@ -231,7 +224,6 @@ func runDiagnostics(configPath string, profile string) []Diagnostic {
 		})
 	}
 
-	// Env file permissions
 	if runtime.GOOS != "windows" {
 		if info, err := os.Stat(cfg.EnvPath); err == nil {
 			perm := info.Mode().Perm()
@@ -258,7 +250,6 @@ func runDiagnostics(configPath string, profile string) []Diagnostic {
 		}
 	}
 
-	// Store section
 	ctx := context.Background()
 	opened, openErr := store.OpenEncrypted(ctx, cfg.DatabasePath, cfg.DatabaseEncryptionKeyBytes)
 	if openErr != nil {
@@ -274,13 +265,9 @@ func runDiagnostics(configPath string, profile string) []Diagnostic {
 		Message: "Database opened at " + cfg.DatabasePath, Category: "internal",
 	})
 
-	// Links section
 	diags = append(diags, appendLinksDiagnostics(ctx, opened)...)
-
-	// Sync section
 	diags = append(diags, appendSyncDiagnostics(ctx, opened)...)
 
-	// Providers section
 	for _, name := range []string{"plaid", "bridge"} {
 		pc, ok := cfg.Providers[name]
 		if !ok || len(pc.Fields) == 0 {
@@ -325,7 +312,6 @@ func appendLinksDiagnostics(ctx context.Context, db *store.SQLiteStore) []Diagno
 		})
 		return diags
 	}
-	// Count items per provider.
 	counts := map[string]int{}
 	for _, item := range items {
 		counts[item.Provider]++
@@ -366,7 +352,6 @@ func appendSyncDiagnostics(ctx context.Context, db *store.SQLiteStore) []Diagnos
 		return diags
 	}
 
-	// Index latest runs by provider item ID.
 	latestByItem := map[string]store.SyncRunSummary{}
 	for _, r := range runs {
 		latestByItem[r.ProviderItemID] = r
@@ -399,8 +384,6 @@ func appendSyncDiagnostics(ctx context.Context, db *store.SQLiteStore) []Diagnos
 	return diags
 }
 
-// runDoctorFixLinks removes provider items with non-active status.
-// Returns the number of items removed.
 func runDoctorFixLinks(ctx context.Context, db *store.SQLiteStore) (int, error) {
 	items, err := db.ListProviderItems(ctx, store.ProviderItemQuery{})
 	if err != nil {
@@ -418,13 +401,10 @@ func runDoctorFixLinks(ctx context.Context, db *store.SQLiteStore) (int, error) 
 	return fixed, nil
 }
 
-// runDoctorFixSync marks stuck sync runs (no finished_at) as "interrupted".
-// Returns the number of runs updated.
 func runDoctorFixSync(ctx context.Context, db *store.SQLiteStore) (int, error) {
 	return db.MarkStuckSyncRunsInterrupted(ctx)
 }
 
-// logDiagnostics emits each diagnostic as a structured slog entry.
 func logDiagnostics(logger *slog.Logger, diags []Diagnostic) {
 	for _, d := range diags {
 		level := slog.LevelInfo
@@ -444,7 +424,6 @@ func logDiagnostics(logger *slog.Logger, diags []Diagnostic) {
 	}
 }
 
-// logFixResult logs the result of a doctor fix operation.
 func logFixResult(logger *slog.Logger, target string, count int) {
 	logger.Info("doctor fix",
 		slog.String("target", target),
@@ -473,7 +452,6 @@ func errString(err error) string {
 }
 
 func runSetupWizard(ctx context.Context, state *runtimeState, stdout io.Writer, diags []Diagnostic) error {
-	// Count unconfigured providers
 	unconfigured := []string{}
 	for _, d := range diags {
 		if d.Section == "Providers" && d.Status == "warn" && strings.HasPrefix(d.Code, "PROVIDER_NOT_CONFIGURED") {
@@ -539,7 +517,6 @@ func runSetupWizard(ctx context.Context, state *runtimeState, stdout io.Writer, 
 					return fmt.Errorf("unknown Plaid setup method %q", method)
 				}
 			}
-			// Build a minimal cobra.Command just to hold flags for runInteractiveProviderConfigure
 			fakeCmd := &cobra.Command{}
 			fakeCmd.Flags().Bool("force", false, "")
 			selectedSpec, _ := providerSpecByName(providerName)
@@ -552,7 +529,6 @@ func runSetupWizard(ctx context.Context, state *runtimeState, stdout io.Writer, 
 			if err := runInteractiveProviderConfigure(state, stdout, providerName, fakeCmd, reader); err != nil {
 				return err
 			}
-			// Refresh diagnostics to see if there are still unconfigured providers
 			_, loadErr := config.Load(config.Options{ConfigPath: state.configPath, Profile: state.profile})
 			if loadErr == nil {
 				diags = runDiagnostics(state.configPath, state.profile)
@@ -603,7 +579,6 @@ func providerSpecByName(name string) (config.ProviderSpec, error) {
 }
 
 func promptForProviderCredentials(stdout io.Writer, reader *bufio.Reader, spec config.ProviderSpec, secrets map[string]string) error {
-	// Skip entirely if all fields are already filled.
 	allFilled := true
 	for _, field := range spec.SecretFields {
 		if secrets[field] == "" {
@@ -664,7 +639,7 @@ func runInteractiveProviderConfigure(state *runtimeState, stdout io.Writer, prov
 			code:     "UNKNOWN_PROVIDER",
 			message:  err.Error(),
 			category: contracts.CategoryValidation,
-			exitCode: 2,
+			exitCode: 7,
 		}
 	}
 
@@ -680,7 +655,6 @@ func runInteractiveProviderConfigure(state *runtimeState, stdout io.Writer, prov
 		options[field] = val
 	}
 
-	// Interactive prompt for missing secrets
 	if !state.json && state.stdin != nil {
 		needsPrompt := false
 		for _, field := range spec.SecretFields {
@@ -699,7 +673,6 @@ func runInteractiveProviderConfigure(state *runtimeState, stdout io.Writer, prov
 		}
 	}
 
-	// Final validation before writing
 	var missing []string
 	for _, field := range spec.SecretFields {
 		if secrets[field] == "" {
@@ -712,7 +685,7 @@ func runInteractiveProviderConfigure(state *runtimeState, stdout io.Writer, prov
 			code:     "MISSING_CREDENTIALS",
 			message:  fmt.Sprintf("%s is missing required credentials: %s. Run interactively or pass them as flags.", providerName, strings.Join(missing, ", ")),
 			category: contracts.CategoryValidation,
-			exitCode: 2,
+			exitCode: 7,
 		}
 	}
 	if err := confirmProviderCredentialOverwrite(state, stdout, spec, &force); err != nil {
@@ -821,7 +794,6 @@ func newConfigureCommand(state *runtimeState, stdout io.Writer) *cobra.Command {
 		},
 	}
 
-	// Use generic flag names; the provider argument determines which spec is used
 	cmd.Flags().String("client-id", "", "provider client ID")
 	cmd.Flags().String("secret", "", "provider secret")
 	cmd.Flags().String("client-secret", "", "provider client secret")

@@ -42,7 +42,7 @@ func newBudgetsListCommand(ctx context.Context, state *runtimeState, stdout io.W
 			if err != nil {
 				return err
 			}
-			if !state.json {
+			return render(stdout, state, "budgets.list", map[string]any{"budgets": budgets}, func() {
 				table := tablewriter.NewWriter(stdout)
 				if verbose {
 					table.SetHeader([]string{"ID", "NAME", "PERIOD", "START", "END", "CURRENCY", "CATEGORIES"})
@@ -58,11 +58,7 @@ func newBudgetsListCommand(ctx context.Context, state *runtimeState, stdout io.W
 					}
 				}
 				table.Render()
-				return nil
-			}
-			env := contracts.NewSuccess("budgets.list", map[string]any{"budgets": budgets})
-			env.Meta.Demo = state.demo
-			return contracts.WriteJSON(stdout, env)
+			})
 		},
 	}
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "show local IDs and category counts")
@@ -84,7 +80,7 @@ func newBudgetsCreateCommand(ctx context.Context, state *runtimeState, stdout io
 					message:   "JSON budget writes require --dry-run or --confirm",
 					category:  contracts.CategoryValidation,
 					retryable: false,
-					exitCode:  2,
+					exitCode:  7,
 				}
 			}
 			if name == "" || startDate == "" || endDate == "" {
@@ -101,13 +97,9 @@ func newBudgetsCreateCommand(ctx context.Context, state *runtimeState, stdout io
 				EndDate:   endDate,
 			}
 			if dryRun {
-				if state.json {
-					env := contracts.NewSuccess("budgets.create", map[string]any{"dry_run": true, "budget": budget})
-					env.Meta.Demo = state.demo
-					return contracts.WriteJSON(stdout, env)
-				}
-				_, _ = fmt.Fprintf(stdout, "Would create budget %q (%s, %s to %s)\n", budget.Name, budget.Period, budget.StartDate, budget.EndDate)
-				return nil
+				return render(stdout, state, "budgets.create", map[string]any{"dry_run": true, "budget": budget}, func() {
+					_, _ = fmt.Fprintf(stdout, "Would create budget %q (%s, %s to %s)\n", budget.Name, budget.Period, budget.StartDate, budget.EndDate)
+				})
 			}
 			activeStore, err := requireStore(state)
 			if err != nil {
@@ -117,13 +109,9 @@ func newBudgetsCreateCommand(ctx context.Context, state *runtimeState, stdout io
 			if err != nil {
 				return err
 			}
-			if state.json {
-				env := contracts.NewSuccess("budgets.create", map[string]any{"budget": created})
-				env.Meta.Demo = state.demo
-				return contracts.WriteJSON(stdout, env)
-			}
-			_, _ = fmt.Fprintf(stdout, "Created budget %s (%s)\n", created.Name, created.ID)
-			return nil
+			return render(stdout, state, "budgets.create", map[string]any{"budget": created}, func() {
+				_, _ = fmt.Fprintf(stdout, "Created budget %s (%s)\n", created.Name, created.ID)
+			})
 		},
 	}
 	cmd.Flags().StringVar(&name, "name", "", "budget name")
@@ -168,7 +156,7 @@ func newBudgetsGetCommand(ctx context.Context, state *runtimeState, stdout io.Wr
 			if err != nil {
 				return err
 			}
-			if !state.json {
+			return render(stdout, state, "budgets.get", map[string]any{"budget": budget}, func() {
 				_, _ = fmt.Fprintf(stdout, "Budget: %s (%s)\n", budget.Name, budget.ID)
 				_, _ = fmt.Fprintf(stdout, "Period: %s\n", budget.Period)
 				_, _ = fmt.Fprintf(stdout, "Range: %s to %s\n", budget.StartDate, budget.EndDate)
@@ -187,11 +175,7 @@ func newBudgetsGetCommand(ctx context.Context, state *runtimeState, stdout io.Wr
 					}
 					table.Render()
 				}
-				return nil
-			}
-			env := contracts.NewSuccess("budgets.get", map[string]any{"budget": budget})
-			env.Meta.Demo = state.demo
-			return contracts.WriteJSON(stdout, env)
+			})
 		},
 	}
 }
@@ -224,13 +208,9 @@ func newBudgetsDeleteCommand(ctx context.Context, state *runtimeState, stdout io
 			if err := activeStore.DeleteBudget(ctx, args[0]); err != nil {
 				return err
 			}
-			if state.json {
-				env := contracts.NewSuccess("budgets.delete", map[string]string{"id": args[0]})
-				env.Meta.Demo = state.demo
-				return contracts.WriteJSON(stdout, env)
-			}
-			_, _ = fmt.Fprintf(stdout, "Deleted budget %s\n", args[0])
-			return nil
+			return render(stdout, state, "budgets.delete", map[string]string{"id": args[0]}, func() {
+				_, _ = fmt.Fprintf(stdout, "Deleted budget %s\n", args[0])
+			})
 		},
 	}
 }
@@ -262,7 +242,7 @@ func newBudgetCategoriesCreateCommand(ctx context.Context, state *runtimeState, 
 					message:   "JSON budget category writes require --dry-run or --confirm",
 					category:  contracts.CategoryValidation,
 					retryable: false,
-					exitCode:  2,
+					exitCode:  7,
 				}
 			}
 			if budgetID == "" || name == "" || limitMinor <= 0 {
@@ -279,13 +259,9 @@ func newBudgetCategoriesCreateCommand(ctx context.Context, state *runtimeState, 
 				bc.CategoryID = &categoryID
 			}
 			if dryRun {
-				if state.json {
-					env := contracts.NewSuccess("budgets.categories.create", map[string]any{"dry_run": true, "budget_category": bc})
-					env.Meta.Demo = state.demo
-					return contracts.WriteJSON(stdout, env)
-				}
-				_, _ = fmt.Fprintf(stdout, "Would create budget category %q with limit %s %s\n", bc.Name, core.FormatMinorUnits(bc.LimitMinorUnits, bc.Currency), bc.Currency)
-				return nil
+				return render(stdout, state, "budgets.categories.create", map[string]any{"dry_run": true, "budget_category": bc}, func() {
+					_, _ = fmt.Fprintf(stdout, "Would create budget category %q with limit %s %s\n", bc.Name, core.FormatMinorUnits(bc.LimitMinorUnits, bc.Currency), bc.Currency)
+				})
 			}
 			activeStore, err := requireStore(state)
 			if err != nil {
@@ -295,13 +271,9 @@ func newBudgetCategoriesCreateCommand(ctx context.Context, state *runtimeState, 
 			if err != nil {
 				return err
 			}
-			if state.json {
-				env := contracts.NewSuccess("budgets.categories.create", map[string]any{"budget_category": created})
-				env.Meta.Demo = state.demo
-				return contracts.WriteJSON(stdout, env)
-			}
-			_, _ = fmt.Fprintf(stdout, "Created budget category %s (%s)\n", created.Name, created.ID)
-			return nil
+			return render(stdout, state, "budgets.categories.create", map[string]any{"budget_category": created}, func() {
+				_, _ = fmt.Fprintf(stdout, "Created budget category %s (%s)\n", created.Name, created.ID)
+			})
 		},
 	}
 	cmd.Flags().StringVar(&budgetID, "budget-id", "", "parent budget ID")
@@ -344,13 +316,9 @@ func newBudgetCategoriesDeleteCommand(ctx context.Context, state *runtimeState, 
 			if err := activeStore.DeleteBudgetCategory(ctx, args[0]); err != nil {
 				return err
 			}
-			if state.json {
-				env := contracts.NewSuccess("budgets.categories.delete", map[string]string{"id": args[0]})
-				env.Meta.Demo = state.demo
-				return contracts.WriteJSON(stdout, env)
-			}
-			_, _ = fmt.Fprintf(stdout, "Deleted budget category %s\n", args[0])
-			return nil
+			return render(stdout, state, "budgets.categories.delete", map[string]string{"id": args[0]}, func() {
+				_, _ = fmt.Fprintf(stdout, "Deleted budget category %s\n", args[0])
+			})
 		},
 	}
 }

@@ -45,12 +45,10 @@ func Setup(configPath string, profile string, force bool) (SetupResult, error) {
 		DatabasePath: dbPath,
 	}
 
-	// Create directory
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return result, fmt.Errorf("create config directory: %w", err)
 	}
 
-	// Write config.yaml if missing
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		content := configSkeleton(dbPath)
 		if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
@@ -58,7 +56,6 @@ func Setup(configPath string, profile string, force bool) (SetupResult, error) {
 		}
 	}
 
-	// Generate encryption key and write .env if key is missing
 	secretCreated, err := ensureEncryptionKey(envPath, force)
 	if err != nil {
 		return result, err
@@ -84,7 +81,6 @@ providers: {}
 `, rel)
 }
 
-// ProviderSpec defines the fields needed for a provider configuration.
 type ProviderSpec struct {
 	Name           string
 	SecretFields   []string          // written to .env
@@ -116,7 +112,6 @@ var BridgeSpec = ProviderSpec{
 	HelpURL: "https://dashboard.bridgeapi.io/dashboard/secret-management",
 }
 
-// ProviderSpecByName returns the spec for a known provider.
 func ProviderSpecByName(name string) (ProviderSpec, bool) {
 	switch name {
 	case "plaid":
@@ -134,7 +129,6 @@ type ConfigureResult struct {
 	KeysWritten int    `json:"keys_written"`
 }
 
-// ConfigureProvider writes provider credentials to .env and env: references to config.yaml.
 func ConfigureProvider(configPath string, profile string, spec ProviderSpec, secrets map[string]string, options map[string]string, force bool) (ConfigureResult, error) {
 	meta, err := ResolveMetadata(Options{ConfigPath: configPath, Profile: profile})
 	if err != nil {
@@ -149,7 +143,6 @@ func ConfigureProvider(configPath string, profile string, spec ProviderSpec, sec
 		ConfigPath: configPath,
 	}
 
-	// Write secrets to .env
 	existing, _ := readDotEnv(envPath)
 	envLines := []string{}
 	if content, err := os.ReadFile(envPath); err == nil {
@@ -176,7 +169,6 @@ func ConfigureProvider(configPath string, profile string, spec ProviderSpec, sec
 		return result, fmt.Errorf("write env file: %w", err)
 	}
 
-	// Update config.yaml with env: references and optional fields
 	if err := updateProviderConfig(configPath, spec, options); err != nil {
 		return result, err
 	}
@@ -184,13 +176,12 @@ func ConfigureProvider(configPath string, profile string, spec ProviderSpec, sec
 	return result, nil
 }
 
-func ProviderCredentialConflicts(configPath string, profile string, spec ProviderSpec) ([]string, string, error) {
+func ProviderCredentialConflicts(configPath string, profile string, spec ProviderSpec) (conflicts []string, envPath string, err error) {
 	meta, err := ResolveMetadata(Options{ConfigPath: configPath, Profile: profile})
 	if err != nil {
 		return nil, "", err
 	}
 	existing, _ := readDotEnv(meta.EnvPath)
-	var conflicts []string
 	for _, field := range spec.SecretFields {
 		envVar := providerEnvVar(spec.Name, field)
 		if existing[envVar] != "" {
@@ -212,7 +203,6 @@ func setEnvLine(lines []string, key, value string) []string {
 			return lines
 		}
 	}
-	// Append
 	if len(lines) > 0 && lines[len(lines)-1] == "" {
 		lines = append(lines[:len(lines)-1], prefix+value, "")
 	} else {

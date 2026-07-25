@@ -384,7 +384,7 @@ func TestWriteSyncHumanVerboseAllErrorItems(t *testing.T) {
 }
 
 func TestSyncJSONWithEmptyStoreReturnsWarningNoLinkedItems(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	var stdout, stderr bytes.Buffer
 	exitCode := Run(context.Background(), []string{"--config", configPath, "sync", "--json"}, nil, &stdout, &stderr)
@@ -430,7 +430,7 @@ func TestSyncJSONWithEmptyStoreReturnsWarningNoLinkedItems(t *testing.T) {
 }
 
 func TestSyncHumanWithEmptyStoreOutputsWarning(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	var stdout, stderr bytes.Buffer
 	exitCode := Run(context.Background(), []string{"--config", configPath, "sync"}, nil, &stdout, &stderr)
@@ -444,7 +444,7 @@ func TestSyncHumanWithEmptyStoreOutputsWarning(t *testing.T) {
 }
 
 func TestSyncVerboseHumanWithEmptyStoreOutputsWarning(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	var stdout, stderr bytes.Buffer
 	exitCode := Run(context.Background(), []string{"--config", configPath, "sync", "--verbose"}, nil, &stdout, &stderr)

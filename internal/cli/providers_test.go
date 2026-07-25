@@ -12,7 +12,7 @@ import (
 )
 
 func TestProvidersPlaidLinkJSONMissingCredentialsReturnsStableAuthError(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	var stdout, stderr bytes.Buffer
 	exitCode := Run(context.Background(), []string{"--config", configPath, "providers", "plaid", "link", "--json", "--no-open"}, nil, &stdout, &stderr)
@@ -49,7 +49,7 @@ func TestProvidersPlaidLinkJSONMissingCredentialsReturnsStableAuthError(t *testi
 }
 
 func TestProvidersBridgeLinkJSONMissingCredentialsReturnsStableAuthError(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	var stdout, stderr bytes.Buffer
 	exitCode := Run(context.Background(), []string{"--config", configPath, "providers", "bridge", "link", "--json", "--no-open"}, nil, &stdout, &stderr)
@@ -86,7 +86,7 @@ func TestProvidersBridgeLinkJSONMissingCredentialsReturnsStableAuthError(t *test
 }
 
 func TestInstitutionLinkJSONMissingCredentialsReportsUnavailableProvider(t *testing.T) {
-	configPath := writeTestConfig(t, "")
+	configPath := writeTestConfig(t)
 
 	var stdout, stderr bytes.Buffer
 	exitCode := Run(context.Background(), []string{"--config", configPath, "link", "bank", "--json"}, nil, &stdout, &stderr)
@@ -126,21 +126,19 @@ func TestInstitutionLinkJSONMissingCredentialsReportsUnavailableProvider(t *test
 	}
 }
 
-func writeTestConfig(t *testing.T, providers string) string {
+func writeTestConfig(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
 	envPath := filepath.Join(dir, ".env")
 	key := base64.RawURLEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
-	if providers == "" {
-		providers = "providers: {}\n"
-	}
 	if err := os.WriteFile(configPath, []byte(`
 database:
   path: ./money.db
   encryption_key:
     env: MONEY_DB_ENCRYPTION_KEY
-`+providers), 0o600); err != nil {
+providers: {}
+`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(envPath, []byte("MONEY_DB_ENCRYPTION_KEY="+key+"\n"), 0o600); err != nil {

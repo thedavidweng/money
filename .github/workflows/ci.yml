@@ -11,4 +11,5 @@ jobs:
     uses: thedavidweng/cli-workflow-template/.github/workflows/go-ci.yml@main
     with:
       enable-coverage: true
+      enable-conventions: true
     secrets: inherit

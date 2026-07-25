@@ -38,13 +38,13 @@ func TestPlaidLinkHelperServesOnlyLinkPageAndCallback(t *testing.T) {
 	handler := helper.Handler()
 
 	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, httptest.NewRequest(http.MethodGet, "/other", nil))
+	handler.ServeHTTP(resp, httptest.NewRequest(http.MethodGet, "/other", http.NoBody))
 	if resp.Code != http.StatusNotFound {
 		t.Fatalf("other path status = %d", resp.Code)
 	}
 
 	pageResp := httptest.NewRecorder()
-	handler.ServeHTTP(pageResp, httptest.NewRequest(http.MethodGet, "/", nil))
+	handler.ServeHTTP(pageResp, httptest.NewRequest(http.MethodGet, "/", http.NoBody))
 	if pageResp.Code != http.StatusOK {
 		t.Fatalf("page status = %d", pageResp.Code)
 	}

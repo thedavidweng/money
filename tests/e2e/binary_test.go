@@ -147,7 +147,7 @@ func requireZero(t *testing.T, code int, stdout string) {
 // helpCmdPattern matches lines that start with 2 spaces, then a command name.
 // Cobra groups commands under headers; we just look for the command lines.
 // Example: "  demo         Run a command..." or "  accounts     "
-var helpCmdPattern = regexp.MustCompile(`^  ([a-z][a-z0-9-]*)(?:$| +)`)
+var helpCmdPattern = regexp.MustCompile(`^ {2}([a-z][a-z0-9-]*)(?:$| +)`)
 
 func discoverCommands(t *testing.T, bin string) []string {
 	t.Helper()

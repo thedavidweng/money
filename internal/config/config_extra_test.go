@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/base64"
 	"os"
 	"path/filepath"
@@ -144,7 +145,7 @@ func TestEnsureEncryptionKeyDoesNotOverwrite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read .env second time: %v", err)
 	}
-	if string(content1) != string(content2) {
+	if !bytes.Equal(content1, content2) {
 		t.Fatalf(".env changed between calls without force:\nfirst:\n%s\nsecond:\n%s", content1, content2)
 	}
 }
@@ -174,7 +175,7 @@ func TestEnsureEncryptionKeyForceOverwrites(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read .env second time: %v", err)
 	}
-	if string(content1) == string(content2) {
+	if bytes.Equal(content1, content2) {
 		t.Fatal(".env not changed after force overwrite")
 	}
 }

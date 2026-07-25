@@ -25,6 +25,19 @@ archives:
       - goos: windows
         formats: [zip]
 
+nfpms:
+  - package_name: money
+    vendor: thedavidweng
+    maintainer: thedavidweng <noreply@github.com>
+    homepage: https://github.com/thedavidweng/money
+    description: "Local-first personal finance backend for agents and power users"
+    license: Apache-2.0
+    formats:
+      - deb
+      - rpm
+      - apk
+    bindir: /usr/bin
+
 checksum:
   name_template: "checksums.txt"
   algorithm: sha256
@@ -50,17 +63,7 @@ sboms:
       - "${artifact}.spdx.json"
 
 changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
-      - "^ci:"
-      - "^chore:"
-      - "^style:"
-      - "^refactor:"
-      - Merge pull request
-      - Merge branch
+  disable: true
 
 release:
   github:
