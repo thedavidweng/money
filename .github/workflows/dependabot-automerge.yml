@@ -3,16 +3,24 @@ name: Dependabot auto-merge
 on:
   pull_request:
 
-permissions:
-  contents: write
-  pull-requests: write
+# Job-scoped write is enough to enable auto-merge on the Dependabot PR.
+permissions: {}
+
+concurrency:
+  group: dependabot-automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   automerge:
     name: Enable auto-merge
-    if: github.actor == 'dependabot[bot]'
+    if: >
+      github.event.pull_request.user.login == 'dependabot[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: write # gh pr merge --auto
+      pull-requests: write # enable auto-merge on the PR
     steps:
       - name: Dependabot metadata
         id: meta
@@ -29,7 +37,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
-          deny='googleapis/release-please-action golangci/golangci-lint-action'
+          deny='googleapis/release-please-action golangci/golangci-lint-action @earendil-works/pi-tui dependabot/fetch-metadata'
           names="${{ steps.meta.outputs.dependency-names }}"
           for blocked in $deny; do
             case " $names " in
