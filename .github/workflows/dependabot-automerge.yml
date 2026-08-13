@@ -1,0 +1,39 @@
+name: Dependabot auto-merge
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    name: Enable auto-merge
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2.5.0
+
+      - name: Enable auto-merge for safe updates
+        if: >
+          steps.meta.outputs.update-type == 'version-update:semver-patch'
+          || (
+            steps.meta.outputs.update-type == 'version-update:semver-minor'
+            && steps.meta.outputs.dependency-type != 'direct:production'
+          )
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          deny='googleapis/release-please-action golangci/golangci-lint-action'
+          names="${{ steps.meta.outputs.dependency-names }}"
+          for blocked in $deny; do
+            case " $names " in
+              *" $blocked "*) echo "skip auto-merge: $blocked"; exit 0 ;;
+            esac
+          done
+          gh pr merge --auto --squash "$PR_URL"
