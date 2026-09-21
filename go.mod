@@ -6,7 +6,7 @@ require (
 	charm.land/huh/v2 v2.0.3
 	github.com/google/uuid v1.6.0
 	github.com/ncruces/go-sqlite3 v0.35.4
-	github.com/olekukonko/tablewriter v1.1.4
+	github.com/olekukonko/tablewriter v1.1.5
 	github.com/plaid/plaid-go/v40 v40.1.0
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/term v0.46.0
