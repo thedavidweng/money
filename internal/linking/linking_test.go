@@ -115,9 +115,11 @@ func (fakeProvider) ValidateConfig(ctx context.Context) []providers.ConfigDiagno
 func (fakeProvider) SearchInstitutions(ctx context.Context, query string) ([]providers.Institution, error) {
 	return nil, nil
 }
+
 func (fakeProvider) CreateLinkSession(ctx context.Context, request *providers.LinkRequest) (providers.LinkSession, error) {
 	return providers.LinkSession{}, nil
 }
+
 func (fakeProvider) ExchangeLinkToken(ctx context.Context, session *providers.LinkSession, callback *providers.LinkCallback) (providers.LinkedItem, error) {
 	return providers.LinkedItem{
 		Institution: providers.Institution{
@@ -137,6 +139,7 @@ func (fakeProvider) ExchangeLinkToken(ctx context.Context, session *providers.Li
 		},
 	}, nil
 }
+
 func (fakeProvider) Sync(ctx context.Context, item *providers.ProviderItem, sink providers.SyncSink) (providers.SyncResult, error) {
 	return providers.SyncResult{}, nil
 }

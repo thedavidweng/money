@@ -30,7 +30,7 @@ func TestRunPlaidLinkFlowNoOpenStoresLinkedItem(t *testing.T) {
 	})
 
 	var opened bool
-	startPlaidLinkSessionServer = func(linkToken string, state string, timeout time.Duration) (linkSessionServer, error) {
+	startPlaidLinkSessionServer = func(linkToken, state string, timeout time.Duration) (linkSessionServer, error) {
 		if linkToken != "link-token" || state == "" {
 			t.Fatalf("server input linkToken=%q state=%q", linkToken, state)
 		}
@@ -83,7 +83,7 @@ func TestRunPlaidLinkFlowWaitsForEnterBeforeOpeningBrowser(t *testing.T) {
 		openBrowser = oldOpen
 	})
 
-	startPlaidLinkSessionServer = func(linkToken string, state string, timeout time.Duration) (linkSessionServer, error) {
+	startPlaidLinkSessionServer = func(linkToken, state string, timeout time.Duration) (linkSessionServer, error) {
 		return &fakeLinkSessionServer{
 			url: "http://127.0.0.1:4000",
 			callback: providers.LinkCallback{
@@ -118,7 +118,7 @@ func TestRunPlaidLinkFlowPassesConsentProductOptions(t *testing.T) {
 
 	oldStart := startPlaidLinkSessionServer
 	t.Cleanup(func() { startPlaidLinkSessionServer = oldStart })
-	startPlaidLinkSessionServer = func(linkToken string, state string, timeout time.Duration) (linkSessionServer, error) {
+	startPlaidLinkSessionServer = func(linkToken, state string, timeout time.Duration) (linkSessionServer, error) {
 		return &fakeLinkSessionServer{
 			url: "http://127.0.0.1:4000",
 			callback: providers.LinkCallback{
@@ -344,7 +344,7 @@ func TestRunPlaidLinkFlowReturnsCLIErrorOnCancel(t *testing.T) {
 
 	oldStart := startPlaidLinkSessionServer
 	t.Cleanup(func() { startPlaidLinkSessionServer = oldStart })
-	startPlaidLinkSessionServer = func(linkToken string, state string, timeout time.Duration) (linkSessionServer, error) {
+	startPlaidLinkSessionServer = func(linkToken, state string, timeout time.Duration) (linkSessionServer, error) {
 		return &fakeLinkSessionServer{
 			url: "http://127.0.0.1:4000",
 			callback: providers.LinkCallback{
@@ -392,7 +392,7 @@ func TestRunPlaidLinkFlowReturnsCLIErrorOnLinkError(t *testing.T) {
 
 	oldStart := startPlaidLinkSessionServer
 	t.Cleanup(func() { startPlaidLinkSessionServer = oldStart })
-	startPlaidLinkSessionServer = func(linkToken string, state string, timeout time.Duration) (linkSessionServer, error) {
+	startPlaidLinkSessionServer = func(linkToken, state string, timeout time.Duration) (linkSessionServer, error) {
 		return &fakeLinkSessionServer{
 			url: "http://127.0.0.1:4000",
 			callback: providers.LinkCallback{
@@ -441,7 +441,7 @@ func TestRunPlaidLinkFlowWritesJSONWhenStateJSON(t *testing.T) {
 
 	oldStart := startPlaidLinkSessionServer
 	t.Cleanup(func() { startPlaidLinkSessionServer = oldStart })
-	startPlaidLinkSessionServer = func(linkToken string, state string, timeout time.Duration) (linkSessionServer, error) {
+	startPlaidLinkSessionServer = func(linkToken, state string, timeout time.Duration) (linkSessionServer, error) {
 		return &fakeLinkSessionServer{
 			url: "http://127.0.0.1:4000",
 			callback: providers.LinkCallback{
@@ -512,12 +512,15 @@ func (fakePlaidCLIProvider) Name() string { return "plaid" }
 func (fakePlaidCLIProvider) ValidateConfig(ctx context.Context) []providers.ConfigDiagnostic {
 	return nil
 }
+
 func (fakePlaidCLIProvider) SearchInstitutions(ctx context.Context, query string) ([]providers.Institution, error) {
 	return nil, nil
 }
+
 func (fakePlaidCLIProvider) CreateLinkSession(ctx context.Context, request *providers.LinkRequest) (providers.LinkSession, error) {
 	return providers.LinkSession{Provider: "plaid", LinkToken: "link-token", State: request.State}, nil
 }
+
 func (fakePlaidCLIProvider) ExchangeLinkToken(ctx context.Context, session *providers.LinkSession, callback *providers.LinkCallback) (providers.LinkedItem, error) {
 	return providers.LinkedItem{
 		Institution: providers.Institution{
@@ -536,6 +539,7 @@ func (fakePlaidCLIProvider) ExchangeLinkToken(ctx context.Context, session *prov
 		},
 	}, nil
 }
+
 func (fakePlaidCLIProvider) Sync(ctx context.Context, item *providers.ProviderItem, sink providers.SyncSink) (providers.SyncResult, error) {
 	return providers.SyncResult{}, nil
 }
@@ -589,9 +593,11 @@ func (fakeBridgeCLIProvider) Name() string { return "bridge" }
 func (fakeBridgeCLIProvider) ValidateConfig(ctx context.Context) []providers.ConfigDiagnostic {
 	return nil
 }
+
 func (fakeBridgeCLIProvider) SearchInstitutions(ctx context.Context, query string) ([]providers.Institution, error) {
 	return nil, nil
 }
+
 func (fakeBridgeCLIProvider) CreateLinkSession(ctx context.Context, request *providers.LinkRequest) (providers.LinkSession, error) {
 	return providers.LinkSession{
 		Provider:            "bridge",
@@ -600,6 +606,7 @@ func (fakeBridgeCLIProvider) CreateLinkSession(ctx context.Context, request *pro
 		ProviderAccessToken: "bridge-user-token",
 	}, nil
 }
+
 func (fakeBridgeCLIProvider) ExchangeLinkToken(ctx context.Context, session *providers.LinkSession, callback *providers.LinkCallback) (providers.LinkedItem, error) {
 	return providers.LinkedItem{
 		Institution: providers.Institution{
@@ -619,6 +626,7 @@ func (fakeBridgeCLIProvider) ExchangeLinkToken(ctx context.Context, session *pro
 		},
 	}, nil
 }
+
 func (fakeBridgeCLIProvider) Sync(ctx context.Context, item *providers.ProviderItem, sink providers.SyncSink) (providers.SyncResult, error) {
 	return providers.SyncResult{}, nil
 }

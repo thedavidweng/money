@@ -1,5 +1,6 @@
 [tools]
 go = "1.26.5"
+gofumpt = "0.12.0"
 golangci-lint = "2.12.2"
 
 [tasks.build]
@@ -9,7 +10,7 @@ run = "go build ./..."
 run = "go test ./..."
 
 [tasks.fmt]
-run = "golangci-lint fmt"
+run = "gofumpt -extra -w ."
 
 [tasks.lint]
 run = "golangci-lint run"

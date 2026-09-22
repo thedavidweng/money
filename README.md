@@ -168,7 +168,7 @@ Project docs and landing page: **https://thedavidweng.github.io/site/money/**
 
 ## Infrastructure
 
-- **CI/CD:** [cli-workflow-template](https://github.com/thedavidweng/cli-workflow-template) — reusable GitHub Actions workflows
+- **CI/CD:** GitHub Actions + [mise](https://mise.jdx.dev/)
 - **Docs:** [site](https://github.com/thedavidweng/site) — landing page and documentation
 
 ## License

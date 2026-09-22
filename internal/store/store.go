@@ -20,7 +20,7 @@ type Store interface {
 	ListRecurring(ctx context.Context) ([]core.Recurring, error)
 	ListProviderItems(ctx context.Context, query ProviderItemQuery) ([]LinkedItem, error)
 	GetProviderItem(ctx context.Context, id string) (LinkedItem, error)
-	UpdateProviderItemName(ctx context.Context, id string, name string) error
+	UpdateProviderItemName(ctx context.Context, id, name string) error
 	RemoveProviderItem(ctx context.Context, id string) error
 	ListHoldings(ctx context.Context) ([]core.InvestmentHolding, error)
 	ListSecurities(ctx context.Context) ([]core.InvestmentSecurity, error)
@@ -49,7 +49,7 @@ type Store interface {
 	UpsertAccount(ctx context.Context, account *core.FinancialAccount) error
 	UpsertTransaction(ctx context.Context, transaction *core.ProviderTransaction) error
 	UpsertRecurring(ctx context.Context, recurring *core.ProviderRecurring) error
-	MarkTransactionRemoved(ctx context.Context, providerItemID string, providerTransactionID string) error
+	MarkTransactionRemoved(ctx context.Context, providerItemID, providerTransactionID string) error
 	RecordSyncRun(ctx context.Context, run *core.SyncRun) error
 	UpsertSecurity(ctx context.Context, security *core.InvestmentSecurity) error
 	UpsertHolding(ctx context.Context, providerItemID string, holding *core.InvestmentHolding) error

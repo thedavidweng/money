@@ -94,7 +94,7 @@ func TestPlaidLoginCommandsUseSharedFakeAndPreserveStderr(t *testing.T) {
 	t.Cleanup(func() { runPlaidLoginCLI = oldRunPlaidLogin })
 
 	var commands []string
-	runPlaidLoginCLI = func(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer, opts *plaidLoginCLIOptions) error {
+	runPlaidLoginCLI = func(ctx context.Context, state *runtimeState, stdout, stderr io.Writer, opts *plaidLoginCLIOptions) error {
 		commands = append(commands, opts.CommandName)
 		if _, err := fmt.Fprintln(stderr, "oauth progress"); err != nil {
 			return err

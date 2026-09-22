@@ -184,18 +184,23 @@ func (p *fakeSyncProvider) Name() string {
 	}
 	return p.name
 }
+
 func (p *fakeSyncProvider) ValidateConfig(ctx context.Context) []providers.ConfigDiagnostic {
 	return nil
 }
+
 func (p *fakeSyncProvider) SearchInstitutions(ctx context.Context, query string) ([]providers.Institution, error) {
 	return nil, nil
 }
+
 func (p *fakeSyncProvider) CreateLinkSession(ctx context.Context, request *providers.LinkRequest) (providers.LinkSession, error) {
 	return providers.LinkSession{}, nil
 }
+
 func (p *fakeSyncProvider) ExchangeLinkToken(ctx context.Context, session *providers.LinkSession, callback *providers.LinkCallback) (providers.LinkedItem, error) {
 	return providers.LinkedItem{}, nil
 }
+
 func (p *fakeSyncProvider) Sync(ctx context.Context, item *providers.ProviderItem, sink providers.SyncSink) (providers.SyncResult, error) {
 	p.item = *item
 	if err := p.failByItem[item.ID]; err != nil {

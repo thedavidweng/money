@@ -101,7 +101,7 @@ type SyncSink interface {
 	UpsertAccount(ctx context.Context, account *FinancialAccount) error
 	UpsertTransaction(ctx context.Context, transaction *ProviderTransaction) error
 	UpsertRecurring(ctx context.Context, recurring *ProviderRecurring) error
-	MarkTransactionRemoved(ctx context.Context, providerItemID string, providerTransactionID string) error
+	MarkTransactionRemoved(ctx context.Context, providerItemID, providerTransactionID string) error
 	RecordSyncRun(ctx context.Context, run *SyncRun) error
 	UpsertSecurity(ctx context.Context, security *InvestmentSecurity) error
 	UpsertHolding(ctx context.Context, providerItemID string, holding *InvestmentHolding) error

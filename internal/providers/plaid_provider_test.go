@@ -384,22 +384,27 @@ type recordingSyncSink struct {
 func (s *recordingSyncSink) UpsertInstitution(ctx context.Context, institution Institution) error {
 	return nil
 }
+
 func (s *recordingSyncSink) UpsertProviderItem(ctx context.Context, item *ProviderItem) error {
 	return nil
 }
+
 func (s *recordingSyncSink) UpsertAccount(ctx context.Context, account *FinancialAccount) error {
 	s.calls = append(s.calls, "account:"+account.ProviderAccountID)
 	s.accounts = append(s.accounts, *account)
 	return nil
 }
+
 func (s *recordingSyncSink) UpsertTransaction(ctx context.Context, transaction *Transaction) error {
 	s.calls = append(s.calls, "transaction:"+transaction.ProviderTransactionID)
 	s.transactions = append(s.transactions, *transaction)
 	return nil
 }
+
 func (s *recordingSyncSink) UpsertRecurring(ctx context.Context, recurring *Recurring) error {
 	return nil
 }
+
 func (s *recordingSyncSink) MarkTransactionRemoved(ctx context.Context, providerItemID, providerTransactionID string) error {
 	s.calls = append(s.calls, "removed:"+providerTransactionID)
 	return nil
@@ -408,15 +413,19 @@ func (s *recordingSyncSink) RecordSyncRun(ctx context.Context, run *SyncRun) err
 func (s *recordingSyncSink) UpsertSecurity(ctx context.Context, security *InvestmentSecurity) error {
 	return nil
 }
+
 func (s *recordingSyncSink) UpsertHolding(ctx context.Context, providerItemID string, holding *InvestmentHolding) error {
 	return nil
 }
+
 func (s *recordingSyncSink) ClearHoldings(ctx context.Context, providerItemID string) error {
 	return nil
 }
+
 func (s *recordingSyncSink) UpsertLiability(ctx context.Context, providerItemID string, liability *Liability) error {
 	return nil
 }
+
 func (s *recordingSyncSink) ClearLiabilities(ctx context.Context, providerItemID string) error {
 	return nil
 }

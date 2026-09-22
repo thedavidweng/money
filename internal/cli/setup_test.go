@@ -271,7 +271,7 @@ func TestRunSetupWizardSelectPlaidDashboardLogin(t *testing.T) {
 	oldRunPlaidLogin := runPlaidLoginCLI
 	t.Cleanup(func() { runPlaidLoginCLI = oldRunPlaidLogin })
 	var called bool
-	runPlaidLoginCLI = func(ctx context.Context, state *runtimeState, stdout io.Writer, stderr io.Writer, opts *plaidLoginCLIOptions) error {
+	runPlaidLoginCLI = func(ctx context.Context, state *runtimeState, stdout, stderr io.Writer, opts *plaidLoginCLIOptions) error {
 		called = true
 		if opts.CommandName != "plaid.login" || opts.Environment != "sandbox" {
 			t.Fatalf("opts = %#v", opts)

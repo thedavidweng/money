@@ -1,45 +1,47 @@
-name: "CodeQL"
+name: CodeQL
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
   pull_request:
-    branches: [ "main" ]
+    branches: [main]
   schedule:
-    - cron: "0 0 * * 1"
+    - cron: '0 6 * * 1'
+
+permissions:
+  security-events: write
+  actions: read
+  contents: read
 
 jobs:
   analyze:
-    name: Analyze
-    runs-on: ${{ matrix.language == 'swift' && 'macos-latest' || 'ubuntu-latest' }}
-    timeout-minutes: ${{ matrix.language == 'swift' && 120 || 360 }}
-    permissions:
-      security-events: write
-      actions: read
-      contents: read
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - language: go
-            build-mode: autobuild
-
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v4
 
       - name: Initialize CodeQL
+<<<<<<< Updated upstream
         uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+=======
+        uses: github/codeql-action/init@v3
+>>>>>>> Stashed changes
         with:
-          languages: ${{ matrix.language }}
+          languages: go
           queries: security-extended
 
       - name: Autobuild
+<<<<<<< Updated upstream
         uses: github/codeql-action/autobuild@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         if: matrix.build-mode == 'autobuild'
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+=======
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+>>>>>>> Stashed changes
         with:
-          category: "/language:${{matrix.language}}"
+          category: "/language:go"

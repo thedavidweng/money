@@ -219,7 +219,7 @@ func (s localLinkSessionServer) Shutdown(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
 }
 
-var startPlaidLinkSessionServer = func(linkToken string, state string, timeout time.Duration) (linkSessionServer, error) {
+var startPlaidLinkSessionServer = func(linkToken, state string, timeout time.Duration) (linkSessionServer, error) {
 	helper := linking.NewPlaidLinkHelper(linking.PlaidLinkHelperConfig{
 		LinkToken: linkToken,
 		State:     state,
