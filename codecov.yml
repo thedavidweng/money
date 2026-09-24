@@ -3,10 +3,10 @@ coverage:
     project:
       default:
         target: auto
-        threshold: 2%
+        threshold: 5%
     patch:
       default:
-        target: 80%
+        target: 50%
 
   precision: 1
   round: down

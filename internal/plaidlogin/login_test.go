@@ -488,3 +488,8 @@ database:
 	}
 	return configPath, envPath
 }
+
+func isPlaidLoginCode(err error, code string) bool {
+	var dashErr Error
+	return errors.As(err, &dashErr) && dashErr.Code == code
+}
