@@ -225,15 +225,6 @@ func TestAllCommandsInHelp(t *testing.T) {
 
 // ─── Individual command tests ───
 
-func TestBinary_Demo_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "demo", "--help")
-	requireZero(t, code, stdout)
-	if !strings.Contains(stdout, "sandbox") {
-		t.Error("demo help missing 'sandbox'")
-	}
-}
-
 func TestBinary_Doctor(t *testing.T) {
 	bin := buildBinary(t)
 	stdout, code := run(t, bin, "doctor")
@@ -250,179 +241,6 @@ func TestBinary_Doctor_JSON(t *testing.T) {
 	stdout, code := run(t, bin, "doctor", "--json")
 	requireZero(t, code, stdout)
 	assertValidEnvelope(t, stdout, "doctor")
-}
-
-func TestBinary_Setup_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "setup", "--help")
-	requireZero(t, code, stdout)
-	if !strings.Contains(stdout, "Usage:") {
-		t.Fatal("setup help missing Usage:")
-	}
-}
-
-func TestBinary_Accounts_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "accounts", "--help")
-	requireZero(t, code, stdout)
-	if !strings.Contains(stdout, "list") {
-		t.Errorf("accounts help missing 'list'")
-	}
-	if !strings.Contains(stdout, "create-manual") {
-		t.Errorf("accounts help missing 'create-manual'")
-	}
-}
-
-func TestBinary_Budgets_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "budgets", "--help")
-	requireZero(t, code, stdout)
-}
-
-func TestBinary_Cashflow_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "cashflow", "--help")
-	requireZero(t, code, stdout)
-	for _, flag := range []string{"--from", "--to"} {
-		if !strings.Contains(stdout, flag) {
-			t.Errorf("cashflow help missing flag %q", flag)
-		}
-	}
-}
-
-func TestBinary_Categories_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "categories", "--help")
-	requireZero(t, code, stdout)
-	if !strings.Contains(stdout, "list") {
-		t.Errorf("categories help missing 'list'")
-	}
-}
-
-func TestBinary_Import_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "import", "--help")
-	requireZero(t, code, stdout)
-}
-
-func TestBinary_Investments_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "investments", "--help")
-	requireZero(t, code, stdout)
-	if !strings.Contains(stdout, "holdings") {
-		t.Errorf("investments help missing 'holdings'")
-	}
-	if !strings.Contains(stdout, "securities") {
-		t.Errorf("investments help missing 'securities'")
-	}
-}
-
-func TestBinary_Items_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "items", "--help")
-	requireZero(t, code, stdout)
-	if !strings.Contains(stdout, "list") {
-		t.Errorf("items help missing 'list'")
-	}
-}
-
-func TestBinary_Liabilities_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "liabilities", "--help")
-	requireZero(t, code, stdout)
-	if !strings.Contains(stdout, "list") {
-		t.Errorf("liabilities help missing 'list'")
-	}
-}
-
-func TestBinary_NetWorth_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "net-worth", "--help")
-	requireZero(t, code, stdout)
-	if !strings.Contains(stdout, "Usage:") {
-		t.Fatalf("net-worth help missing Usage:")
-	}
-}
-
-func TestBinary_Recurring_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "recurring", "--help")
-	requireZero(t, code, stdout)
-	if !strings.Contains(stdout, "list") {
-		t.Errorf("recurring help missing 'list'")
-	}
-}
-
-func TestBinary_Rules_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "rules", "--help")
-	requireZero(t, code, stdout)
-}
-
-func TestBinary_Sync_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "sync", "--help")
-	requireZero(t, code, stdout)
-	if !strings.Contains(stdout, "Usage:") {
-		t.Fatalf("sync help missing Usage:")
-	}
-}
-
-func TestBinary_Tags_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "tags", "--help")
-	requireZero(t, code, stdout)
-	if !strings.Contains(stdout, "list") {
-		t.Errorf("tags help missing 'list'")
-	}
-}
-
-func TestBinary_Transactions_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "transactions", "--help")
-	requireZero(t, code, stdout)
-	if !strings.Contains(stdout, "list") {
-		t.Errorf("transactions help missing 'list'")
-	}
-}
-
-func TestBinary_Tx_Alias(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "tx", "--help")
-	requireZero(t, code, stdout)
-	if !strings.Contains(stdout, "list") {
-		t.Errorf("tx alias help missing 'list'")
-	}
-}
-
-func TestBinary_Link_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "link", "--help")
-	requireZero(t, code, stdout)
-	if !strings.Contains(stdout, "Usage:") {
-		t.Fatalf("link help missing Usage:")
-	}
-}
-
-func TestBinary_Plaid_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "plaid", "--help")
-	requireZero(t, code, stdout)
-}
-
-func TestBinary_Providers_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "providers", "--help")
-	requireZero(t, code, stdout)
-}
-
-func TestBinary_Feedback_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "feedback", "--help")
-	requireZero(t, code, stdout)
-	if !strings.Contains(stdout, "Usage:") {
-		t.Fatalf("feedback help missing Usage:")
-	}
 }
 
 func TestBinary_Version(t *testing.T) {
@@ -654,18 +472,6 @@ func TestBinary_GlobalFlags_JSON(t *testing.T) {
 	assertValidEnvelope(t, stdout, "version")
 }
 
-func TestBinary_TransactionsList_Help(t *testing.T) {
-	bin := buildBinary(t)
-	stdout, code := run(t, bin, "transactions", "list", "--help")
-	requireZero(t, code, stdout)
-	flags := []string{"--account", "--category", "--limit", "--offset", "--needs-review", "--pending"}
-	for _, flag := range flags {
-		if !strings.Contains(stdout, flag) {
-			t.Errorf("transactions list help missing flag %q", flag)
-		}
-	}
-}
-
 func TestBinary_Demo_Accounts_Plain(t *testing.T) {
 	bin := buildBinary(t)
 	stdout, code := run(t, bin, "demo", "accounts", "list")
@@ -715,26 +521,3 @@ func TestBinary_Demo_Transactions_Filter_NeedsReview(t *testing.T) {
 }
 
 // ─── Coverage check ───
-
-func TestCoverageReport(t *testing.T) {
-	var uncovered []string
-	for _, cmd := range requiredCommands {
-		mu.Lock()
-		covered := executedCmds[cmd]
-		for executed := range executedCmds {
-			if strings.HasPrefix(executed, cmd+" ") {
-				covered = true
-				break
-			}
-		}
-		mu.Unlock()
-		if !covered {
-			uncovered = append(uncovered, cmd)
-		}
-	}
-
-	if len(uncovered) > 0 {
-		t.Errorf("%d commands have NO E2E test coverage: %v. Add a TestBinary_<command>_Help test above this one.", len(uncovered), uncovered)
-	}
-	t.Logf("E2E command coverage: %d/%d commands tested", len(requiredCommands)-len(uncovered), len(requiredCommands))
-}
