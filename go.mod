@@ -5,7 +5,7 @@ go 1.26.5
 require (
 	charm.land/huh/v2 v2.0.3
 	github.com/google/uuid v1.6.0
-	github.com/ncruces/go-sqlite3 v0.35.5
+	github.com/ncruces/go-sqlite3 v0.35.6
 	github.com/olekukonko/tablewriter v1.1.5
 	github.com/plaid/plaid-go/v40 v40.1.0
 	github.com/spf13/cobra v1.10.2
@@ -40,7 +40,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.29 // indirect
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
-	github.com/ncruces/go-sqlite3-wasm/v6 v6.2.35304 // indirect
+	github.com/ncruces/go-sqlite3-wasm/v6 v6.3.35304 // indirect
 	github.com/ncruces/julianday v1.0.0 // indirect
 	github.com/olekukonko/cat v0.0.0-20250911104152-50322a0618f6 // indirect
 	github.com/olekukonko/errors v1.3.0 // indirect
