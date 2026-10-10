@@ -2,7 +2,6 @@
 go = "1.26.5"
 gofumpt = "0.12.0"
 golangci-lint = "2.12.2"
-jactionlint = "2.0.2"
 
 [tasks.build]
 run = "go build ./..."

@@ -62,16 +62,16 @@ jobs:
           dt="${DEP_TYPE}"
           alert="${ALERT_STATE}"
 
-          if [ "$ut" = "version-update:semver-major" ]; then
-            echo "major updates require manual review"
-            exit 0
-          fi
+          case "$ut" in
+            version-update:semver-patch|version-update:semver-minor) ;;
+            *) echo "major or unclassified updates require manual review"; exit 0 ;;
+          esac
 
           eligible=false
           reason=""
 
           # Eligible non-major security updates bypass cooldown.
-          if { [ "$alert" = "OPEN" ] || [ "$alert" = "FIXED" ]; } && [ -n "$ut" ]; then
+          if { [ "$alert" = "OPEN" ] || [ "$alert" = "FIXED" ]; }; then
             eligible=true
             reason="security-update"
           fi
