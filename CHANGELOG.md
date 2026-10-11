@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.2](https://github.com/thedavidweng/money/compare/v0.4.1...v0.4.2) (2026-10-11)
+
+
+### Documentation
+
+* refactor agent instructions with progressive disclosure ([#44](https://github.com/thedavidweng/money/issues/44)) ([cedbdaa](https://github.com/thedavidweng/money/commit/cedbdaa9c1316c06281fdc7343e8b1296b172b57))
+
 ## [0.4.1](https://github.com/thedavidweng/money/compare/v0.4.0...v0.4.1) (2026-09-21)
 
 
