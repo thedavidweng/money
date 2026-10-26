@@ -14,9 +14,13 @@ builds:
     goarch:
       - amd64
       - arm64
+    hooks:
+      post: bash build/darwin/sign-and-notarize.sh "{{ .Path }}" "{{ .IsSnapshot }}" "{{ .Os }}"
 
 universal_binaries:
   - name_template: "money_{{ .Version }}_darwin_all"
+    hooks:
+      post: bash build/darwin/sign-and-notarize.sh "{{ .Path }}" "{{ .IsSnapshot }}" "{{ .Os }}"
 
 archives:
   - formats: [tar.gz]
