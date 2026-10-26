@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.3](https://github.com/thedavidweng/money/compare/v0.4.2...v0.4.3) (2026-10-26)
+
+
+### Bug Fixes
+
+* **release:** notarize macOS executables and refresh Go tooling ([#51](https://github.com/thedavidweng/money/issues/51)) ([14ee369](https://github.com/thedavidweng/money/commit/14ee369181157b3ccc6574c53ea1c976ce08073a))
+
 ## [0.4.2](https://github.com/thedavidweng/money/compare/v0.4.1...v0.4.2) (2026-10-11)
 
 
