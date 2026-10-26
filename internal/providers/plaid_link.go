@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	plaid "github.com/plaid/plaid-go/v40/plaid"
+	plaid "github.com/plaid/plaid-go/v49/legacy"
 )
 
 type PlaidLinkTokenRequestConfig struct {
