@@ -1,7 +1,7 @@
 [tools]
-go = "1.26.5"
+go = "1.27.3"
 gofumpt = "0.12.0"
-golangci-lint = "2.12.2"
+"go:github.com/golangci/golangci-lint/v2/cmd/golangci-lint" = "2.15.0"
 
 [tasks.build]
 run = "go build ./..."
@@ -13,7 +13,7 @@ run = "go test ./..."
 run = "gofumpt -extra -w ."
 
 [tasks.lint]
-run = "golangci-lint run"
+run = "mise exec go:github.com/golangci/golangci-lint/v2/cmd/golangci-lint@2.15.0 -- golangci-lint run --timeout 10m"
 
 [tasks.conventions]
 run = '''
@@ -28,6 +28,9 @@ if [ "$comments" -gt $((total * 5 / 100)) ]; then
 fi
 '''
 
+[tasks.signing-check]
+run = "python3 build/darwin/test-signing.py"
+
 [tasks.check]
 depends = ["fmt"]
-run = "mise run build ::: test ::: lint ::: conventions"
+run = "mise run build ::: test ::: lint ::: conventions ::: signing-check"
