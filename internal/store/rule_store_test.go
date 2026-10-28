@@ -582,7 +582,7 @@ func TestSQLiteStoreApplyRulesSQLMatchingWithBulkData(t *testing.T) {
 		"AMAZON PHOTOS PRINT", "AMAZON DRIVE STORAGE",
 	}
 
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		if err := db.UpsertTransaction(ctx, &core.ProviderTransaction{
 			ProviderItemID:        "pi_bulk",
 			ProviderTransactionID: fmt.Sprintf("tx_amazon_%d", i),
@@ -624,7 +624,7 @@ func TestSQLiteStoreApplyRulesSQLMatchingWithBulkData(t *testing.T) {
 		"UBER RIDE", "LYFT RIDE", "DOORDASH DELIVERY", "GRUBHUB ORDER", "INSTACART SHOPPING",
 	}
 
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		if err := db.UpsertTransaction(ctx, &core.ProviderTransaction{
 			ProviderItemID:        "pi_bulk",
 			ProviderTransactionID: fmt.Sprintf("tx_other_%d", i),
@@ -805,7 +805,7 @@ func TestSQLiteStoreApplyRulesSQLMatchingMultipleRules(t *testing.T) {
 	// Insert 10 Amazon, 10 Starbucks, 10 other transactions.
 	merchants := []string{"Amazon Market", "Starbucks Coffee", "Walmart Store"}
 	names := []string{"AMAZON.COM ORDER", "STARBUCKS #123", "WALMART SUPERCENTER"}
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		idx := i % 3
 		if err := db.UpsertTransaction(ctx, &core.ProviderTransaction{
 			ProviderItemID:        "pi_multi",

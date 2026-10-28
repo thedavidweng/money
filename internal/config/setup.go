@@ -68,8 +68,8 @@ func Setup(configPath, profile string, force bool) (SetupResult, error) {
 func configSkeleton(dbPath string) string {
 	home, _ := os.UserHomeDir()
 	rel := dbPath
-	if strings.HasPrefix(dbPath, home) {
-		rel = "~" + strings.TrimPrefix(dbPath, home)
+	if after, ok := strings.CutPrefix(dbPath, home); ok {
+		rel = "~" + after
 	}
 	rel = filepath.ToSlash(rel)
 	return fmt.Sprintf(`database:
@@ -279,7 +279,7 @@ func ensureEncryptionKey(envPath string, force bool) (bool, error) {
 			return false, fmt.Errorf("read env file: %w", err)
 		}
 		replaced := false
-		for _, line := range strings.Split(string(content), "\n") {
+		for line := range strings.SplitSeq(string(content), "\n") {
 			trimmed := strings.TrimSpace(line)
 			if strings.HasPrefix(trimmed, "MONEY_DB_ENCRYPTION_KEY=") {
 				lines = append(lines, "MONEY_DB_ENCRYPTION_KEY="+encoded)

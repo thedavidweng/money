@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/base64"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -320,15 +321,11 @@ func mergedEnvironment(options Options, envPath string) (map[string]string, erro
 	if err != nil {
 		return nil, err
 	}
-	for key, value := range fileEnv {
-		merged[key] = value
-	}
+	maps.Copy(merged, fileEnv)
 	if options.Env == nil {
 		options.Env = processEnv()
 	}
-	for key, value := range options.Env {
-		merged[key] = value
-	}
+	maps.Copy(merged, options.Env)
 	return merged, nil
 }
 

@@ -80,7 +80,7 @@ func (c *CSVImporter) Import(ctx context.Context, store ImportStore, batchID str
 				Type:                     "other_asset",
 				CurrentBalanceMinorUnits: 0,
 				Currency:                 currency,
-				Source:                   core.Source{Kind: "import", ImportSourceID: strPtr("csv"), ImportBatchID: strPtr(batchID)},
+				Source:                   core.Source{Kind: "import", ImportSourceID: new("csv"), ImportBatchID: new(batchID)},
 			}
 			if err := store.UpsertImportedAccount(ctx, &acc); err != nil {
 				return result, fmt.Errorf("upsert account %q: %w", accountName, err)
@@ -103,7 +103,7 @@ func (c *CSVImporter) Import(ctx context.Context, store ImportStore, batchID str
 			Currency:         currency,
 			Name:             name,
 			CategorySource:   "none",
-			Source:           core.Source{Kind: "import", ImportSourceID: strPtr("csv"), ImportBatchID: strPtr(batchID)},
+			Source:           core.Source{Kind: "import", ImportSourceID: new("csv"), ImportBatchID: new(batchID)},
 		}
 
 		inserted, possibleDups, err := store.UpsertImportedTransaction(ctx, &tx, rowHash)
@@ -166,8 +166,4 @@ func hashCSVRow(row []string) string {
 		_, _ = fmt.Fprintf(h, "%s\n", cell)
 	}
 	return fmt.Sprintf("%x", h.Sum(nil))[:16]
-}
-
-func strPtr(s string) *string {
-	return &s
 }

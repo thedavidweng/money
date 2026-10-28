@@ -100,8 +100,7 @@ func TestSyncPartialFailurePreservesPerItemResults(t *testing.T) {
 	}
 
 	result, err := Sync(ctx, db, fakeRegistry{provider: provider}, Options{Provider: "plaid"})
-	var partial PartialFailure
-	if !errors.As(err, &partial) {
+	if _, ok := errors.AsType[PartialFailure](err); !ok {
 		t.Fatalf("error = %#v, want PartialFailure", err)
 	}
 	if len(result.Items) != 2 {
@@ -142,8 +141,7 @@ func TestSyncPartialFailureCoversPlaidAndBridgeItems(t *testing.T) {
 		"plaid":  &fakeSyncProvider{name: "plaid", result: providers.SyncResult{Provider: "plaid", AccountsSeen: 1}},
 		"bridge": &fakeSyncProvider{name: "bridge", failByItem: map[string]error{"pi_bridge": providers.ProviderAPIError{Provider: "bridge", StatusCode: 401, Code: "UNAUTHORIZED", Message: "Bridge authorization failed"}}},
 	}}, Options{})
-	var partial PartialFailure
-	if !errors.As(err, &partial) {
+	if _, ok := errors.AsType[PartialFailure](err); !ok {
 		t.Fatalf("error = %#v, want PartialFailure", err)
 	}
 	byID := map[string]ItemResult{}

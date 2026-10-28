@@ -8,6 +8,7 @@ import (
 	"io"
 	"os/exec"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -327,8 +328,7 @@ func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider provide
 	}
 	result, err := linking.CompleteProviderLink(ctx, activeStore, provider, &session, &callback)
 	if err != nil {
-		var canceled linking.LinkCanceledError
-		if errors.As(err, &canceled) {
+		if canceled, ok := errors.AsType[linking.LinkCanceledError](err); ok {
 			return &cliError{
 				command:   opts.CommandName,
 				code:      "LINK_CANCELED",
@@ -338,8 +338,7 @@ func runPlaidLinkFlow(ctx context.Context, state *runtimeState, provider provide
 				exitCode:  10,
 			}
 		}
-		var flowErr *linking.LinkFlowError
-		if errors.As(err, &flowErr) {
+		if flowErr, ok := errors.AsType[*linking.LinkFlowError](err); ok {
 			return &cliError{
 				command:   opts.CommandName,
 				code:      "LINK_ERROR",
@@ -386,16 +385,14 @@ func runPlaidSandboxLink(ctx context.Context, state *runtimeState, sandboxCreato
 		}
 	}
 	products := commaList(opts.Products)
-	for _, product := range products {
-		if product == "balance" {
-			return &cliError{
-				command:   "plaid.sandbox.link",
-				code:      "INVALID_PRODUCT",
-				message:   "Plaid Sandbox product balance is not supported; choose explicit initial products such as transactions.",
-				category:  contracts.CategoryValidation,
-				retryable: false,
-				exitCode:  7,
-			}
+	if slices.Contains(products, "balance") {
+		return &cliError{
+			command:   "plaid.sandbox.link",
+			code:      "INVALID_PRODUCT",
+			message:   "Plaid Sandbox product balance is not supported; choose explicit initial products such as transactions.",
+			category:  contracts.CategoryValidation,
+			retryable: false,
+			exitCode:  7,
 		}
 	}
 	activeStore, err := requireStore(state)

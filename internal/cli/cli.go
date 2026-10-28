@@ -63,8 +63,7 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	root.SetErr(stderr)
 
 	if err := root.ExecuteContext(ctx); err != nil {
-		var exitErr cliExit
-		if errors.As(err, &exitErr) {
+		if exitErr, ok := errors.AsType[cliExit](err); ok {
 			return exitErr.exitCode
 		}
 		if cliErr, ok := err.(*cliError); ok {

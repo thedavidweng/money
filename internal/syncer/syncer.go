@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/thedavidweng/money/internal/providers"
@@ -266,12 +267,7 @@ func syncOne(ctx context.Context, target store.Store, registry Registry, linked 
 }
 
 func hasProduct(products []string, target string) bool {
-	for _, p := range products {
-		if p == target {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(products, target)
 }
 
 func recordSyncRun(ctx context.Context, target store.Store, itemResult *ItemResult, started string) {

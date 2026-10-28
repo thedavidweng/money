@@ -161,7 +161,7 @@ func (c PlaidClient) GetTransactions(ctx context.Context, accessToken, startDate
 	offset := int32(0)
 	for {
 		request.Options = &plaid.TransactionsGetRequestOptions{
-			Offset: plaid.PtrInt32(offset),
+			Offset: new(offset),
 			Count:  plaid.PtrInt32(500),
 		}
 		response, httpResponse, err := c.APIClient.PlaidApi.TransactionsGet(ctx).TransactionsGetRequest(*request).Execute()

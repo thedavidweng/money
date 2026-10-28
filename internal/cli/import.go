@@ -63,8 +63,7 @@ func newImportCommand(ctx context.Context, state *runtimeState, stdout io.Writer
 				defer func() { _ = f.Close() }()
 				result, err := source.Import(ctx, activeStore, batchID, f)
 				if err != nil {
-					var importErr importsource.ImportError
-					if errors.As(err, &importErr) {
+					if importErr, ok := errors.AsType[importsource.ImportError](err); ok {
 						return &cliError{
 							command:   "import." + sourceName,
 							code:      importErr.Code,

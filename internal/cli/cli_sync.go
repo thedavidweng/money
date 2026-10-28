@@ -59,8 +59,7 @@ func writeSyncJSON(state *runtimeState, stdout io.Writer, result syncer.Result, 
 		env := contracts.NewSuccess("sync", result)
 		return state.writeEnvelope(stdout, &env)
 	}
-	var partial syncer.PartialFailure
-	if errors.As(err, &partial) {
+	if _, ok := errors.AsType[syncer.PartialFailure](err); ok {
 		env := contracts.NewError("sync", "SYNC_PARTIAL_FAILURE", err.Error(), contracts.CategoryAPI, true)
 		env.Data = result
 		if writeErr := state.writeEnvelope(stdout, &env); writeErr != nil {

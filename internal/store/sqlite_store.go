@@ -955,7 +955,7 @@ func (s *SQLiteStore) hydrateTransactionTags(ctx context.Context, transactions [
 		return nil
 	}
 
-	ids := make([]interface{}, len(transactions))
+	ids := make([]any, len(transactions))
 	placeholders := make([]string, len(transactions))
 	for i := range transactions {
 		ids[i] = transactions[i].ID
