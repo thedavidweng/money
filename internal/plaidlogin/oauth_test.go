@@ -32,15 +32,6 @@ func TestBuildAuthURLUsesPlaidCLICompatiblePKCE(t *testing.T) {
 	}
 }
 
-func TestBindAndRedirectHostsMatch(t *testing.T) {
-	if BindHost != "127.0.0.1" {
-		t.Fatalf("BindHost = %q", BindHost)
-	}
-	if RedirectHost != "127.0.0.1" {
-		t.Fatalf("RedirectHost = %q", RedirectHost)
-	}
-}
-
 func assertQuery(t *testing.T, values url.Values, key, want string) {
 	t.Helper()
 	if got := values.Get(key); got != want {

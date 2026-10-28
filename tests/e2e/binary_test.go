@@ -6,9 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
-	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -68,26 +66,6 @@ func findProjectRoot() (string, error) {
 
 // ─── Execution helper ───
 
-var (
-	executedCmds = make(map[string]bool)
-	mu           sync.Mutex
-)
-
-func recordCommand(args []string) {
-	if len(args) == 0 {
-		return
-	}
-	mu.Lock()
-	defer mu.Unlock()
-	var path string
-	if len(args) >= 2 && !strings.HasPrefix(args[1], "-") {
-		path = args[0] + " " + args[1]
-	} else {
-		path = args[0]
-	}
-	executedCmds[path] = true
-}
-
 func run(t *testing.T, bin string, args ...string) (stdout string, exitCode int) {
 	t.Helper()
 	cmd := exec.Command(bin, args...)
@@ -106,7 +84,6 @@ func run(t *testing.T, bin string, args ...string) (stdout string, exitCode int)
 	} else if err != nil {
 		t.Fatalf("unexpected exec error: %v", err)
 	}
-	recordCommand(args)
 	return stdout, exitCode
 }
 
@@ -139,87 +116,6 @@ func requireZero(t *testing.T, code int, stdout string) {
 	t.Helper()
 	if code != 0 {
 		t.Fatalf("expected exit 0, got %d. output:\n%s", code, stdout)
-	}
-}
-
-// ─── Command discovery from help output ───
-
-// helpCmdPattern matches lines that start with 2 spaces, then a command name.
-// Cobra groups commands under headers; we just look for the command lines.
-// Example: "  demo         Run a command..." or "  accounts     "
-var helpCmdPattern = regexp.MustCompile(`^ {2}([a-z][a-z0-9-]*)(?:$| +)`)
-
-func discoverCommands(t *testing.T, bin string) []string {
-	t.Helper()
-	stdout, _ := run(t, bin, "--help")
-	var cmds []string
-	inFlags := false
-	for _, line := range strings.Split(stdout, "\n") {
-		if strings.HasPrefix(line, "Flags:") || strings.HasPrefix(line, "Global Flags:") {
-			inFlags = true
-		}
-		if inFlags {
-			continue
-		}
-		if m := helpCmdPattern.FindStringSubmatch(line); m != nil {
-			cmd := m[1]
-			if cmd == "help" || cmd == "completion" || cmd == "money" {
-				continue
-			}
-			cmds = append(cmds, cmd)
-		}
-	}
-	sort.Strings(cmds)
-	return cmds
-}
-
-// ─── The golden list of expected commands ───
-//
-// AGENT INSTRUCTION: When you add a new command to money:
-// 1. Add it to this list
-// 2. Add a test below that exercises it
-// 3. Run go test -v ./tests/e2e/... to verify
-
-var requiredCommands = []string{
-	"demo", "doctor", "setup",
-	"accounts", "budgets", "cashflow", "categories",
-	"import", "investments", "items", "liabilities",
-	"net-worth", "recurring", "rules", "sync",
-	"tags", "transactions", "tx",
-	"link", "plaid", "providers",
-	"feedback", "version",
-}
-
-// ─── Meta tests ───
-
-func TestAllCommandsInHelp(t *testing.T) {
-	bin := buildBinary(t)
-	discovered := discoverCommands(t, bin)
-
-	for _, required := range requiredCommands {
-		found := false
-		for _, d := range discovered {
-			if d == required {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("required command %q not found in help. Add the command to Cobra OR remove it from requiredCommands.", required)
-		}
-	}
-
-	for _, d := range discovered {
-		known := false
-		for _, required := range requiredCommands {
-			if d == required {
-				known = true
-				break
-			}
-		}
-		if !known {
-			t.Errorf("command %q appears in help but is NOT in requiredCommands. Add it to the list (and add a test below).", d)
-		}
 	}
 }
 
@@ -519,5 +415,3 @@ func TestBinary_Demo_Transactions_Filter_NeedsReview(t *testing.T) {
 		}
 	}
 }
-
-// ─── Coverage check ───

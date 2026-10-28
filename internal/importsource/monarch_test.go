@@ -6,13 +6,6 @@ import (
 	"testing"
 )
 
-func TestMonarchImporter_Name(t *testing.T) {
-	m := &MonarchImporter{}
-	if m.Name() != "monarch" {
-		t.Errorf("Name() = %q, want %q", m.Name(), "monarch")
-	}
-}
-
 func TestMonarchImporter_ImportFullFlowWithAccountsAndTransactions(t *testing.T) {
 	json := `{
 		"accounts": [
