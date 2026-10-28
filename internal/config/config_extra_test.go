@@ -103,8 +103,8 @@ func TestEnsureEncryptionKeyCreatesEnvFile(t *testing.T) {
 	lines := strings.Split(string(content), "\n")
 	var keyLine string
 	for _, line := range lines {
-		if strings.HasPrefix(line, "MONEY_DB_ENCRYPTION_KEY=") {
-			keyLine = strings.TrimPrefix(line, "MONEY_DB_ENCRYPTION_KEY=")
+		if after, ok := strings.CutPrefix(line, "MONEY_DB_ENCRYPTION_KEY="); ok {
+			keyLine = after
 			break
 		}
 	}

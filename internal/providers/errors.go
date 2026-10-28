@@ -48,13 +48,11 @@ func ClassifyProviderError(provider string, err error) ClassifiedProviderError {
 		return ClassifiedProviderError{Provider: provider}
 	}
 
-	var netErr net.Error
-	if errors.As(err, &netErr) {
+	if _, ok := errors.AsType[net.Error](err); ok {
 		return ClassifiedProviderError{Provider: provider, Kind: ProviderErrorNetwork, Code: "NETWORK_ERROR", Message: err.Error(), Retryable: true}
 	}
 
-	var apiErr ProviderAPIError
-	if errors.As(err, &apiErr) {
+	if apiErr, ok := errors.AsType[ProviderAPIError](err); ok {
 		return classifyAPIError(provider, apiErr)
 	}
 

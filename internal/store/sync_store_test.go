@@ -338,7 +338,7 @@ func TestSQLiteStoreBatchUpsertTransactions(t *testing.T) {
 
 	names := make([]string, 10)
 	amounts := make([]int64, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		names[i] = fmt.Sprintf("BatchTxn %d", i)
 		amounts[i] = int64(-(i + 1) * 100)
 	}
@@ -362,7 +362,7 @@ func TestSQLiteStoreBatchUpsertTransactions(t *testing.T) {
 	for _, r := range results {
 		resultByName[r.Name] = r
 	}
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		name := fmt.Sprintf("BatchTxn %d", i)
 		r, ok := resultByName[name]
 		if !ok {
@@ -376,7 +376,7 @@ func TestSQLiteStoreBatchUpsertTransactions(t *testing.T) {
 	// Now call UpsertTransactions again: modify txns 0-4, leave 5-9 unchanged.
 	modNames := make([]string, 10)
 	modAmounts := make([]int64, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		if i < 5 {
 			modNames[i] = fmt.Sprintf("BatchTxn UPDATED %d", i)
 			modAmounts[i] = int64(-(i + 1) * 200)
@@ -406,7 +406,7 @@ func TestSQLiteStoreBatchUpsertTransactions(t *testing.T) {
 	}
 
 	// Check the 5 updated transactions (0-4).
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		name := fmt.Sprintf("BatchTxn UPDATED %d", i)
 		r, ok := resultByName2[name]
 		if !ok {
@@ -430,7 +430,7 @@ func TestSQLiteStoreBatchUpsertTransactions(t *testing.T) {
 	}
 
 	// Ensure the old names for txns 0-4 are gone (they were updated to "BatchTxn UPDATED N").
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		oldName := fmt.Sprintf("BatchTxn %d", i)
 		if _, ok := resultByName2[oldName]; ok {
 			t.Fatalf("old transaction %q should have been updated, but still present", oldName)

@@ -57,8 +57,8 @@ func (m *MonarchImporter) Import(ctx context.Context, store ImportStore, batchID
 			Currency:                 ma.Currency,
 			Source: core.Source{
 				Kind:           "import",
-				ImportSourceID: stringPtr("monarch"),
-				ImportBatchID:  stringPtr(batchID),
+				ImportSourceID: new("monarch"),
+				ImportBatchID:  new(batchID),
 			},
 			UpdatedAt: now,
 		}
@@ -92,8 +92,8 @@ func (m *MonarchImporter) Import(ctx context.Context, store ImportStore, batchID
 			CategorySource:   "import",
 			Source: core.Source{
 				Kind:           "import",
-				ImportSourceID: stringPtr("monarch"),
-				ImportBatchID:  stringPtr(batchID),
+				ImportSourceID: new("monarch"),
+				ImportBatchID:  new(batchID),
 			},
 			LastChangedAt: now,
 		}
@@ -160,8 +160,4 @@ func hashMonarchRow(mt *monarchTransaction) string {
 	h := sha256.New()
 	_, _ = fmt.Fprintf(h, "%s|%s|%s|%d|%s|%s|%t", mt.ID, mt.AccountID, mt.Date, int64(mt.Amount*100), mt.Currency, mt.Name, mt.Pending)
 	return hex.EncodeToString(h.Sum(nil))
-}
-
-func stringPtr(s string) *string {
-	return &s
 }

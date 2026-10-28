@@ -82,8 +82,7 @@ func TestCompleteProviderLinkDoesNotExchangeTokenForCancelOrError(t *testing.T) 
 		Status: "cancel",
 		State:  "state",
 	})
-	var canceled LinkCanceledError
-	if !errors.As(err, &canceled) {
+	if _, ok := errors.AsType[LinkCanceledError](err); !ok {
 		t.Fatalf("cancel err = %#v", err)
 	}
 

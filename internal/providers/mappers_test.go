@@ -30,7 +30,7 @@ func TestMapPlaidCreditAccountNormalizesLiabilityBalanceToNegative(t *testing.T)
 		Type:              "credit",
 		Subtype:           "credit card",
 		CurrentBalance:    456.78,
-		AvailableCredit:   floatPtr(1500),
+		AvailableCredit:   new(float64(1500)),
 		Currency:          "USD",
 	})
 
@@ -70,8 +70,4 @@ func TestMapBridgeTransactionKeepsPositiveCreditAndNegativeDebit(t *testing.T) {
 	if debit.AmountMinorUnits != -2500 {
 		t.Fatalf("debit amount = %d, want -2500", debit.AmountMinorUnits)
 	}
-}
-
-func floatPtr(v float64) *float64 {
-	return &v
 }
