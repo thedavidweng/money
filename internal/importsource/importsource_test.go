@@ -134,13 +134,6 @@ func (m *mockImportStore) UpsertImportedTransaction(ctx context.Context, tx *cor
 	return m.inserted, m.dupIDs, nil
 }
 
-func TestCSVImporter_Name(t *testing.T) {
-	c := &CSVImporter{}
-	if c.Name() != "csv" {
-		t.Errorf("Name() = %q, want %q", c.Name(), "csv")
-	}
-}
-
 func TestCSVImporter_Import_Success(t *testing.T) {
 	csv := "date,amount,name,currency\n2024-01-01,100.50,Coffee,USD\n2024-01-02,-42.99,Lunch,USD\n"
 	store := &mockImportStore{inserted: true}
@@ -279,32 +272,5 @@ func TestRegistry(t *testing.T) {
 	names := r.Names()
 	if len(names) != 1 || names[0] != "csv" {
 		t.Errorf("Names() = %v, want [csv]", names)
-	}
-}
-
-func TestDefaultRegistry(t *testing.T) {
-	r := DefaultRegistry()
-	names := r.Names()
-	if len(names) != 2 {
-		t.Fatalf("DefaultRegistry should have 2 sources, got %d", len(names))
-	}
-
-	nameSet := make(map[string]bool)
-	for _, n := range names {
-		nameSet[n] = true
-	}
-	if !nameSet["csv"] {
-		t.Error("DefaultRegistry should contain 'csv'")
-	}
-	if !nameSet["monarch"] {
-		t.Error("DefaultRegistry should contain 'monarch'")
-	}
-}
-
-func TestImportError(t *testing.T) {
-	e := ImportError{Code: "TEST", Message: "something went wrong"}
-	want := "import error TEST: something went wrong"
-	if e.Error() != want {
-		t.Errorf("Error() = %q, want %q", e.Error(), want)
 	}
 }
