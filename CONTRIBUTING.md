@@ -49,7 +49,7 @@ CI runs `gofumpt -extra -l`, `go vet`, `go test -race`, and `go build` on both `
 
 ### Release Workflow
 
-Releases are automated via [GoReleaser](https://goreleaser.com/) and triggered by pushing a `v*` tag. The release workflow requires a `HOMEBREW_TAP_GITHUB_TOKEN` secret with push access to the Homebrew tap repository. To test the release process locally:
+Releases are automated via [GoReleaser](https://goreleaser.com/) and triggered by pushing a `v*` tag. The Homebrew tap checks published releases and updates its cask separately. To test the release process locally:
 
 ```bash
 goreleaser release --snapshot --clean
