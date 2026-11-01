@@ -7,7 +7,7 @@ golangci-lint = "2.15.0"
 run = "go build ./..."
 
 [tasks.test]
-run = "go test ./..."
+run = "go test -coverprofile=coverage.out ./..."
 
 [tasks.fmt]
 run = "gofumpt -extra -w ."

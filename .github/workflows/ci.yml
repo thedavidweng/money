@@ -30,6 +30,8 @@ jobs:
         if: always()
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.out
+          plugins: noop
           fail_ci_if_error: false
 
   matrix:
