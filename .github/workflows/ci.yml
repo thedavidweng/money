@@ -18,6 +18,9 @@ jobs:
     name: Check (Linux)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -32,15 +35,23 @@ jobs:
           go tool covdata textfmt -i="$MONEY_E2E_COVER_DIR" -o="${RUNNER_TEMP}/coverage-e2e.out"
           test -s "${RUNNER_TEMP}/coverage-e2e.out"
       - run: git diff --exit-code
+      - run: bash scripts/test-codecov-keyring.sh
+      - name: Prepare Codecov verification key
+        id: codecov-key
+        if: always()
+        run: |
+          curl -fsSL --retry 3 https://keybase.io/codecovsecops/pgp_keys.asc -o "$RUNNER_TEMP/codecov-key.asc"
+          bash scripts/prepare-codecov-keyring.sh "$RUNNER_TEMP/codecov-key.asc" "$RUNNER_TEMP/codecov-keyring" '27034E7FDB850E0BBC2C62FF806BB28AED779869'
+          echo "GNUPGHOME=$RUNNER_TEMP/codecov-keyring/trusted" >> "$GITHUB_ENV"
       - name: Upload coverage
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
-        if: always()
+        if: always() && steps.codecov-key.outcome == 'success'
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
           files: coverage.out,${{ runner.temp }}/coverage-e2e.out
           flags: go
           plugins: noop
-          fail_ci_if_error: false
+          fail_ci_if_error: true
 
   matrix:
     name: Test (${{ matrix.os }})
