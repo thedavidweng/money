@@ -37,7 +37,11 @@ func buildBinary(t *testing.T) string {
 		if runtime.GOOS == "windows" {
 			cachedBin += ".exe"
 		}
-		cmd := exec.Command("go", "build", "-o", cachedBin, "./cmd/money")
+		args := []string{"build", "-o", cachedBin}
+		if os.Getenv("MONEY_E2E_COVER_DIR") != "" {
+			args = append(args, "-cover")
+		}
+		cmd := exec.Command("go", append(args, "./cmd/money")...)
 		cmd.Dir = projectRoot
 		if out, err := cmd.CombinedOutput(); err != nil {
 			buildErr = fmt.Errorf("build failed: %v\n%s", err, out)
@@ -76,6 +80,9 @@ func run(t *testing.T, bin string, args ...string) (stdout string, exitCode int)
 		"PATH=/usr/bin:/bin:/usr/local/bin",
 		"TERM=dumb",
 		"NO_COLOR=1",
+	}
+	if coverDir := os.Getenv("MONEY_E2E_COVER_DIR"); coverDir != "" {
+		cmd.Env = append(cmd.Env, "GOCOVERDIR="+coverDir)
 	}
 	outBytes, err := cmd.CombinedOutput()
 	stdout = string(outBytes)
