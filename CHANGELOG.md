@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.4](https://github.com/thedavidweng/money/compare/v0.4.3...v0.4.4) (2026-11-10)
+
+
+### Bug Fixes
+
+* **ci:** verify Codecov uploader before execution ([#59](https://github.com/thedavidweng/money/issues/59)) ([0af4ad3](https://github.com/thedavidweng/money/commit/0af4ad36999479fdf3d5fe68a0e5d9cde7b1114b))
+
 ## [0.4.3](https://github.com/thedavidweng/money/compare/v0.4.2...v0.4.3) (2026-10-26)
 
 
